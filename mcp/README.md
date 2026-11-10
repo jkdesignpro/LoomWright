@@ -104,6 +104,9 @@ one). You can fine-tune it afterwards in the app's component builder.
 | `build_progress` | Tick wires off as cut, ends done, fitted and tested |
 | `add_starter_circuit`, `tidy_wires` | Drop in a ready-drawn circuit (spot lamps, split charge, consumer unit, motor starter and more); re-route wires with square corners |
 | `number_wires_by_potential` | Control panel style wire numbers: one number per potential |
+| `compressed_air_report` | Work out a compressed air system: demand, pipe sizes and losses, pressure at each tool, receiver, running and leak cost, water, checks |
+| `set_compressed_air_system` | Add or change a compressed air system, from JSON or a worked example |
+| `list_compressed_air_parts` | Compressor kinds, air treatment, pipe sizes, hoses, couplings and typical tool air use |
 | `report` | Build lists as CSV: wires, parts and costs, cable to buy, colour usage, fuses, connector tables, cut list, labels, locations, nets, voltage at each load, household circuit schedule, motors, terminal plan, PLC I/O |
 | `harness_formboard` | A harness's branches, lengths and bundle sizes; copy routed lengths to the wires |
 | `project_settings` | Project type (vehicle, household, factory, electronics, mixed), mains settings, title block, voltage, colour standard, paper size per project or sheet, black and white, revision clouds, currency |

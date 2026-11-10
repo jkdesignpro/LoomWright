@@ -172,7 +172,7 @@
     root.querySelectorAll('[data-air="sys-rename"],[data-air="sys-del"],[data-air="csv"],[data-air="svg"],[data-air="pdf"]').forEach((b) => { b.disabled = !sys; });
     if (!sys) { report = null; main.className = 'air-main empty'; main.innerHTML = emptyHTML(); return; }
     report = L.airReport(sys);
-    if (main.className !== 'air-main') {
+    if (main.className !== 'air-main' || !$('#air-res')) {
       main.className = 'air-main';
       main.innerHTML = `<aside class="air-edit" id="air-edit" aria-label="${esc(t('System parts'))}"></aside>
         <div class="air-right">

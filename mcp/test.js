@@ -133,6 +133,13 @@ const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio
   expect(await call('test_circuit', { path: 'panel', set: { S3: 'Pressed' } }), /Relays pulled in: K1/, 'start button pulls in the contactor');
   console.log(await call('number_wires_by_potential', { path: 'panel' }));
   expect(await call('report', { path: 'panel', kind: 'motors' }), /M1/, 'motor list');
+  // compressed air
+  expect(await call('compressed_air_report', { path: 'panel' }).then(() => '', (e) => e.message), /no compressed air systems/, 'no air systems yet');
+  expect(await call('list_compressed_air_parts', {}), /impact-12/, 'air parts');
+  console.log((await call('set_compressed_air_system', { path: 'panel', example: 'workshop' })).split('\n').slice(0, 4).join('\n'));
+  const air = expect(await call('set_compressed_air_system', { path: 'panel', system: { name: 'Shed', settings: { use: 'home' }, compressors: [{ kind: 'piston', fad: 200 }], receivers: [{ litres: 50 }], pipes: [{ id: 'p1', name: 'Main', material: 'pvc', size: '20', length: 8 }], drops: [{ pipe: 'p1', name: 'Bench', tools: [{ kind: 'impact-12' }] }] } }), /D1-PVC/, 'PVC pipe is an error');
+  expect(air, /Planning estimates only/, 'air disclaimer');
+  expect(await call('compressed_air_report', { path: 'panel', system: 'Workshop air' }), /D3-PSSR/, 'PSSR note for a receiver at work');
   await c.close();
   console.log('MCP smoke test passed');
 })().catch((e) => { console.error(e); process.exit(1); });

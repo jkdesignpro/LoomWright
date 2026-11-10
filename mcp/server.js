@@ -184,6 +184,7 @@ const server = new McpServer({ name: 'loomwright', version: L.VERSION }, {
     'Build details: update_wire takes insulation, a multicore cable, and end_a/end_b with terminal, method, strip length, sleeve and seal. update_part takes part number, supplier, cost and fitted location. These feed the cut list, connector tables, costed parts list and build pack (report and export tools).',
     'Revision history: when the user signs off a change, call issue_revision with a short description. compare_revisions shows what changed since any revision, and project_settings clouds marks it on the drawing.',
     'Use trace_circuit to follow a circuit across sheets and test_circuit to check what a switch or relay powers. solve_circuit estimates volts and amps at each load from wire sizes and lengths; it is a guide to what a meter should read, not a measurement. fault_find writes a step-by-step test sheet for a load that misbehaves.',
+    'Compressed air: a project can hold compressed air systems (compressor, receiver, air treatment, pipe runs, drops and tools). Use list_compressed_air_parts, then set_compressed_air_system, then compressed_air_report. The figures are planning estimates from rules of thumb and typical tool air use: never say a system is safe or meets the Pressure Systems Safety Regulations, and tell the user to use their own equipment\'s figures where they have them.',
     'Never invent pinouts or part numbers for a specific vehicle, ECU or module from memory. Ask for the documentation or a picture, and say part numbers must be checked against the maker.',
   ].join('\n'),
 });
@@ -1126,6 +1127,112 @@ server.registerTool('import', {
   }
   save(full, project);
   return ok(msg + (r.warnings && r.warnings.length ? '\n\nWarnings:\n- ' + r.warnings.join('\n- ') : ''));
+}));
+
+/* ---------------- compressed air ---------------- */
+function airSystem(project, which) {
+  const list = Array.isArray(project.air) ? project.air : [];
+  if (!list.length) throw new Error('This project has no compressed air systems yet. Add one with set_compressed_air_system.');
+  if (which == null || which === '') return list[0];
+  const ref = String(which).trim().toLowerCase();
+  const hit = list.find((x) => x.id === which || String(x.name || '').toLowerCase() === ref);
+  if (!hit) throw new Error(`No compressed air system "${which}". Systems: ${list.map((x) => `"${x.name}"`).join(', ')}`);
+  return hit;
+}
+function airSummary(sys) {
+  const r = L.airReport(sys), f = L.air.fmt, d = r.demand;
+  const tools = r.drops.flatMap((dr) => dr.tools.map((t) => ({ ...t, drop: dr.name })));
+  const low = tools.reduce((m, t) => (m == null || t.pTool < m.pTool ? t : m), null);
+  const lines = [
+    `System: ${r.name}`,
+    `Compressors: ${f(r.fad)} l/min free air, ${f(r.kw, 1)} kW. Supply (lowest cut-in) ${f(r.supply, 1)} bar, ${f(r.afterTreatment, 2)} bar after air treatment.`,
+    `Design demand: ${f(d.design)} l/min (tools at their use ${f(d.q)}, leaks ${f(d.leak)}, growth ${f(d.growth)}${d.purge ? `, dryer purge ${f(d.purge)}` : ''}). Biggest flat-out draw ${f(d.peak)} l/min. Compressor running about ${f(r.duty * 100)} % of the time.`,
+    `Receivers: ${f(r.receiver.have)} l plus ${f(r.receiver.pipeVolume)} l in the pipes; about ${f(r.receiver.needed)} l needed, ${f(r.receiver.cycles)} load cycles an hour at worst.`,
+    low ? `Lowest pressure at a tool: ${low.name} on ${low.drop}, ${f(low.pTool, 2)} bar (it needs ${f(low.bar, 1)} bar).` : 'No tools yet.',
+    `Running cost: ${f(r.energy.kwh)} kWh, about ${f(r.energy.cost)} a year at ${r.energy.tariff} per kWh for ${r.energy.hours} hours. Leaks cost about ${f(r.energy.leakCost)} a year. Each 1 bar lower saves about ${r.energy.perBarPct} % of the energy.`,
+    `Water to drain: about ${f(r.water.perDay, 1)} l in an 8-hour day${r.water.dried ? ', most of it at the dryer' : ''}.`,
+    '',
+    'Pipes:',
+    ...r.pipes.map((pp) => `- ${pp.name}: ${pp.sizeLabel} ${pp.material}, ${f(pp.length)} m${pp.ring ? ' ring' : ''}, ${f(pp.flow)} l/min, ${f(pp.velocity, 1)} m/s, loses ${f(pp.dp, 3)} bar`),
+    '',
+    'Checks:',
+    ...(r.checks.length ? r.checks.map((c) => `- [${c.level}] (${c.rule}) ${c.where && c.where.label ? c.where.label + ': ' : ''}${c.text}`) : ['- Nothing to look at.']),
+    '',
+    L.AIR_DISCLAIMER.short,
+  ];
+  return lines.join('\n');
+}
+
+server.registerTool('compressed_air_report', {
+  title: 'Compressed air report',
+  description: 'Work out a compressed air system kept in the project: air demand, pipe flow, air speed and pressure loss, pressure at each tool, receiver size, compressor duty, running and leak cost, water to drain, and checks (rule codes D1 to D7). Planning estimates from published rules of thumb, not proof that a system is safe.',
+  inputSchema: { path: z.string(), system: z.string().optional().describe('System name or id; the first when omitted'), csv: z.boolean().optional().describe('Also write the full results as CSV next to the project') },
+}, wrap(async ({ path: p, system, csv }) => {
+  const { full, project } = load(p);
+  const sys = airSystem(project, system);
+  let text = airSummary(sys);
+  if (csv) {
+    const out = full.replace(/\.(loom|json)$/i, '') + '-' + String(sys.name || 'air').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-air.csv';
+    fs.writeFileSync(out, L.toCSV(L.airRows(sys)));
+    text += `\n\nWrote ${out}`;
+  }
+  return ok(text);
+}));
+
+server.registerTool('list_compressed_air_parts', {
+  title: 'Compressed air parts',
+  description: 'List the values set_compressed_air_system understands: compressor kinds with their defaults, air treatment kinds, air quality classes, pipe materials and sizes (size key, label, bore mm), hose sizes, coupling sizes, and the tool library with typical air use.',
+  inputSchema: {},
+}, wrap(async () => {
+  const A = L.air;
+  return ok('Compressed air parts. Tool air use figures are typical values from makers and published tables; use your own tools\' figures where you have them.', {
+    compressorKinds: Object.fromEntries(Object.entries(A.COMPRESSOR_KINDS).map(([k, v]) => [k, { name: v.name, defaults: v.defaults }])),
+    treatment: Object.fromEntries(Object.entries(A.TREATMENT).map(([k, v]) => [k, v.name])),
+    quality: Object.fromEntries(Object.entries(A.QUALITY).map(([k, v]) => [k, v.name])),
+    pipes: Object.fromEntries(Object.entries(A.PIPES).map(([k, v]) => [k, { name: v.name, sizes: v.sizes.map((x) => ({ size: x[0], label: x[1], bore: x[2] })) }])),
+    hoses: A.HOSES.map((h) => h[0]),
+    couplings: Object.keys(A.COUPLINGS),
+    tools: A.TOOLS.map((t) => ({ kind: t.id, name: t.name, lpm: t.lpm, util: t.util, bar: t.bar })),
+  });
+}));
+
+server.registerTool('set_compressed_air_system', {
+  title: 'Add or change a compressed air system',
+  description: 'Add a compressed air system to the project, or replace one with the same id or name. Give system as JSON in the shape the planner uses: { name, settings: { use: "home"|"work", quality, tariff, hours, ambient, altitude, rh, leakPct, growthPct, simultaneity }, compressors: [{ name, kind, fad, basis, kw, cutIn, cutOut }], receivers: [{ name, litres, ps, safetyValve, drain }], treatment: [{ kind, name, rated, dp }], pipes: [{ id, parent, name, material, size, length, role, ring, fittings }], drops: [{ pipe, name, frl, hose, tools: [{ kind, name, lpm, util, bar, cont }] }] }. Flows are free air l/min, pressures bar gauge, lengths m. Kinds, materials and sizes: see list_compressed_air_parts. Or give example ("garage" or "workshop") to start from a worked example. Returns the report.',
+  inputSchema: { path: z.string(), system: z.record(z.string(), z.any()).optional(), example: z.enum(['garage', 'workshop']).optional(), name: z.string().optional().describe('Name for the system (overrides the one in system or the example)') },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  if (!a.system && !a.example) throw new Error('Give system (JSON) or example.');
+  const A = L.air, given = a.system;
+  let sys;
+  if (!given) sys = A.example(a.example === 'workshop' ? 'factory' : 'garage');
+  else {
+    // Build it with the planner's own constructors, so anything left out gets the planner's defaults.
+    sys = A.newSystem(given.name, { empty: true });
+    if (given.id) sys.id = String(given.id);
+    sys.settings = { ...A.DEFAULT_SETTINGS, ...(given.settings || {}) };
+    const list = (k) => (Array.isArray(given[k]) ? given[k].filter((x) => x && typeof x === 'object') : []);
+    const merge = (into, from) => { Object.entries(from).forEach(([k, v]) => { if (v && typeof v === 'object' && !Array.isArray(v) && into[k] && typeof into[k] === 'object') into[k] = { ...into[k], ...v }; else if (v !== undefined) into[k] = v; }); return into; };
+    list('compressors').forEach((x) => merge(A.addCompressor(sys, x.kind), x));
+    list('receivers').forEach((x) => merge(A.addReceiver(sys), x));
+    list('treatment').forEach((x) => merge(A.addTreatment(sys, x.kind), x));
+    list('pipes').forEach((x) => { const pp = A.addPipe(sys, x.parent || null); merge(pp, x); });
+    list('drops').forEach((x) => {
+      const { tools, ...rest } = x;
+      const dr = merge(A.addDrop(sys, x.pipe || null), rest);
+      dr.tools = [];
+      (Array.isArray(tools) ? tools : []).filter((t) => t && typeof t === 'object').forEach((t) => A.addTool(dr, t.kind || 'other', t));
+    });
+    const ids = new Set(sys.pipes.map((pp) => pp.id));
+    const bad = [...sys.pipes.filter((pp) => pp.parent && !ids.has(pp.parent)).map((pp) => `pipe ${pp.name} has parent ${pp.parent}`), ...sys.drops.filter((dr) => dr.pipe && !ids.has(dr.pipe)).map((dr) => `drop ${dr.name} is on pipe ${dr.pipe}`)];
+    if (bad.length) throw new Error(`Unknown pipe ids: ${bad.join('; ')}. Give each pipe an id and use it for parent and pipe.`);
+  }
+  if (a.name) sys.name = a.name;
+  if (!Array.isArray(project.air)) project.air = [];
+  const at = project.air.findIndex((x) => (given && given.id && x.id === String(given.id)) || String(x.name || '').toLowerCase() === String(sys.name || '').toLowerCase());
+  if (at >= 0) { sys.id = project.air[at].id; project.air[at] = sys; } else { if (!sys.id || project.air.some((x) => x.id === sys.id)) sys.id = L.uid('air'); project.air.push(sys); }
+  save(full, project);
+  return ok(`${at >= 0 ? 'Replaced' : 'Added'} "${sys.name}". Open it in LoomWright with Tools, Compressed air planner.\n\n` + airSummary(sys));
 }));
 
 if (require.main === module) {
