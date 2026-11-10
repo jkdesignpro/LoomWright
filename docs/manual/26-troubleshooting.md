@@ -103,11 +103,15 @@ It needs a path from a battery through closed switches and good fuses to its fee
 
 ### A motor starter drops out when I release the start button
 
-The live test does not remember that a contactor was pulled in, so a hold-in contact does not latch. Leave the start button on **Pressed** to see the circuit running. See [Operating parts](11-trace-and-live-test.md#operating-parts).
+The hold-in contact must be a **Contact of a contactor or relay** with the same reference as the contactor, such as `K1`, wired across the start button, or the contactor's own 13–14 contact. Check its **Contact** setting is normally open. See [Operating parts](11-trace-and-live-test.md#operating-parts).
+
+### A motor does not run in the live test
+
+The phases must reach the motor from net labels named exactly `L1`, `L2` and `L3`, in a factory or mixed project. All three of U, V and W must be live, so check the isolator and motor circuit breaker are **On** and the contactor has pulled in. See [Mains and factory parts in the live test](11-trace-and-live-test.md#mains-and-factory-parts-in-the-live-test).
 
 ### Nothing comes on in the live test of a household project
 
-The household **Supply** part is not a supply in the live test, so household circuits do not run. Use the [circuit schedule](18-household-wiring.md#the-circuit-schedule) and the checks for household circuits.
+Check the **Supply** is wired to the main switch, and that the main switch, the breaker for the circuit and any light switch are **On**. The live test shows which loads run but not their volts and amps in a household project.
 
 ### The live test figures look too high or too low
 

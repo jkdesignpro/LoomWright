@@ -65,7 +65,7 @@ On a panel drawing, a contactor's coil is usually in the control circuit and its
 
 A contact and its contactor sharing a reference is not a duplicate, and the checks do not flag it. When they are on different sheets, the contactor is labelled with where its contacts are, such as `contacts on 2/B4`, and each contact with where its coil is, such as `coil on 1/C3`. Click the label to go there.
 
-In the live test, the contact follows its contactor. A contact only follows a **Contactor**. It does not follow a vehicle relay with the same reference.
+In the live test, the contact follows the contactor or relay with the same reference.
 
 When you paste parts, or place a block or starter circuit, a coil and its contacts that shared a reference still share one, with a new number.
 
@@ -76,17 +76,18 @@ The [live test](11-trace-and-live-test.md#the-live-test) can run a 24 V DC or co
 1. Place the starter, and set the **System voltage** to 24 V.
 2. Choose **Tools › Live circuit test**, or click **Test** on the tool rail.
 3. Click the start button, or set it to **Pressed** under **Controls**. The contactor pulls in, its contacts show **Coil on**, and the wires to the coil glow. **Voltage at each load** shows the coil's volts and amps.
-4. Set the stop button or the emergency stop to **Pressed**. The contactor drops out.
+4. Set the start button back to **Released**. The hold-in contact keeps the contactor in, and the motor M1 keeps running from the `L1`, `L2` and `L3` labels.
+5. Set the stop button or the emergency stop to **Pressed**. The contactor drops out and the motor stops. It stays out when you release the stop button, until you press start again.
 
 ![The direct-on-line starter in the live test](../../app/manual/img/dol-starter.png "The direct-on-line starter in the live test, with the start button pressed: the contactor K1 has pulled in and its hold-in contact shows Coil on.")
 
 Things the live test does not do on a panel:
 
-- **It does not latch.** The live test works out each state from the start, so the hold-in contact does not keep the contactor in once you set the start button back to **Released**. Leave the start button on **Pressed** to see the circuit running.
-- **The power side is not modelled.** The three-phase wiring, the motor, indicator lamps, PLC cards, drives and safety relays do not run or light.
-- **Supplies are simplified.** The 24 V power supply is treated like a charged 24 V battery, so it gives about 25.2 V.
+- **The power side shows what runs, not amps.** The motor runs when `L1`, `L2` and `L3` reach it, but the live test does not work out motor currents. Use the **Motors** list for those.
+- **Only labels named L1, L2 and L3 are live.** If your drawing names the phases differently, such as `L1-400V`, the motor will not run in the live test.
+- **PLC cards do not run.** Their inputs and outputs are not switched.
 
-[Fault finding](12-fault-finding.md) offers each contactor coil as a relay. The steps are written for vehicles: read "battery negative" as the power supply's − terminal, and "chassis earth" as 0 V.
+[Fault finding](12-fault-finding.md) offers each contactor coil as a relay. In a factory project the steps are worded for a panel: the power supply's − terminal and 0 V take the place of the battery negative and chassis earth.
 
 ## The factory checks
 

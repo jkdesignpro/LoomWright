@@ -271,6 +271,22 @@ assert.strictEqual(L.wireCode({ settings: { standard: 'sae' } }, { colour: 'brow
   L.numberByPotential(f);
   const names = new Set(fv.wires.filter((w) => [w.from.part, w.to.part].includes(aux.id)).map((w) => w.name));
   assert.strictEqual(names.size, 2, 'wires on one potential share a number');
+  // the hold-in contact keeps the motor running after start is released, and stop drops it out
+  const motor = fv.parts.find((p) => p.type === 'motor3'), stop = fv.parts.find((p) => p.type === 'pb_stop');
+  const pressed = L.simulate(f, { [L.partKey(start)]: 1 });
+  assert.ok(pressed.loads.has(motor.id), 'the motor runs from the L1, L2 and L3 labels');
+  const held = L.simulate(f, {}, { relays: pressed.relays });
+  assert.ok(held.relays.has(L.partKey(k)) && held.loads.has(motor.id), 'the hold-in contact latches');
+  assert.ok(!L.simulate(f, { [L.partKey(stop)]: 1 }, { relays: held.relays }).relays.has(L.partKey(k)), 'stop drops the contactor out');
+  {
+    // household: the light switch turns the lights off but not the smoke alarm
+    const hcu = tplProject('cu-rcbo', 'household'), hv = L.view(hcu, 0);
+    const sw = hv.parts.find((p) => p.type === 'switch_light'), sa = hv.parts.find((p) => p.type === 'smoke_alarm');
+    const lights = hv.parts.filter((p) => p.type === 'light').map((p) => p.id);
+    assert.ok(lights.every((id) => L.simulate(hcu, {}).loads.has(id)), 'lights run with the switch on');
+    const off = L.simulate(hcu, { [L.partKey(sw)]: 1 });
+    assert.ok(lights.every((id) => !off.loads.has(id)) && off.loads.has(sa.id), 'the switch turns off the lights, not the smoke alarm');
+  }
   const fpdf = Buffer.from(L.projectPDF(f, { tables: ['motors', 'terminals', 'plcio'] })).toString('latin1');
   assert.ok(fpdf.includes('/Outlines'), 'factory PDF builds');
 }

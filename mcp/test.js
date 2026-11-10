@@ -131,6 +131,8 @@ const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio
   await call('project_settings', { path: 'panel', projectType: 'factory' });
   console.log(await call('add_starter_circuit', { path: 'panel', template: 'dol-starter' }));
   expect(await call('test_circuit', { path: 'panel', set: { S3: 'Pressed' } }), /Relays pulled in: K1/, 'start button pulls in the contactor');
+  expect(await call('test_circuit', { path: 'panel', set: { S3: 'Pressed' }, then: [{ S3: 'Released' }] }), /Relays pulled in: K1/, 'hold-in contact keeps the contactor in');
+  expect(await call('test_circuit', { path: 'panel', set: { S3: 'Pressed' }, then: [{ S3: 'Released' }, { S2: 'Pressed' }] }), /Relays pulled in: none/, 'stop drops the contactor out');
   console.log(await call('number_wires_by_potential', { path: 'panel' }));
   expect(await call('report', { path: 'panel', kind: 'motors' }), /M1/, 'motor list');
   // compressed air

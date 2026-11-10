@@ -82,9 +82,9 @@ Click a part on the sheet to move it to its next position, or choose its positio
 
 **Relays are not operated by hand.** A relay pulls in by itself when its coil has a feed on one side and an earth on the other, as a real one would. To test a relay circuit, operate the switch that feeds its coil. A **Contactor** works the same way.
 
-A **Contact of a contactor or relay** drawn apart from its coil follows the **Contactor** with the same reference. It is not in **Controls**, and clicking it only tells you which coil it follows. Under it on the sheet, it shows **Coil on** or **Coil off**.
+A **Contact of a contactor or relay** drawn apart from its coil follows the contactor or relay with the same reference. It is not in **Controls**, and clicking it only tells you which coil it follows. Under it on the sheet, it shows **Coil on** or **Coil off**.
 
-The live test works out each state from the start. It does not remember that a contactor was pulled in a moment ago. So a hold-in contact across a start button does not keep the contactor in once you set the button back to **Released**. To see a latching circuit running, leave the start button on **Pressed**.
+The live test remembers which relays and contactors were pulled in a moment ago. So a hold-in contact across a start button keeps the contactor in when you set the button back to **Released**, as a real latching circuit does. Press the stop button to drop it out. Stopping the live test and starting it again starts with every relay out.
 
 Fuse boxes always pass power to every way; to test a blown fuse, use separate fuse parts.
 
@@ -130,9 +130,11 @@ To find out why a load does not work as it should, click **Fault finding…** at
 
 ### Mains and factory parts in the live test
 
-The live test treats a 24 V power supply and a control transformer as supplies, so a 24 V or control transformer control circuit can be tested. Contactor coils, push buttons, emergency stops and overload trip contacts work as described above.
+The live test treats a 24 V power supply and a control transformer as supplies, at their set voltage, so a 24 V or control transformer control circuit can be tested. Contactor coils, push buttons, emergency stops and overload trip contacts work as described above. Indicator lamps light when they have a feed and a return.
 
-The three-phase power side is not modelled. Motors, indicator lamps, PLC cards, drives and safety relays do not light or run in the live test. The **Supply** part of a household project is not a supply in the live test, so household circuits do not come on.
+In a factory or mixed project, net labels named `L1`, `L2` and `L3` are treated as live. A three-phase motor runs when all three of its terminals U, V and W are live, so it runs when its isolator, motor circuit breaker and contactor are all closed. A drive passes power to its motor while its run input DI is live. A safety relay closes its outputs 13–14 and 23–24 while its coil is powered and both input channels, S11–S12 and S21–S22, are closed. PLC cards do not run.
+
+In a household project the **Supply** is live. Because a household drawing is single-line, one line standing for the whole cable, a light, smoke alarm or appliance runs when the cable to it is live. There is no neutral to complete the circuit, so the live test shows what runs but not its volts and amps.
 
 ## Using them together
 

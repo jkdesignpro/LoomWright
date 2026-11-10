@@ -711,8 +711,8 @@ server.registerTool('trace_circuit', {
 
 server.registerTool('test_circuit', {
   title: 'Live circuit test',
-  description: 'Switch parts on and off and see what would be powered: which loads run, which relays pull in, which wires are live, and any short to earth. Without set, lists the parts that can be switched and their states. Fuses can be set to Blown. Checks connections only, not voltages or currents.',
-  inputSchema: { path: z.string(), set: z.record(z.union([z.string(), z.number()])).optional().describe('Part reference to state name or number, e.g. {"S1":"On","S2":"Up","F2":"Blown"}') },
+  description: 'Switch parts on and off and see what would be powered: which loads run, which relays pull in, which wires are live, and any short to earth. Without set, lists the parts that can be switched and their states. Fuses can be set to Blown. Use then for a sequence, such as pressing and releasing a start button: relays pulled in by one step carry on to the next, so hold-in contacts latch. Checks connections only, not voltages or currents.',
+  inputSchema: { path: z.string(), set: z.record(z.union([z.string(), z.number()])).optional().describe('Part reference to state name or number, e.g. {"S1":"On","S2":"Up","F2":"Blown"}'), then: z.array(z.record(z.union([z.string(), z.number()]))).optional().describe('Further steps, each changing some parts from the step before, e.g. [{"S3":"Released"}]') },
 }, wrap(async (a) => {
   const { project } = load(a.path);
   const sw = [];
@@ -720,21 +720,23 @@ server.registerTool('test_circuit', {
   const list = sw.map((x) => `  ${x.ref}: ${x.states.map((s, i) => (i === x.def ? `[${s}]` : s)).join(' | ')}`).join('\n');
   if (!a.set || !Object.keys(a.set).length) return ok(`Parts you can switch (default state in brackets):\n${list || '  none'}`);
   const state = {};
-  Object.entries(a.set).forEach(([ref, val]) => {
+  const apply = (set) => Object.entries(set).forEach(([ref, val]) => {
     const x = sw.find((s) => s.ref.toLowerCase() === ref.toLowerCase());
     if (!x) throw new Error(`${ref} cannot be switched. Switchable parts:\n${list}`);
     const i = typeof val === 'number' ? val : x.states.findIndex((s) => String(s).toLowerCase() === String(val).toLowerCase());
     if (i < 0 || i >= x.states.length) throw new Error(`${ref} has no state "${val}". States: ${x.states.join(', ')}`);
     state[x.key] = i;
   });
-  const r = L.simulate(project, state);
+  apply(a.set);
+  let r = L.simulate(project, state);
+  (a.then || []).forEach((step) => { apply(step); r = L.simulate(project, state, { relays: r.relays }); });
   const loads = [], relays = [...r.relays].map((k) => k.split('|')[1]);
   const live = {};
   L.views(project).forEach((v) => {
     v.parts.forEach((p) => { const n = `${p.label || p.type} (${(L.partDef(v, p.type) || {}).name})`; if (r.loads.has(p.id) && !relays.includes(p.label) && !loads.includes(n)) loads.push(n); });
     v.wires.forEach((w) => { if (r.wires.has(w.id)) (live[v.sheet.name] = live[v.sheet.name] || []).push(w.name); });
   });
-  const lines = [`Set: ${Object.entries(a.set).map(([k, v]) => `${k}=${v}`).join(', ')}`];
+  const lines = [[a.set, ...(a.then || [])].map((st, i) => `${i ? 'Then' : 'Set'}: ${Object.entries(st).map(([k, v]) => `${k}=${v}`).join(', ')}`).join('\n')];
   if (r.shorts.length) lines.push(`SHORT TO EARTH from ${r.shorts.join(', ')}: a fuse would blow.`);
   lines.push(`Running: ${loads.join(', ') || 'nothing'}`, `Relays pulled in: ${relays.join(', ') || 'none'}`, 'Live wires:');
   Object.entries(live).forEach(([s, ws]) => lines.push(`  ${s}: ${ws.join(', ')}`));

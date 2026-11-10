@@ -695,7 +695,8 @@
     const p = doc.parts.find((q) => q.id === end.part);
     if (!p) return '?';
     const pn = resolved(doc, p).pins.find((q) => q.id === end.pin);
-    return `${p.label || partDef(doc, p.type)?.name || p.type}:${pn ? pn.id : end.pin}`;
+    // pn.term: the terminal number printed on the device, where it differs from the pin id
+    return `${p.label || partDef(doc, p.type)?.name || p.type}:${pn ? pn.term || pn.id : end.pin}`;
   }
   function snap(v) { return Math.round(v / GRID) * GRID; }
 
@@ -1387,8 +1388,9 @@
       const r = resolved(doc, p), d = r.def;
       if (!d) { out.push({ level: 'error', part: p.id, text: `${p.label || p.type}: component type "${p.type}" is missing from the library.` }); return; }
       if (d.cat === 'Annotation') return;
-      const free = r.pins.filter((pn) => !conn.get(p.id + '|' + pn.id));
-      if (free.length && free.length === r.pins.length && r.pins.length) out.push({ level: 'info', part: p.id, text: `${p.label || d.name} has no wires connected.` });
+      // optionalPins: spare contacts and the like, often left unwired on purpose
+      const allFree = r.pins.filter((pn) => !conn.get(p.id + '|' + pn.id)), free = allFree.filter((pn) => !(d.optionalPins || []).includes(pn.id));
+      if (allFree.length && allFree.length === r.pins.length && r.pins.length) out.push({ level: 'info', part: p.id, text: `${p.label || d.name} has no wires connected.` });
       else if (free.length && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas', 'pdm'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
       // Fuse rating against the wire it protects
       if (['fuse', 'fuse_maxi', 'breaker', 'fusible_link'].includes(p.type) || p.type === 'fuse_box') {

@@ -250,7 +250,7 @@ The sizes, ratings and lengths are examples to change, not a design. Change them
 ## What the household tools do not do
 
 - They do not inspect, test or certify anything. A tester's readings on the finished installation are what count.
-- The **Supply** part is not a supply in the live test, so household circuits do not run there, and [fault finding](12-fault-finding.md) does not offer household loads.
+- The [live test](11-trace-and-live-test.md#mains-and-factory-parts-in-the-live-test) shows which lights, sockets and appliances are live as you switch breakers and switches, but not their volts and amps, because one line stands for the whole cable. [Fault finding](12-fault-finding.md) does not work on single-line household circuits.
 - Three-phase circuits are not worked out.
 - Only twin and earth cable is rated.
 - Only a selection of BS 7671 is checked. The known limits are listed in [the list of standards sources](../standards-sources.md) in the LoomWright source code.

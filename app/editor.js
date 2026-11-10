@@ -165,7 +165,7 @@
     if (test) {
       o.sim = test.sim.wires; o.simLoads = test.sim.loads;
       o.states = new Map();
-      doc.parts.forEach((p) => { const st = L.partStates(doc, p); if (st) { const v = st.follows ? (test.sim.relays.has(st.follows) ? 1 : 0) : test.state[st.key] != null ? test.state[st.key] : st.def; o.states.set(p.id, st.states[v]); } });
+      doc.parts.forEach((p) => { const st = L.partStates(doc, p); if (st) { const v = st.follows ? (L.coilOn(test.sim.relays, st.follows) ? 1 : 0) : test.state[st.key] != null ? test.state[st.key] : st.def; o.states.set(p.id, st.states[v]); } });
       if (test.sol) {
         o.badges = new Map();
         doc.parts.forEach((p) => { const l = test.sol.load(sheetId, p.id); if (l && l.running && l.volts != null) o.badges.set(p.id, { text: `${l.volts.toFixed(1)} V · ${l.amps.toFixed(1)} A`, level: l.status }); });
@@ -600,8 +600,8 @@
   function setTestState(key, v) { test.state[key] = v; runTest(); render(); inspector.force = true; inspector(); inspector.force = false; }
   /* Connections first (what is live), then the solver for volts and amps. A solver problem never stops the test. */
   function runTest() {
-    test.sim = L.simulate(project, test.state);
-    try { test.sol = L.solveCircuit ? L.solveCircuit(project, test.state, { battery: test.battery }) : null; } catch (e) { test.sol = null; console.warn('circuit solver', e); }
+    test.sim = L.simulate(project, test.state, { relays: test.sim && test.sim.relays });
+    try { test.sol = L.solveCircuit ? L.solveCircuit(project, test.state, { battery: test.battery, relays: test.sim.relays }) : null; } catch (e) { test.sol = null; console.warn('circuit solver', e); }
   }
   function operate(p) {
     const st = L.partStates(doc, p);
@@ -2012,7 +2012,11 @@
   function faultModal(ref, symptom) {
     if (!L.faultFind) return;
     const ts = L.faultTargets(project);
-    if (!ts.length) { showMessage(t('Fault finding'), `<p>${esc(t('Give your loads a reference (H1, M1 and so on) to fault-find them.'))}</p>`); return; }
+    if (!ts.length) {
+      const single = ptype() === 'household';
+      showMessage(t('Fault finding'), `<p>${esc(t(single ? 'Fault-finding sheets follow low-voltage circuits drawn with both the feed and the return. Household circuits are drawn single-line, so there is no path to follow. Faults on mains wiring need a qualified electrician with the right test equipment.' : 'Give your loads a reference (H1, M1 and so on) to fault-find them.'))}</p>`);
+      return;
+    }
     const cur = { ref: ts.some((x) => x.part === ref) ? ref : ts[0].part, symptom: symptom || 'dead' };
     if (ref && !ts.some((x) => x.part === ref)) { const p = partById(ref); const m = p && p.label && ts.find((x) => x.ref === p.label); if (m) cur.ref = m.part; }
     showModal(t('Fault finding'), `<p class="muted">${esc(t('Pick a load and what it is doing wrong. LoomWright follows its feed, switches, fuses and earth through every sheet and writes a step-by-step test with the readings to expect.'))}</p>

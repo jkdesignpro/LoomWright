@@ -53,7 +53,7 @@
       }
       if (b.kind === 'switch') {
         // a contact drawn apart from its coil (b.follows) takes the coil's state
-        const st = b.follows && opts.relays instanceof Set ? (opts.relays.has(b.follows) ? 1 : 0) : state(it);
+        const st = b.follows && opts.relays instanceof Set ? (coilOn(opts.relays, b.follows) ? 1 : 0) : state(it);
         const pairs = opts.switches === 'closed' ? (b.states || ['', '']).flatMap((_, i) => (b.switched ? b.switched(i) : [])) : opts.switches === 'open' ? [] : (b.switched ? b.switched(st) : []);
         pairs.forEach(([a, c]) => join(k(a), k(c), { kind: 'switch', ...at }));
         if (b.earthWhen && (opts.switches === 'closed' || (opts.switches !== 'open' && b.earthWhen(state(it))))) join(k('1'), EARTH, { kind: 'switch', ...at });
@@ -109,9 +109,20 @@
   }
 
   /* ---------------- Live circuit test ---------------- */
-  function simulate(d, state = {}) {
+  /* opts.relays: the relays pulled in before this change. Starting from them lets a
+     hold-in (self-latching) contact keep its coil on after the start button is released. */
+  /* Is the coil a contact follows pulled in? follows is 'coil|K1' (any relay or contactor
+     with reference K1) or a part key such as 'contactor|K1'. */
+  function coilOn(relays, follows) {
+    if (!relays || !follows) return false;
+    if (relays.has(follows)) return true;
+    if (!follows.startsWith('coil|')) return false;
+    const ref = follows.slice(5);
+    return [...relays].some((k) => k.slice(k.indexOf('|') + 1) === ref);
+  }
+  function simulate(d, state = {}, opts = {}) {
     const project = projectOf(d);
-    let relays = new Set(), pdm = new Set(), result = null;
+    let relays = opts.relays instanceof Set ? new Set(opts.relays) : new Set(), pdm = new Set(), result = null;
     for (let iter = 0; iter < 12; iter++) {
       const { uf, inv } = build(project, { state, relays, pdm, switches: 'state' });
       const earth = uf.find(EARTH), powered = new Set();
@@ -119,6 +130,7 @@
       inv.forEach((it) => {
         const b = it.b, s = state[partKey(it.p)] != null ? state[partKey(it.p)] : b.def || 0;
         if (b.kind === 'source' && (!b.sourceWhen || b.sourceWhen(s))) powered.add(rootOf(it, b.source));
+        if (b.liveFeed) powered.add(rootOf(it, b.liveFeed));
       });
       // diodes and converters pass power on; repeat until nothing changes
       for (let k = 0; k < 20; k++) {
@@ -136,7 +148,9 @@
       const next = new Set();
       inv.forEach((it) => {
         if (it.b.kind !== 'relay') return;
+        if (it.b.runInput) { const r = rootOf(it, it.b.runInput); if (powered.has(r) && r !== earth) next.add(partKey(it.p)); return; }
         const a = rootOf(it, it.b.coil[0]), c = rootOf(it, it.b.coil[1]);
+        if (it.b.needsJoined && !it.b.needsJoined.every(([x, y]) => rootOf(it, x) === rootOf(it, y))) return;
         if ((powered.has(a) && c === earth) || (powered.has(c) && a === earth)) next.add(partKey(it.p));
       });
       // electronic power modules: an output is on when its control input is
@@ -162,6 +176,7 @@
       const on = (pw, ea) => pw.some((x) => live(R(x))) && ea.some((x) => R(x) === earth);
       if (b.kind === 'load' && (on(b.power, b.earth) || (b.either && on(b.earth, b.power)))) loads.add(it.p.id);
       if (b.lamp && (on([b.lamp[0]], [b.lamp[1]]) || on([b.lamp[1]], [b.lamp[0]]))) loads.add(it.p.id);
+      if (b.lineLoad && (b.lineLoadAll ? b.lineLoad.every((x) => live(R(x))) : b.lineLoad.some((x) => live(R(x))))) loads.add(it.p.id);
       if (b.kind === 'relay' && result.relays.has(partKey(it.p))) loads.add(it.p.id);
       if (b.kind === 'source' && powered.has(earth) && R(b.source) === earth) shorts.push(it.p.label || it.p.type);
     });
@@ -324,6 +339,6 @@
     return d && d.sheet ? base.concat(extra.filter((c) => !c.sheetId || c.sheetId === d.sheet.id)) : base.concat(extra);
   };
 
-  Object.assign(Loom, { nets, netOf, simulate, partStates, partKey, schedule, projectChecks, EARTH, buildNet: build });
+  Object.assign(Loom, { nets, netOf, simulate, coilOn, partStates, partKey, schedule, projectChecks, EARTH, buildNet: build });
   return Loom;
 });

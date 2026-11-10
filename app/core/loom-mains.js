@@ -216,7 +216,7 @@
   const mp = poles3(60, (y) => [...swPole(y), R(48, y - 4, 6, 8, { sw: 1 })]);
   def('mpcb', { name: 'Motor circuit breaker (MPCB)', cat: FACTORY, prefix: 'Q', w: 60, h: 60, props: [{ k: 'range', l: 'Adjustment range (A)', d: '4–6.3' }, { k: 'setting', l: 'Set to (A)', d: '' }], sub: '{range}A set {setting}', pins: mp.pins, shapes: [...mp.shapes, L(29, 2, 29, 44, { w: 1, dash: '3 3' })], factory: true });
   def('contactor', {
-    name: 'Contactor', cat: FACTORY, prefix: 'K', w: 80, h: 100, xrefGroup: 'coil', coil: true, factory: true,
+    name: 'Contactor', cat: FACTORY, prefix: 'K', w: 80, h: 100, xrefGroup: 'coil', coil: true, factory: true, optionalPins: ['13', '14'],
     props: [{ k: 'ac3', l: 'AC-3 rating (A)', d: '9' }, sel('coilV', 'Coil', '24V DC', ['24V DC', '24V AC', '110V AC', '230V AC'])], sub: 'AC-3 {ac3}A · {coilV}',
     pins: [pin('L1', 0, 10), pin('L2', 0, 30), pin('L3', 0, 50), pin('T1', 80, 10), pin('T2', 80, 30), pin('T3', 80, 50), pin('A1', 0, 70, 'A1 coil'), pin('A2', 80, 70, 'A2 coil'), pin('13', 0, 90, '13 auxiliary (NO)'), pin('14', 80, 90, '14 auxiliary (NO)')],
     shapes: [...[10, 30, 50].flatMap((y) => [L(0, y, 28, y), DOT(28, y, 2), L(28, y, 48, y - 8, { w: 2 }), L(52, y, 80, y)]), R(30, 62, 20, 16, { sw: 1.6 }), L(0, 70, 30, 70), L(50, 70, 80, 70), L(0, 90, 30, 90), L(30, 90, 46, 84, { w: 1.6 }), L(50, 90, 80, 90), L(39, 4, 39, 62, { w: 1, dash: '3 3' }), L(39, 78, 39, 86, { w: 1, dash: '3 3' })],
@@ -229,7 +229,7 @@
       const shapes = [L(0, 10, 20, 10), L(40, 10, 60, 10), p.kind === 'NC' ? L(20, 10, 42, 2, { w: 1.8 }) : L(20, 10, 38, 2, { w: 1.8 })];
       if (p.kind === 'NC') shapes.push(L(40, 2, 40, 10, { w: 1.4 }));
       shapes.push(T(8, 6, a || '1', { size: 6 }), T(52, 6, b || '2', { size: 6 }));
-      return { w: 60, h: 20, pins: [pin('1', 0, 10, a || '1'), pin('2', 60, 10, b || '2')], shapes };
+      return { w: 60, h: 20, pins: [{ ...pin('1', 0, 10, a || '1'), term: a || '1' }, { ...pin('2', 60, 10, b || '2'), term: b || '2' }], shapes };
     },
   });
   const ol = poles3(80, (y) => [L(0, y, 28, y), R(28, y - 5, 22, 10, { sw: 1.2 }), P(`M31 ${y} h4 v-3 h5 v6 h5 v-3 h3`, { w: 1 }), L(50, y, 80, y)]);
@@ -303,19 +303,40 @@
   });
 
   /* ---------------- How the new parts behave in nets, trace and the live test ---------------- */
-  const PASS = ['socket', 'light', 'switch_light', 'smoke_alarm', 'jbox'];
+  const PASS = ['socket', 'light', 'smoke_alarm', 'jbox'];
+  // Household circuits are drawn single-line (one wire is one cable), so in the live test a
+  // load runs when its cable is live: there is no separate neutral to complete the circuit.
+  const LINE_LOADS = ['light', 'smoke_alarm', 'cooker', 'shower', 'immersion', 'ev_charger', 'appliance', 'machine'];
   const DEVICES = ['mcb', 'rcbo', 'rcd', 'main_switch', 'fcu'];
   const baseBehaviour = Loom.behaviour;
   Loom.behaviour = function (doc, p) {
     const d = Loom.partDef(doc, p.type) || {};
+    // In a factory drawing the three-phase supply is often drawn as net labels L1, L2 and L3.
+    // The live test treats those as live so motors and their contactors can be tried out.
+    if (p.type === 'net_label' && /^L[123]$/i.test(String((p.props || {}).text || '').trim())) {
+      const pt = (((doc && doc.project) || {}).settings || {}).projectType;
+      const B = baseBehaviour(doc, p);
+      if (pt === 'factory' || pt === 'mixed') B.liveFeed = 'R';
+      return B;
+    }
     if (!d.mains && !d.factory) return baseBehaviour(doc, p);
     const r = Loom.resolved(doc, p), ids = r.pins.map((x) => x.id), pr = r.props || {};
     const B = { links: [], switched: null, kind: 'mains', states: null };
+    if (LINE_LOADS.includes(p.type)) B.lineLoad = ['in'];
     if (PASS.includes(p.type)) { B.links = ids.slice(1).map((x) => [ids[0], x]); return B; }
+    if (LINE_LOADS.includes(p.type)) return B;
+    if (p.type === 'supply_cutout') { B.kind = 'source'; B.source = 'out'; B.singleLine = true; return B; }
+    if (p.type === 'switch_light') { B.kind = 'switch'; B.states = ['On', 'Off']; B.switched = (s) => (s ? [] : [['in', 'out']]); return B; }
+    if (p.type === 'pilot') { B.lamp = ['X1', 'X2']; return B; }
+    if (p.type === 'motor3') { B.lineLoad = ['U', 'V', 'W']; B.lineLoadAll = true; return B; }
+    // a drive passes power to the motor while its run input is live
+    if (p.type === 'vfd') { B.kind = 'relay'; B.runInput = 'DI'; B.coil = ['DI', 'DI']; B.contacts = (on) => (on ? [['L1', 'U'], ['L2', 'V'], ['L3', 'W']] : []); return B; }
+    // a safety relay closes its outputs while it is powered and both input channels are closed
+    if (p.type === 'safety_relay') { B.kind = 'relay'; B.coil = ['A1', 'A2']; B.needsJoined = [['S11', 'S12'], ['S21', 'S22']]; B.contacts = (on) => (on ? [['13', '14'], ['23', '24']] : []); return B; }
     if (DEVICES.includes(p.type)) { B.kind = 'switch'; B.states = ['On', 'Off or tripped']; B.switched = (s) => (s ? [] : [['in', 'out']]); return B; }
     if (['isolator3', 'mcb3', 'mpcb'].includes(p.type)) { B.kind = 'switch'; B.states = ['On', 'Off']; B.switched = (s) => (s ? [] : [['L1', 'T1'], ['L2', 'T2'], ['L3', 'T3']]); return B; }
     if (p.type === 'contactor') { B.kind = 'relay'; B.coil = ['A1', 'A2']; B.contacts = (on) => (on ? [['L1', 'T1'], ['L2', 'T2'], ['L3', 'T3'], ['13', '14']] : []); B.rating = parseFloat(pr.ac3) || 9; return B; }
-    if (p.type === 'aux_contact') { B.kind = 'switch'; B.states = ['Coil off', 'Coil on']; B.switched = (s) => ((pr.kind === 'NC') === !s ? [['1', '2']] : []); if (p.label) B.follows = 'contactor|' + p.label; return B; }
+    if (p.type === 'aux_contact') { B.kind = 'switch'; B.states = ['Coil off', 'Coil on']; B.switched = (s) => ((pr.kind === 'NC') === !s ? [['1', '2']] : []); if (p.label) B.follows = 'coil|' + p.label; return B; }
     if (p.type === 'psu24') { B.kind = 'source'; B.source = '+'; B.ret = '-'; B.earthPins = ['-']; return B; }
     if (p.type === 'ctrl_tx') { B.kind = 'source'; B.source = 'X1'; B.ret = 'X2'; B.earthPins = ['X2']; return B; }
     if (p.type === 'overload') { B.links = [['L1', 'T1'], ['L2', 'T2'], ['L3', 'T3']]; B.kind = 'switch'; B.states = ['Not tripped', 'Tripped']; B.switched = (s) => (s ? [] : [['95', '96']]); return B; }
@@ -774,7 +795,6 @@
     if (type === 'household' || type === 'factory') base = base.filter((c) => !VEHICLE_ONLY.test(c.text || ''));
     // the last socket or light on a radial has nothing on its loop-out terminal
     base = base.filter((c) => !(c.level === 'info' && c.part && / pin out not connected\.$/.test(c.text || '') && view(project).some((v) => v.parts.some((p) => p.id === c.part && PASS.includes(p.type)))));
-    if (project.settings && project.settings.wireNumbering === 'potential') base = base.filter((c) => !/named .* twice|same name/i.test(c.text || ''));
     let extra = [];
     if (isMains(project) || (type === 'factory' && view(project).some((v) => v.parts.some((p) => p.type === 'mcb' || p.type === 'rcbo')))) extra = extra.concat(householdChecks(project).out);
     if (isFactory(project)) extra = extra.concat(factoryChecks(project));
@@ -792,11 +812,21 @@
       plcio: { title: 'PLC inputs and outputs', cols: ['Address', 'Module', 'Sheet', 'Wire', 'Connected to'], ref: 'Module', sheet: 'Sheet' },
     });
   }
+  // settings.typeChanged keeps what the type change replaced, so going back to vehicle restores it
   Loom.projectTypeHooks.push((project, type) => {
+    const st = project.settings, was = st.typeChanged || {};
     if (type === 'household' || type === 'factory' || type === 'mixed') {
-      project.settings.mains = { building: 'dwelling', country: 'england', ambient: 30, method: 'C', ...(project.settings.mains || {}) };
-      if (!project.settings.standard || project.settings.standard === 'lr') project.settings.standard = 'din';
-      if (type === 'household' && [12, 24, 48].includes(parseFloat(project.settings.volts) || 12)) project.settings.volts = 230;
+      st.mains = { building: 'dwelling', country: 'england', ambient: 30, method: 'C', ...(st.mains || {}) };
+      if (!st.standard || st.standard === 'lr') { if (was.standard == null) was.standard = st.standard || 'lr'; st.standard = 'din'; }
+      const v = parseFloat(st.volts) || 12;
+      // household: mains at 230 V. factory: control circuits usually run at 24 V DC.
+      const want = type === 'household' ? 230 : type === 'factory' ? 24 : null;
+      if (want && v !== want && [12, 24, 48, 230].includes(v) && !(type === 'factory' && v === 230 && was.volts == null)) { if (was.volts == null) was.volts = v; st.volts = want; }
+      if (Object.keys(was).length) st.typeChanged = was;
+    } else if (type === 'vehicle' && st.typeChanged) {
+      if (was.standard != null && st.standard === 'din') st.standard = was.standard;
+      if (was.volts != null && [24, 230].includes(parseFloat(st.volts))) st.volts = was.volts;
+      delete st.typeChanged;
     }
   });
 
@@ -821,7 +851,8 @@
       a.wire(c2, 'out', sw, 'in', { ...T, gauge: '1.5', length: 10, circuit: 'Lights' });
       a.wire(sw, 'out', l1, 'in', { ...T, gauge: '1.5', length: 4, circuit: 'Lights' });
       a.wire(l1, 'out', l2, 'in', { ...T, gauge: '1.5', length: 5, circuit: 'Lights' });
-      a.wire(l2, 'out', sa, 'in', { ...T, gauge: '1.5', length: 4, circuit: 'Lights' });
+      // the alarm takes a permanent feed from the lighting circuit, ahead of the switch
+      a.wire(c2, 'out', sa, 'in', { ...T, gauge: '1.5', length: 12, circuit: 'Lights', notes: 'Unswitched feed so the alarm stays on' });
       const sh = a.part('shower', 440, 260, { props: { kw: '9.5', ratedV: '240', zone: '1', ip: 'IPX4' } });
       a.wire(c3, 'out', sh, 'in', { ...T, gauge: '10', length: 15, circuit: 'Shower' });
       const ck = a.part('cooker', 440, 380, { props: { kw: '10', socket: 'no' } });

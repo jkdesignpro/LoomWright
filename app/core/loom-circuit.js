@@ -63,7 +63,7 @@
 
   /* The circuit as resistors and sources, in one switch state. */
   function network(project, state, opts = {}) {
-    const sim = Loom.simulate(project, state);
+    const sim = Loom.simulate(project, state, { relays: opts.relays });
     const B = Loom.buildNet(project, { state, relays: sim.relays, pdm: sim.pdm, switches: 'state', protect: true, edges: true });
     const uf = new UF();
     B.inv.forEach((it) => Loom.resolved(it.v, it.p).pins.forEach((pn) => uf.find(key(it.sheet, it.p.id, pn.id))));
@@ -97,15 +97,19 @@
       const s = state[partKey(it.p)] != null ? state[partKey(it.p)] : b.def || 0;
       const ret = (pin) => { const r = pin ? P(pin) : E; return touched.has(r) ? r : E; }; // an unwired return is taken as case-earthed
       if (b.kind === 'source') {
-        if ((b.sourceWhen && !b.sourceWhen(s)) || !first(it)) return;
+        // a single-line mains supply has no return to solve against
+        if (b.singleLine || (b.sourceWhen && !b.sourceWhen(s)) || !first(it)) return;
         const p = P(b.source), n = ret(b.ret);
-        if (it.p.type === 'alternator') els.push({ type: 'src', it, p, n, emf: 14.2 * k, r: 0.02, limit: parseFloat(pr.amps) || null, mode: 'v', what: 'alternator' });
+        if (it.p.type === 'psu24') els.push({ type: 'src', it, p, n, emf: parseFloat(pr.volts) || 24, r: 0.02, limit: parseFloat(pr.amps) || null, mode: 'v', what: 'power supply' });
+        else if (it.p.type === 'ctrl_tx') els.push({ type: 'src', it, p, n, emf: parseFloat(pr.secondary) || 24, r: 0.2, limit: (parseFloat(pr.va) || 100) / (parseFloat(pr.secondary) || 24), mode: 'v', what: 'transformer' });
+        else if (it.p.type === 'alternator') els.push({ type: 'src', it, p, n, emf: 14.2 * k, r: 0.02, limit: parseFloat(pr.amps) || null, mode: 'v', what: 'alternator' });
         else if (it.p.type === 'solar') {
           const w = parseFloat(pr.watts) || 100, voc = 1.75 * vn, vmp = 1.45 * vn, imp = w / vmp;
           els.push({ type: 'src', it, p, n, emf: voc, r: (voc - vmp) / imp, limit: imp * 1.1, mode: 'v', what: 'solar' });
         } else {
           const nom = parseFloat(pr.volts) > 0 ? parseFloat(pr.volts) : vn;
-          els.push({ type: 'bat', it, p, n, emf: (opts.battery ? opts.battery * (nom / 12) : 12.6 * (nom / 12)), r: 0.01, rc: 0.1, mode: 'dis', what: 'battery' });
+          // opts.battery is the resting voltage the user typed for the system voltage
+          els.push({ type: 'bat', it, p, n, emf: (opts.battery ? opts.battery * (nom / vn) : 12.6 * (nom / 12)), r: 0.01, rc: 0.1, mode: 'dis', what: 'battery' });
         }
       } else if (b.kind === 'converter') {
         if (!first(it)) return;
@@ -124,7 +128,7 @@
         const use = live.length ? live : pw.slice(0, 1);
         use.forEach((x) => els.push({ type: 'R', it, a: P(x), b: P(ea), g: I / (vn * use.length), owner: 'load', pins: [x, ea] }));
       } else if (b.kind === 'relay') {
-        if (!first(it, 'coil')) return;
+        if (b.runInput || !first(it, 'coil')) return;
         const I = it.p.type === 'relay_ssr' ? 0.01 : 0.15;
         els.push({ type: 'R', it, a: P(b.coil[0]), b: P(b.coil[1]), g: I / vn, owner: 'coil', pins: b.coil });
       }
@@ -416,6 +420,9 @@
     N.B.inv.forEach((it) => { if (it.b.states && it.b.kind !== 'protect' && !defaults.has(partKey(it.p))) defaults.set(partKey(it.p), it); });
     defaults.forEach((it, k) => { const s = onState[k] != null ? onState[k] : it.b.def || 0; if (s !== (it.b.def || 0)) setup.push(`${refOf(it)}: ${stateName(it, s)}`); });
     const tref = refOf(target), srcRef = refOf(src.it);
+    // a control panel's 0 V is the power supply or transformer, not a battery and chassis
+    const panel = src.what === 'power supply' || src.what === 'transformer';
+    const NEG = panel ? `${srcRef} 0 V` : 'the battery negative', CHASSIS = panel ? `${srcRef} 0 V` : 'a clean chassis earth';
     const { tps, segs } = points(path);
     const coilSteps = (relayIt) => {
       // the relay's own coil feed, followed back to a supply
@@ -425,7 +432,7 @@
       const ce = bfs(adj, c1, (x) => x === EARTH);
       if (f) mark({ steps: f.steps }); if (ce) mark(ce);
       const a = add({ id: 'coil-' + relayIt.p.id, text: `Measure from ${label(c0)} (the coil feed of ${refOf(relayIt)}) to earth.`, expect: vtxt(Vk(c0)) });
-      const b = add({ id: 'coilE-' + relayIt.p.id, text: `Measure from ${label(c1)} (the coil earth) to the battery negative.`, expect: 'under 0.1 V' });
+      const b = add({ id: 'coilE-' + relayIt.p.id, text: `Measure from ${label(c1)} (the coil earth) to ${NEG}.`, expect: 'under 0.1 V' });
       a.ifOk = { goto: b.id };
       a.ifNot = { text: `The coil is not being fed, so the relay never switches. Follow its feed back: ${pts.map((t) => `${t.label} (${vtxt(t.v)})`).join(', ') || 'see the drawing'}. The fault is just after the first point that reads correctly.` };
       b.ifOk = { text: `The coil is fed and earthed but the contacts do not close. Replace ${refOf(relayIt)} with a known good relay, and check its base terminals.` };
@@ -447,14 +454,14 @@
 
     if (sym.id === 'dead') {
       if (setup.length) notes.push('Set the switches as listed before you start, so the load should be running.');
-      const s0 = add({ id: 'load', text: `With the circuit switched on, measure from ${loadPin.at} to a clean chassis earth.`, expect: vtxt(loadPin.v) });
+      const s0 = add({ id: 'load', text: `With the circuit switched on, measure from ${loadPin.at} to ${CHASSIS}.`, expect: vtxt(loadPin.v) });
       const across = add({ id: 'across', text: `Measure across ${tref} itself: from ${loadPin.label} to ${ek ? label(ek) : 'its earth pin'}.`, expect: vtxt(loadPin.v - (ek ? Vk(ek) : 0)) });
-      const er = add({ id: 'earth', text: `Measure from ${ek ? label(ek) : tref + ' earth'} to the battery negative, with the circuit on.`, expect: 'under 0.1 V' });
+      const er = add({ id: 'earth', text: `Measure from ${ek ? label(ek) : tref + ' earth'} to ${NEG}, with the circuit on.`, expect: 'under 0.1 V' });
       s0.ifOk = { text: 'Supply reaches the load.', goto: across.id };
       across.ifOk = { text: `${tref} has its full voltage but does not work, so the fault is in ${tref} itself (bulb, motor, internal fuse or its own plug). Try it on a known good supply.` };
       across.ifNot = { text: 'Supply is fine but there is little voltage across the load, so its earth is suspect.', goto: er.id };
       er.ifOk = { text: `The earth path reads fine. Check the plug and pins right at ${tref}, then test it on a known good supply.` };
-      er.ifNot = { text: `The earth path is broken: check ${list(earthPath ? describe(earthPath.steps.map((s) => s.e)) : ['the earth wire'])}. Earth points must be clean bare metal, tight, with a star washer.` };
+      er.ifNot = { text: `The earth path is broken: check ${list(earthPath ? describe(earthPath.steps.map((s) => s.e)) : ['the earth wire'])}. ${panel ? 'Check every terminal on the way back to the 0 V terminal is tight and any links are in place.' : 'Earth points must be clean bare metal, tight, with a star washer.'}` };
       let prevStep = s0;
       for (let i = tps.length - 2; i >= 0; i--) {
         const tp = tps[i], st = add({ id: 'tp' + i, text: i === 0 ? `Measure at the supply: ${tp.at} to earth.` : `Measure from ${tp.at} to earth.`, expect: vtxt(tp.v) });
@@ -465,6 +472,7 @@
       const last = prevStep;
       last.ifNot = src.type === 'conv'
         ? { text: `${srcRef} is not giving an output. Check its input ${label(key(src.it.sheet, src.it.p.id, src.it.b.input))} (${vtxt(Vk(key(src.it.sheet, src.it.p.id, src.it.b.input)))})${src.it.b.enable ? `, its ignition sense ${label(key(src.it.sheet, src.it.p.id, src.it.b.enable))}` : ''} and its earth.` }
+        : panel ? { text: `No output from ${srcRef}: check its mains supply and its own fuse or breaker, and that the output terminals are tight.` }
         : { text: `No supply at ${srcRef}: the battery is flat or isolated, or its main lead or earth strap is loose. Check the terminals and any isolator.` };
     }
 
@@ -540,7 +548,7 @@
         if (through.length) notes.push(`Wires on this fuse that pass through grommets or bulkheads, the usual places for chafing: ${list(through)}.`);
         const smallest = sch && sch.smallest ? Loom.gaugeInfo(sch.smallest) : null;
         const w = add({ id: 'when', text: `Note when ${fref}${rating ? ' (' + rating + ' A)' : ''} blows. Straight away when fitted with everything off: go to step {A}. Only when ${tref} is switched on: go to step {B}. After running a while, or under heavy load: go to step {C}.`, expect: '' });
-        const A = add({ id: 'A', text: `Take the fuse out and switch everything off. Measure resistance from ${label(out)} (the load side of the fuse holder) to chassis earth.`, expect: 'open circuit, or many ohms through other loads' });
+        const A = add({ id: 'A', text: `Take the fuse out and switch everything off. Measure resistance from ${label(out)} (the load side of the fuse holder) to ${panel ? NEG : 'chassis earth'}.`, expect: 'open circuit, or many ohms through other loads' });
         const Bs = add({ id: 'B', text: `Leave the fuse out. Switch on${setup.length ? ' (' + setup.join(', ') + ')' : ''} and measure resistance from ${label(out)} to earth again.`, expect: amps > 0 ? `roughly ${fmt(sol.supply / amps, 1)} Ω or more (motors and LED drivers read lower or higher); near 0 Ω means a short` : 'not near 0 Ω' });
         const C = add({ id: 'C', text: `Refit the fuse and measure the current with a clamp meter while ${tref} runs.`, expect: amps ? `about ${fmt(amps, 1)} A${rating ? ` on a ${rating} A fuse (${Math.round((amps / rating) * 100)}%)` : ''}` : 'the load\'s rated current' });
         w.ifOk = null;
@@ -562,7 +570,7 @@
       const totalDrop = (tps[0] ? tps[0].v : 0) - loadPin.v;
       const tot = add({ id: 'total', text: `Switch ${tref} on. Measure the voltage drop from ${tps[0].label} to ${loadPin.label}, one probe on each (use a long lead).`, expect: `about ${fmt(totalDrop, 2)} V (under 0.5 V is good)` });
       bat.ifOk = { goto: tot.id };
-      const ear = add({ id: 'earthdrop', text: `Measure the drop on the earth side: from ${ek ? label(ek) : tref + ' earth'} to the battery negative, with ${tref} running.`, expect: `about ${fmt(ek ? Vk(ek) : 0, 2)} V (under 0.2 V is good)` });
+      const ear = add({ id: 'earthdrop', text: `Measure the drop on the earth side: from ${ek ? label(ek) : tref + ' earth'} to ${NEG}, with ${tref} running.`, expect: `about ${fmt(ek ? Vk(ek) : 0, 2)} V (under 0.2 V is good)` });
       tot.ifOk = { text: 'The supply side is fine.', goto: ear.id };
       let prev = null;
       const dv = (v) => (v < 0.05 ? 'under 0.05 V' : `about ${fmt(v, 2)} V`);
@@ -575,7 +583,7 @@
       });
       if (prev) prev.ifOk = { text: 'Each part reads as expected.', goto: ear.id };
       ear.ifOk = { text: `Supply and earth are both fine, so ${tref} itself is weak: worn motor brushes, failing LEDs, a blocked pump or a tired compressor.` };
-      ear.ifNot = { text: `The earth path has resistance: check ${list(earthPath ? describe(earthPath.steps.map((s) => s.e)) : ['the earth wire'])}, the earth points (clean bare metal, tight, star washer), the battery earth strap and the engine to chassis strap.` };
+      ear.ifNot = { text: `The earth path has resistance: check ${list(earthPath ? describe(earthPath.steps.map((s) => s.e)) : ['the earth wire'])}${panel ? ' and every terminal on the way back to the 0 V terminal.' : ', the earth points (clean bare metal, tight, star washer), the battery earth strap and the engine to chassis strap.'}` };
     }
 
     // link the steps
@@ -589,7 +597,7 @@
     notes.push('Expected readings come from the drawing and assume healthy parts. Real readings vary a little; look for big differences.');
     return {
       title: `${tref}: ${sym.name.toLowerCase()}`, symptom: sym.id, symptomName: sym.name, part: target.p.id, sheetId: target.sheet.id, ref: tref,
-      setup, supply: srcRef, steps: steps.map(({ id, n, text, expect, ifOk, ifNot }) => ({ id, n, text, expect, ifOk: ifOk || null, ifNot: ifNot || null })),
+      setup, supply: srcRef, panel, ac: src.what === 'transformer', steps: steps.map(({ id, n, text, expect, ifOk, ifNot }) => ({ id, n, text, expect, ifOk: ifOk || null, ifNot: ifNot || null })),
       notes, highlight: { wires: [...highlight.wires], parts: [...highlight.parts] },
       path: tps.map((t) => ({ point: t.label, volts: +t.v.toFixed(2) })),
     };
@@ -614,7 +622,7 @@
     return `<section class="fault-sheet">
 <h2>${esc(f.title)}</h2>
 <p class="fs-meta">${esc(opts.project || '')}${opts.project ? ' · ' : ''}Supply ${esc(f.supply)}${f.setup.length ? ' · Set up: ' + esc(f.setup.join(', ')) : ''}</p>
-<p class="fs-how">Use a multimeter on DC volts. "To earth" means black probe on clean chassis metal or the battery negative.</p>
+<p class="fs-how">${f.panel ? `Use a multimeter on ${f.ac ? 'AC' : 'DC'} volts. "To earth" means black probe on the 0 V terminal of ${esc(f.supply)}.` : 'Use a multimeter on DC volts. "To earth" means black probe on clean chassis metal or the battery negative.'}</p>
 <ol class="fs-steps">${f.steps.map((s) => `<li id="fs-${esc(f.part)}-${s.n}"><div class="fs-do">${esc(s.text)}</div>${s.expect ? `<div class="fs-expect"><b>Expect</b> ${esc(s.expect)}</div>` : ''}${br('ok', 'If yes', s.ifOk)}${br('not', 'If not', s.ifNot)}</li>`).join('')}</ol>
 ${f.path.length ? `<details class="fs-path"><summary>Expected voltages along the feed</summary><table><tr><th>Point</th><th>Volts</th></tr>${f.path.map((p) => `<tr><td>${esc(p.point)}</td><td>${p.volts.toFixed(2)}</td></tr>`).join('')}</table></details>` : ''}
 ${f.notes.length ? `<ul class="fs-notes">${f.notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
@@ -634,7 +642,7 @@ ${f.notes.length ? `<ul class="fs-notes">${f.notes.map((n) => `<li>${esc(n)}</li
     Loom.views(project).forEach((v) => v.parts.forEach((p) => {
       if (!p.label) return;
       const b = Loom.behaviour(v, p);
-      if (b.kind !== 'load' && b.kind !== 'relay') return;
+      if ((b.kind !== 'load' && b.kind !== 'relay') || b.runInput) return;
       const k = partKey(p); if (seen.has(k)) return; seen.add(k);
       out.push({ ref: p.label, part: p.id, sheetId: v.sheet.id, sheet: v.sheet.name, kind: b.kind, name: (Loom.partDef(v, p.type) || {}).name || p.type });
     }));
