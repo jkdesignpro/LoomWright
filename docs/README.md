@@ -27,6 +27,7 @@ The **user manual** covers everything in the app, from installing it to printing
 21. [The Claude add-on](manual/21-claude-add-on.md)
 22. [Troubleshooting and questions](manual/22-troubleshooting.md)
 23. [Disclaimer](manual/23-disclaimer.md)
+24. [Compressed air planner](manual/24-compressed-air.md)
 
 Please read the [Disclaimer](manual/23-disclaimer.md) before you build from your drawings.
 
