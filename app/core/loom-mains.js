@@ -345,6 +345,11 @@
     return B;
   };
 
+  /* A wire with a household or factory part at either end. In a mixed project the vehicle and
+     electronics wires keep their own colour rules, so the mains colour checks skip them. */
+  const isMainsPart = (v, partId) => { const p = v.parts.find((q) => q.id === partId), d = p && Loom.partDef(v, p.type); return !!(d && (d.mains || d.factory)); };
+  const mainsWire = (v, w) => isMainsPart(v, w.from.part) || isMainsPart(v, w.to.part);
+
   /* ---------------- Reading the drawing: cables and circuits ---------------- */
   const view = (project) => Loom.views(project);
   function graph(project) {
@@ -625,8 +630,8 @@
     });
     g.parts.filter((x) => x.p.type === 'home_battery' && ['loft', 'understairs'].includes(x.props.where)).forEach((x) => add('warn', 'A10-BATT-LOFT', `${refOf(x)}: PAS 63100 advises against putting home batteries in lofts or under-stairs spaces.`, x));
     // colours of conductors, where wires are drawn as conductors
-    const cols = new Set(view(project).flatMap((v) => v.wires.map((w) => (w.tracer ? '' : w.colour))));
-    view(project).forEach((v) => v.wires.forEach((w) => { if (!w.tracer && ['green', 'yellow'].includes(w.colour)) out.push({ level: 'error', rule: 'A8-COLOURS', wire: w.id, sheetId: v.sheet.id, text: `${w.name}: green alone and yellow alone are never used in mains wiring. Protective conductors are green-and-yellow.` }); }));
+    const cols = new Set(view(project).flatMap((v) => v.wires.filter((w) => mainsWire(v, w)).map((w) => (w.tracer ? '' : w.colour))));
+    view(project).forEach((v) => v.wires.forEach((w) => { if (mainsWire(v, w) && !w.tracer && ['green', 'yellow'].includes(w.colour)) out.push({ level: 'error', rule: 'A8-COLOURS', wire: w.id, sheetId: v.sheet.id, text: `${w.name}: green alone and yellow alone are never used in mains wiring. Protective conductors are green-and-yellow.` }); }));
     if ((cols.has('red') || cols.has('black')) && cols.has('brown') && cols.has('blue')) add('info', 'A8-MIXED', 'this drawing mixes old and new cable colours. Fit the notice: "CAUTION: This installation has wiring colours to two versions of BS 7671…" at the consumer unit.');
     // notifiable work
     const notif = [];
@@ -668,6 +673,7 @@
     const pe = new Set(all.flatMap((x) => Loom.resolved(x.v, x.p).pins.filter((q) => q.id === 'PE').map((q) => P_(x.v, x.p, q.id))));
     const wrong = { pe: [], dc: [], ac: [], pw: [] };
     views.forEach((v) => v.wires.forEach((w) => {
+      if (!mainsWire(v, w)) return;
       const n = net.uf.find(net.k(v.sheet, w.from.part, w.from.pin)), col = w.colour, gy = (col === 'green' && w.tracer === 'yellow') || (col === 'yellow' && w.tracer === 'green');
       const ww = { ...w, _s: v.sheet.id };
       if (pe.has(n) && !gy) wrong.pe.push(ww);
@@ -738,7 +744,7 @@
   function circuitRows(project) {
     const h = householdChecks(project);
     const st = (c) => { const lv = h.out.filter((x) => x.part === c.dev.p.id); return lv.some((x) => x.level === 'error') ? 'fix' : lv.some((x) => x.level === 'warn') ? 'check' : 'ok'; };
-    return [['Way', 'Circuit', 'Device', 'RCD', 'AFDD', 'Cable mm²', 'cpc mm²', 'Method', 'Length m', 'Design A', 'Cable A (derated)', 'Volt drop %', 'Zs Ω', 'Max Zs Ω', 'Zs to read Ω (0.8 × max)', 'Status']]
+    return [['Way', 'Circuit', 'Device', 'RCD', 'AFDD', 'Cable mm²', 'cpc mm²', 'Method', 'Length m', 'Design A', 'Cable A (derated)', 'Volt drop %', 'Zs Ω', 'Max Zs Ω', '0.8 × max Zs Ω', 'Status']]
       .concat(h.circuits.map((c) => [c.ref, circuitName(c), `${c.curve}${c.In}${c.three ? ' 3P' : ''}`, c.rcd ? `${c.rcd.mA} mA ${c.rcd.type}` : '', c.afdd ? 'yes' : '', c.minSize, c.cab[0] ? c.cab[0].cpc : '', c.worst ? c.worst.method : '', c.L == null ? '' : r1(c.L), c.Ib, c.worst ? r1(c.worst.iz) : '', c.vdPct == null ? '' : c.vdPct, c.zs == null ? '' : c.zs, c.zsMax == null ? '' : c.zsMax, c.zsMax == null ? '' : Math.round(c.zsMax * 0.8 * 100) / 100, st(c)]));
   }
   function motorRows(project) {
@@ -804,6 +810,8 @@
     if (!project || !Array.isArray(project.sheets)) return base;
     const type = (project.settings || {}).projectType;
     if (type === 'household' || type === 'factory') base = base.filter((c) => !VEHICLE_ONLY.test(c.text || ''));
+    // in a mixed project the vehicle cable and fuse rules still apply, but not to mains and panel parts
+    else if (type === 'mixed') base = base.filter((c) => !VEHICLE_ONLY.test(c.text || '') || !(view(project).some((v) => (c.part && isMainsPart(v, c.part)) || (c.wire && v.wires.some((w) => w.id === c.wire && mainsWire(v, w))))));
     // the last socket or light on a radial has nothing on its loop-out terminal
     base = base.filter((c) => !(c.level === 'info' && c.part && / pin out not connected\.$/.test(c.text || '') && view(project).some((v) => v.parts.some((p) => p.id === c.part && PASS.includes(p.type)))));
     let extra = [];
@@ -817,7 +825,7 @@
   Loom.reportRows = function (d, kind, o) { return extraReports[kind] ? extraReports[kind](d && d.project ? d.project : d) : baseRows(d, kind, o); };
   if (Loom.PDF_TABLES) {
     Object.assign(Loom.PDF_TABLES, {
-      circuits: { title: 'Circuit schedule (household)', cols: ['Way', 'Circuit', 'Device', 'RCD', 'AFDD', 'Cable mm²', 'cpc mm²', 'Method', 'Length m', 'Design A', 'Cable A (derated)', 'Volt drop %', 'Zs Ω', 'Max Zs Ω', 'Zs to read Ω (0.8 × max)', 'Status'], ref: 'Way' },
+      circuits: { title: 'Circuit schedule (household)', cols: ['Way', 'Circuit', 'Device', 'RCD', 'AFDD', 'Cable mm²', 'cpc mm²', 'Method', 'Length m', 'Design A', 'Cable A (derated)', 'Volt drop %', 'Zs Ω', 'Max Zs Ω', '0.8 × max Zs Ω', 'Status'], ref: 'Way' },
       motors: { title: 'Motors', cols: ['Motor', 'Sheet', 'kW', 'Full-load A', 'Starting', 'Starting A (about)'], ref: 'Motor', sheet: 'Sheet' },
       terminals: { title: 'Terminal plan', cols: ['Strip', 'Terminal', 'Sheet', 'Side A wire', 'Side A goes to', 'Side B wire', 'Side B goes to'], ref: 'Strip', sheet: 'Sheet' },
       plcio: { title: 'PLC inputs and outputs', cols: ['Address', 'Module', 'Sheet', 'Wire', 'Connected to'], ref: 'Module', sheet: 'Sheet' },

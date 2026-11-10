@@ -79,7 +79,7 @@ The [live test](11-trace-and-live-test.md#the-live-test) can run a 24 V DC or co
 4. Set the start button back to **Released**. The hold-in contact keeps the contactor in, and the motor M1 keeps running from the `L1`, `L2` and `L3` labels.
 5. Set the stop button or the emergency stop to **Pressed**. The contactor drops out and the motor stops. It stays out when you release the stop button, until you press start again.
 
-![The direct-on-line starter in the live test](../../app/manual/img/dol-starter.png "The direct-on-line starter in the live test, with the start button pressed: the contactor K1 has pulled in and its hold-in contact shows Coil on.")
+![The direct-on-line starter in the live test](../../app/manual/img/dol-starter.png "The direct-on-line starter in the live test after start was pressed and released: the hold-in contact (Coil on) keeps the contactor K1 in, so the motor M1 and the running lamp H1 stay on.")
 
 Things the live test does not do on a panel:
 

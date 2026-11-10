@@ -146,7 +146,7 @@ At the top, a note says that the schedule is a planning aid and not a design or 
 | Cable A (derated) | The rating of the weakest cable, once derated. |
 | Volt drop % | The voltage drop at the design current. |
 | Zs Ω, Max Zs Ω | The worked-out earth fault loop impedance, and the maximum for the breaker. |
-| Zs to read Ω (0.8 × max) | 0.8 of the maximum: the most a tester should measure on a cold cable, allowing for the cable warming up in use. |
+| 0.8 × max Zs Ω | 0.8 of the maximum: the most a tester should measure on a cold cable, allowing for the cable warming up in use. |
 | Status | **ok**, **check** if the circuit has a finding at check level, or **fix** if it has an error. Rows to fix are marked. |
 
 Click a row to select the breaker on the drawing. **Reports › Export circuit schedule (CSV)** saves the schedule for a spreadsheet, and the [PDF export](15-build-pack-and-labels.md#export-pdf) can include it.

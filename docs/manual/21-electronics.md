@@ -113,6 +113,8 @@ The **Power rails** tab in the lists, also under **Reports › Power rails**, li
 
 The figures come from each part's **Current it draws (mA)** field, or its current or wattage. A board passes on what its own outputs feed: if a sensor on an Arduino's `3V3` pin draws 10 mA, the supply feeding the Arduino gives those 10 mA as well. A converter takes its output power from its input, with 85% efficiency assumed.
 
+![The Power rails tab](../../app/manual/img/power-rails.png "The Power rails tab for the I2C sensor starter circuit, with 5 mA entered for the sensor. The UNO's 5V pin feeds it; the UNO has no rating for that pin, so the status is no rating. The Properties panel shows where the UNO's pinout came from.")
+
 Save it as a spreadsheet with **Reports › Export power rails (CSV)**. It is also the **Power rails** table in the PDF export and the build pack, and the `power` report of the [Claude add-on](26-claude-add-on.md).
 
 ## Where the board data comes from
