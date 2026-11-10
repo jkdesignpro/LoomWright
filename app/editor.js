@@ -1164,7 +1164,7 @@
     const mine = project.customColours.filter(keep), stdList = std === 'custom' && !stock ? [] : L.COLOURS.filter(keep);
     return (allowNone ? `<option value="">${esc(t('None'))}</option>` : '') +
       (mine.length ? `<optgroup label="${esc(t('My colours'))}">${mine.map(opt).join('')}</optgroup>` : '') +
-      (stdList.length ? `<optgroup label="${esc(stock ? t('Colours I stock') : L.STANDARDS[std === 'custom' ? 'lr' : std].name)}">${stdList.map(opt).join('')}</optgroup>` : '');
+      (stdList.length ? `<optgroup label="${esc(stock ? t('Colours I stock') : t(L.STANDARDS[std === 'custom' ? 'lr' : std].name))}">${stdList.map(opt).join('')}</optgroup>` : '');
   }
   function colourField(label, field, value, allowNone) {
     const c = L.colourById(doc, value);
@@ -1359,7 +1359,7 @@
           ${fld('Ambient temperature °C', 'settings:mains:ambient', (s.mains || {}).ambient || 30, 'number', 'min="0" max="70" step="1"')}
           <p class="muted" style="margin:0;font-size:11.5px">${esc(t('Earthing, Ze and the supply fuse are set on the Supply part. Cable method, insulation and grouping can be set on each cable.'))}</p></div>` : ''}
         <label class="fld"><span>${esc(t('System voltage'))}</span><select id="f-volts" data-field="settings:volts">${[12, 24, 48, 110, 230, 400].map((v) => `<option value="${v}"${(parseFloat(s.volts) || 12) === v ? ' selected' : ''}>${v} V</option>`).join('')}</select></label>
-        <label class="fld"><span>${esc(t('Colour codes'))}</span><select id="f-std" data-field="settings:standard">${Object.values(L.STANDARDS).map((x) => `<option value="${x.id}"${x.id === s.standard ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
+        <label class="fld"><span>${esc(t('Colour codes'))}</span><select id="f-std" data-field="settings:standard">${Object.values(L.STANDARDS).map((x) => `<option value="${x.id}"${x.id === s.standard ? ' selected' : ''}>${esc(t(x.name))}</option>`).join('')}</select></label>
         ${selFld('Wire labels', 'settings:labels', s.labels || 'full', [['full', t('Number, colour, size')], ['code', t('Colour code only')], ['none', t('None')]])}
         <label class="fld check"><input type="checkbox" id="f-tb" data-field="settings:titleBlock"${s.titleBlock !== false ? ' checked' : ''}><span>${esc(t('Title block and revision table'))}</span></label>
         <label class="fld check"><input type="checkbox" id="f-key" data-field="settings:colourKey"${s.colourKey !== false ? ' checked' : ''}><span>${esc(t('Colour key'))}</span></label>
@@ -2078,7 +2078,7 @@
     const stockBox = (id) => `<input type="checkbox" data-stock="${esc(id)}"${stock.has(id) ? ' checked' : ''} aria-label="${esc(t('In stock'))}">`;
     const rows = project.customColours.map((c, i) => `<tr data-i="${i}"><td>${stockBox(c.id)}</td><td><input type="color" value="${esc(c.hex)}" data-k="hex" aria-label="${esc(t('Colour'))}"></td><td><input type="text" value="${esc(c.name)}" data-k="name" aria-label="${esc(t('Name'))}"></td><td><input type="text" value="${esc(c.code)}" data-k="code" aria-label="${esc(t('Code'))}" class="mono"></td><td class="mono">${used.has(c.id) ? esc(t('used')) : ''}</td><td><button class="btn icon danger" data-del="${i}" aria-label="${esc(t('Remove'))}">✕</button></td></tr>`).join('');
     showModal(t('Wire colours'), `<div class="colours-m">
-      <label class="fld"><span>${esc(t('Colour codes'))}</span><select id="m-std">${Object.values(L.STANDARDS).map((x) => `<option value="${x.id}"${x.id === s.standard ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
+      <label class="fld"><span>${esc(t('Colour codes'))}</span><select id="m-std">${Object.values(L.STANDARDS).map((x) => `<option value="${x.id}"${x.id === s.standard ? ' selected' : ''}>${esc(t(x.name))}</option>`).join('')}</select></label>
       <p class="muted">${esc(L.STANDARDS[s.standard].note)} ${esc(t('Changing the standard relabels every wire; the colours stay the same.'))}</p>
       <h3>${esc(t('Colours I stock'))}</h3>
       <p class="muted">${esc(t('Tick the cable colours you actually have. With "only offer colours I stock" on, wire pickers list just these, so the same few colours get reused for different jobs. The Colour usage list then shows each job a colour does.'))}</p>
