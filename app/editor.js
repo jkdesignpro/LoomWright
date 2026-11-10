@@ -251,7 +251,7 @@
     view = { ...tb.view };
     sel = { parts: new Set(), wires: new Set() }; draft = null; trace = null; endTest(true);
     editRev++;
-    buildLibrary(); refreshAll(); setHint(); updateTitle(); applyView();
+    buildLibrary(); refreshAll(); setHint(); updateTitle(); applyView(); checkDisclaimer();
     if (!tb.viewed) { tb.viewed = true; requestAnimationFrame(fit); }
     autosave();
   }
@@ -771,6 +771,7 @@
 
   /* ---------------- Keyboard ---------------- */
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'F1' && window.LoomManualViewer && !window.LoomManualViewer.isOpen()) { e.preventDefault(); openManual(true); return; }
     if (!$('#builder').hidden || ($('#views') && !$('#views').hidden)) return;
     if (!$('#palette').hidden) return; // the palette handles its own keys
     if (!$('#modal').hidden) { if (e.key === 'Escape') closeModal(); return; }
@@ -1314,6 +1315,8 @@
         <div class="kv"><span>${esc(t('Parts'))}</span><b>${doc.parts.length}</b><span>${esc(t('Wires'))}</span><b>${doc.wires.length}</b><span>${esc(t('Cable on this sheet'))}</span><b>${metres.toFixed(1)} m</b></div>
         ${issues.length ? `<button class="callout warn" data-act="show-checks">${issues.length} ${esc(t('design checks to review on this sheet'))}</button>` : ''}`)}
       ${sec('Drawing', `
+        ${selFld('Project type', 'settings:projectType', s.projectType || 'vehicle', L.PROJECT_TYPES.map((x) => [x.id, t(x.name)]))}
+        ${L.disclaimerFor(project).mains ? `<p class="callout warn small">${esc(t('Planning aid only. Checks are guidance, not proof the work meets BS 7671, IEC 60204 or any other code. Not a certificate. Use a qualified electrician.'))} <a href="#" data-act="disclaimer">${esc(t('Disclaimer'))}</a></p>` : ''}
         ${selFld('Paper size, all sheets', 'settings:page', s.page || 'fit', pages)}
         ${selFld('Orientation', 'settings:orientation', s.orientation || 'landscape', [['landscape', t('Landscape')], ['portrait', t('Portrait')]])}
         <label class="fld"><span>${esc(t('System voltage'))}</span><select id="f-volts" data-field="settings:volts">${[12, 24, 48].map((v) => `<option value="${v}"${(parseFloat(s.volts) || 12) === v ? ' selected' : ''}>${v} V</option>`).join('')}</select></label>
@@ -1356,6 +1359,7 @@
     if (f.startsWith('settings:')) {
       const k = f.slice(9);
       if (k === 'cutAllowance') { if (live && v === '') return; project.settings[k] = Math.max(0, parseFloat(v) || 0); }
+      else if (k === 'projectType') { if (live) return; L.applyProjectType(project, v); buildLibrary(); checkDisclaimer(); }
       else project.settings[k] = v;
     }
     else if (f === 'sheet:name') { if (!live && v.trim()) doc.sheet.name = v.trim(); }
@@ -1420,6 +1424,7 @@
     else if (act === 'delete') deleteSelection();
     else if (act === 'edit-custom') window.LoomBuilder.open(defOf(only('part').type));
     else if (act === 'show-checks') showTab('checks');
+    else if (act === 'disclaimer') { e.preventDefault(); disclaimerModal(); }
     else if (act === 'swap') { const w = only('wire'); pushHistory(); [w.from, w.to] = [w.to, w.from]; if (w.points) w.points.reverse(); if (w.ends) w.ends = { from: w.ends.to, to: w.ends.from }; commit(); }
     else if (act === 'clear-bends') { const w = only('wire'); pushHistory(); delete w.points; delete w.dx; commit(); }
     else if (act === 'reset-label') { const w = only('wire'); pushHistory(); delete w.lab; commit(); }
@@ -1603,7 +1608,7 @@
     file = tb.file; dirty = false; hist = tb.hist; redoStack = tb.redoStack;
     Object.keys(views).forEach((k) => delete views[k]);
     sel = { parts: new Set(), wires: new Set() }; draft = null; trace = null; endTest(true); editRev++;
-    buildLibrary(); refreshAll(); setHint(); updateTitle();
+    buildLibrary(); refreshAll(); setHint(); updateTitle(); checkDisclaimer();
     if (!o.keepView) requestAnimationFrame(fit);
     if (file.path && PF.canWatch) { const fl = file; PF.mtime(fl.path).then((m) => { fl.mtime = m; }).catch(() => {}); }
   }
@@ -2208,14 +2213,39 @@
     showModal(t('Keyboard and mouse'), `<div class="kbd-list">${k.map(([a, b]) => `<kbd>${esc(t(a))}</kbd><span>${esc(t(b))}</span>`).join('')}</div>
       <div class="row-btns"><button class="btn primary" data-close>${esc(t('Close'))}</button></div>`);
   }
+  /* The built-in user manual; with context, it opens at the chapter for what is on screen. */
+  function openManual(context) {
+    const M = window.LoomManualViewer;
+    if (!M) { toast(t('The user manual is not included in this copy.')); return; }
+    if (!context) { M.open(); return; }
+    const views = $('#views'), vt = views && !views.hidden ? (views.dataset.kind || '') : '';
+    const ch = !$('#builder').hidden ? 'component-builder' : vt === 'formboard' ? 'harness-formboard' : vt === 'vehicle' ? 'vehicle-locations' : vt === 'air' ? 'compressed-air' : test ? 'trace-and-live-test' : null;
+    const known = ch && M.chapters().some((c) => c.id === ch);
+    if (known) M.open(ch); else M.open();
+  }
+  /* Disclaimer: always available from Help, and shown once before household, factory or compressed air work. */
+  const ACK = 'loomwright.disclaimer.mains';
+  function disclaimerModal(ack) {
+    const dc = L.disclaimerFor(project);
+    showModal(t(L.DISCLAIMER.title), `${ack ? `<p class="callout warn">${esc(t('Please read this before planning household, factory or compressed air work.'))}</p>` : ''}
+      ${dc.full.map((x) => `<p>${esc(t(x))}</p>`).join('')}
+      <div class="row-btns">${ack ? `<button class="btn primary" id="dc-ok">${esc(t('I understand'))}</button>` : `<button class="btn primary" data-close>${esc(t('Close'))}</button>`}${window.LoomManualViewer ? `<button class="btn" id="dc-man">${esc(t('Open in the manual'))}</button>` : ''}</div>`);
+    if ($('#dc-ok')) $('#dc-ok').onclick = () => { try { localStorage.setItem(ACK, new Date().toISOString()); } catch (e) { /* ignore */ } closeModal(); };
+    if ($('#dc-man')) $('#dc-man').onclick = () => { closeModal(); window.LoomManualViewer.open('disclaimer'); };
+  }
+  function acknowledged() { try { return !!localStorage.getItem(ACK); } catch (e) { return false; } }
+  /* Called when a project of a mains type opens, or a project is switched to one. */
+  function checkDisclaimer() { if (L.disclaimerFor(project).mains && !acknowledged()) setTimeout(() => { if ($('#modal').hidden) disclaimerModal(true); }, 300); }
   function aboutModal() {
     const where = PF.kind === 'desktop' ? t('the desktop app') : PF.kind === 'preview' ? t('a preview') : t('a browser');
     showModal(t('About LoomWright'), `
       <p><b>LoomWright ${esc(L.VERSION)}</b>, ${esc(t('running in'))} ${esc(where)}.</p>
-      <p class="muted">${esc(t('Free, open-source wiring diagram editor for vehicles and electronics. Projects are saved as .loom files (plain JSON) that the optional Claude add-on can also read and write.'))}</p>
+      <p class="muted">${esc(t('Free, open-source wiring diagram editor, mainly for vehicles, and also for household, workshop, factory and electronics wiring. Projects are saved as .loom files (plain JSON) that the optional Claude add-on can also read and write.'))}</p>
+      <p class="callout warn">${esc(t('A basic planning tool: its checks are guidance only and do not replace a qualified electrician or engineer.'))} <a href="#" id="h-disc">${esc(t('Read the disclaimer'))}</a></p>
       <p class="muted">Copyright © 2026 LoomWright contributors. ${esc(t('Licensed under the GNU General Public License v3.0 or later.'))} IBM Plex Mono: SIL Open Font License. js-yaml: MIT License.</p>
       <div class="row-btns"><button class="btn" id="h-sample">${esc(t('Open the example project'))}</button><button class="btn primary" data-close>${esc(t('Close'))}</button></div>`);
     $('#h-sample').onclick = () => { closeModal(); openSample(); };
+    $('#h-disc').onclick = (e) => { e.preventDefault(); disclaimerModal(); };
     if (PF.appInfo) PF.appInfo().then((info) => {
       const at = $('#modal-body .muted'); if (!info || !at) return;
       at.insertAdjacentHTML('beforebegin', `<p class="muted">${esc(info.portable ? t('Portable copy: settings and My components are kept next to the program in') : t('My components are kept in'))} <span class="mono">${esc(info.portable ? info.data_dir : info.library)}</span></p>`);
@@ -2399,6 +2429,8 @@
     'rev-compare': { label: 'Compare revisions…', run: () => compareModal(), enabled: () => (project.revisions || []).length > 0 },
     savepoint: { label: 'Keep a save point now', run: () => savePoint('Manual').then(() => toast(t('Save point kept on this computer'))) },
     claude: { label: 'Use with Claude…', run: claudeModal },
+    manual: { label: 'User manual', key: 'F1', run: () => openManual() },
+    disclaimer: { label: 'Disclaimer', run: () => disclaimerModal() },
     help: { label: 'Keyboard and mouse', run: helpModal },
     about: { label: 'About LoomWright', run: aboutModal },
   };
@@ -2411,7 +2443,7 @@
     ['Tools', ['trace', 'test', 'fault', '-', 'formboard', 'locations', '-', 'builder', 'colours', 'cables', '-', 'stock', 'build-share', 'build-import', '-', 'lib-import', 'lib-export', '-', 'check']],
     ['Reports', ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cutlist', 'build', 'shop', 'nets', '-', 'print-pack', 'print-labels', '-', 'export-wires', 'export-bom', 'export-cable', 'export-cut', 'export-connectors', 'export-fuses', 'export-voltages', 'export-shop', 'export-labels', 'export-usage']],
     ['Revision', ['rev-issue', 'rev-compare', 'pane-history', '-', 'savepoint']],
-    ['Help', ['claude', 'help', 'about']],
+    ['Help', ['manual', 'claude', 'help', '-', 'disclaimer', 'about']],
   ];
   function runCommand(id) {
     const c = COMMANDS[id];

@@ -1056,6 +1056,22 @@
     ],
   };
   const MAINS_TYPES = ['household', 'factory', 'mixed'];
+  /* What a project is for. It picks the starter circuits and library sections shown first, and which checks run. */
+  const PROJECT_TYPES = [
+    { id: 'vehicle', name: 'Vehicle (12/24 V)' },
+    { id: 'household', name: 'Household (UK mains)' },
+    { id: 'factory', name: 'Factory, workshop and control panels' },
+    { id: 'electronics', name: 'Electronics project' },
+    { id: 'mixed', name: 'Mixed (show everything)' },
+  ];
+  function applyProjectType(project, type) {
+    if (!PROJECT_TYPES.some((x) => x.id === type)) type = 'vehicle';
+    project.settings = project.settings || {};
+    project.settings.projectType = type;
+    projectTypeHooks.forEach((f) => f(project, type));
+    return project;
+  }
+  const projectTypeHooks = [];
   /* Which disclaimer a project needs: the strong one for mains and compressed air work. */
   function disclaimerFor(d) {
     const project = d && d.project ? d.project : d, st = (project && project.settings) || {};
@@ -1432,7 +1448,7 @@
     allColours, colourById, colourCode, wireCode, wireColourName, gaugeInfo, gaugeWidth, voltageDrop,
     renderDiagram, exportSVG, bounds, sheetBounds, wireList, bom, cableTotals, validate, autoLayout, libraryList, eachView,
     PAGES, pageOf, zoneOf, frameSVG, sheetFurnitureSVG, xrefs, renderOptions, wireLabelPos, wireLabelText, cloudPath,
-    DISCLAIMER, MAINS_TYPES, disclaimerFor, wrapText,
+    DISCLAIMER, MAINS_TYPES, PROJECT_TYPES, applyProjectType, projectTypeHooks, disclaimerFor, wrapText,
     DEFAULT_SETTINGS, revisionState, nextRevision, issueRevision, revisionById, diffStates, compareRevisions, cloudsFor, describeDiff, restoreRevision,
   };
 });

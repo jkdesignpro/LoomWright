@@ -35,8 +35,8 @@
     } else { view.x -= e.deltaX; view.y -= e.deltaY; }
     applyView(); redraw();
   }
-  function open(html) {
-    root.innerHTML = html; root.hidden = false;
+  function open(html, kind) {
+    root.innerHTML = html; root.hidden = false; root.dataset.kind = kind || '';
     document.addEventListener('keydown', keys, true);
     const s = stage();
     s.addEventListener('wheel', wheel, { passive: false });
@@ -114,7 +114,7 @@
     open(head(t('Harness formboard'), `<select id="fb-h" aria-label="${esc(t('Harness'))}">${hs.map((h) => `<option${h === harness ? ' selected' : ''}>${esc(h)}</option>`).join('')}</select>
       <label class="fld check" style="margin-left:8px"><input type="checkbox" id="fb-scale"${fb.scale ? ' checked' : ''}><span>${esc(t('Draw to scale'))}</span></label>
       <span class="vsep"></span><button class="btn" data-v="dxf">${esc(t('Export DXF (1:1)'))}</button><button class="btn" data-v="svg">${esc(t('Export SVG'))}</button><button class="btn" data-v="reset">${esc(t('Start layout again'))}</button>`) +
-      `<div class="v-main"><div class="v-stage"><svg id="v-svg" aria-label="${esc(t('Harness formboard'))}"><g id="v-vp"></g></svg><div class="v-hint" id="v-hint"></div></div><aside class="v-side" id="v-side"></aside></div>`);
+      `<div class="v-main"><div class="v-stage"><svg id="v-svg" aria-label="${esc(t('Harness formboard'))}"><g id="v-vp"></g></svg><div class="v-hint" id="v-hint"></div></div><aside class="v-side" id="v-side"></aside></div>`, 'formboard');
     $('#fb-h').onchange = (e) => openFormboard(e.target.value);
     $('#fb-scale').onchange = (e) => { fb.scale = e.target.checked; fbFit(); applyView(); redraw(); };
     requestAnimationFrame(() => { fbFit(); applyView(); redraw(); side(); });
@@ -351,7 +351,7 @@
   function openVehicle() {
     mode = 'vehicle'; veh.placing = null; veh.sel = null;
     open(head(t('Component locations'), `<span class="vsep"></span><button class="btn" data-v="pic">${esc(t('Use a picture…'))}</button><button class="btn" data-v="nopic"${vehicle().image ? '' : ' disabled'}>${esc(t('Use the plain outline'))}</button><button class="btn" data-v="vsvg">${esc(t('Export SVG'))}</button><button class="btn" data-v="vpng">${esc(t('Export PNG'))}</button>`) +
-      `<div class="v-main"><div class="v-stage"><svg id="v-svg" aria-label="${esc(t('Vehicle view'))}"><g id="v-vp"></g></svg><div class="v-hint" id="v-hint"></div></div><aside class="v-side" id="v-side"></aside></div>`);
+      `<div class="v-main"><div class="v-stage"><svg id="v-svg" aria-label="${esc(t('Vehicle view'))}"><g id="v-vp"></g></svg><div class="v-hint" id="v-hint"></div></div><aside class="v-side" id="v-side"></aside></div>`, 'vehicle');
     requestAnimationFrame(() => { vehFit(); applyView(); redraw(); side(); });
   }
   function vehFit() { fitTo({ x: 0, y: 0, w: VW, h: VH }); }
