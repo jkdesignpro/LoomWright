@@ -919,8 +919,8 @@
     const xr = o.xref && o.xref.get(p.id);
     if (xr) {
       const link = p.type === 'offpage' || p.type === 'net_label';
-      const txt = (link ? '→ ' : 'also on ') + xr.map((x) => x.text).join(', ');
-      s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8" text-anchor="middle" fill="${o.bw ? INK : '#2b5fb8'}" font-family="${MONO}"${edit ? ` data-xref="${p.id}" class="xref"` : ''}>${esc(txt)}${edit ? '<title>Click to go there</title>' : ''}</text>`;
+      const lead = link ? '→ ' : 'also on ', targets = o.links ? xr.map((x) => `<tspan data-link="part|${esc(x.sheetId)}|${esc(x.part)}">${esc(x.text)}</tspan>`).join(', ') : esc(xr.map((x) => x.text).join(', '));
+      s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8" text-anchor="middle" fill="${o.bw ? INK : '#2b5fb8'}" font-family="${MONO}"${edit ? ` data-xref="${p.id}" class="xref"` : ''}>${esc(lead)}${targets}${edit ? '<title>Click to go there</title>' : ''}</text>`;
       ty += 10;
     }
     if (o.states && o.states.has(p.id)) { s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8.5" font-weight="700" text-anchor="middle" fill="#a35f00" font-family="${MONO}" pointer-events="none">${esc(o.states.get(p.id))}</text>`; ty += 10; }
@@ -1042,6 +1042,44 @@
   }
   function usedColourCombos(doc) { return colourUsage(doc).map((e) => [e.code, e.sample, e.uses]); }
 
+  /* ---- Disclaimer. LoomWright is a basic tool: its checks are guidance, not certification. ---- */
+  const DISCLAIMER = {
+    title: 'Disclaimer',
+    general: 'Drawn with LoomWright, a basic planning tool. Its checks are guidance only: check your work against the makers\' data and get a qualified person to check anything you are not sure of. No responsibility is accepted for its use.',
+    mains: 'LoomWright is a basic planning tool. Its checks are guidance only, not proof that work meets BS 7671, IEC 60204 or any other code, and it does not replace a qualified electrician or engineer. No responsibility is accepted for its use.',
+    full: [
+      'LoomWright is a free, basic tool for drawing and planning wiring. It is not a design service, and it does not replace training, the standards themselves or a qualified person.',
+      'Every check, warning, hint, calculation and suggestion it gives (cable sizes, voltage drop, fault loop impedance, protective devices, derating, compressed air sizing and the rest) is guidance only. It uses simplified models and the data you enter, and it can be wrong or incomplete. A clean report does not mean a design is safe, or that it meets BS 7671, IEC 60204-1, the Building Regulations (including Part P), the Electricity at Work Regulations 1989, the Pressure Systems Safety Regulations 2000 or any other standard, regulation or code.',
+      'Mains wiring in homes and workplaces, machine control panels and compressed air systems can kill or injure people and start fires. That work must be designed, installed, inspected, tested and certified by a competent, qualified person, such as a registered electrician, working to the current edition of the relevant standards and the makers\' instructions. Some household electrical work must be notified to building control.',
+      'Vehicle wiring has its own risks: fire from overloaded or unprotected cables, and faults that affect lights, brakes or safety systems. Check your work against the vehicle and component makers\' data.',
+      'LoomWright is free software under the GNU General Public License, version 3 or later. It is provided "as is", without any warranty, not even the implied warranty of merchantability or fitness for a particular purpose. As far as the law allows, its authors and contributors accept no responsibility or liability for any loss, damage, injury or death arising from its use, or from relying on anything it shows or produces.',
+    ],
+  };
+  const MAINS_TYPES = ['household', 'factory', 'mixed'];
+  /* Which disclaimer a project needs: the strong one for mains and compressed air work. */
+  function disclaimerFor(d) {
+    const project = d && d.project ? d.project : d, st = (project && project.settings) || {};
+    const mains = MAINS_TYPES.includes(st.projectType) || !!(project && Array.isArray(project.air) && project.air.length);
+    return { mains, short: mains ? DISCLAIMER.mains : DISCLAIMER.general, full: DISCLAIMER.full, title: DISCLAIMER.title };
+  }
+  /* Break a sentence into lines of at most n characters. */
+  function wrapText(text, n) {
+    const out = [];
+    let line = '';
+    String(text).split(/\s+/).forEach((w) => { if (line && (line + ' ' + w).length > n) { out.push(line); line = w; } else line = line ? line + ' ' + w : w; });
+    if (line) out.push(line);
+    return out;
+  }
+  /* The disclaimer printed on mains drawings, bottom left, in up to two lines. */
+  function disclaimerSVG(doc, x, yBottom, width) {
+    const dc = disclaimerFor(doc);
+    if (!dc.mains || ((doc.settings || {}).disclaimerOnSheets === false)) return '';
+    let size = 7, lines = wrapText(dc.short, Math.floor(width / (size * 0.6)));
+    if (lines.length > 2) { size = Math.max(4.5, (width * 2) / (dc.short.length * 0.6 * 1.08)); lines = wrapText(dc.short, Math.floor(width / (size * 0.6))).slice(0, 2); }
+    return lines.map((l, i) => `<text x="${x}" y="${yBottom - (lines.length - 1 - i) * (size + 2)}" font-size="${num1(size)}" fill="#5b625e" font-family="${MONO}">${esc(l)}</text>`).join('');
+  }
+  const num1 = (v) => Math.round(v * 10) / 10;
+
   /* ---- Sheet furniture: colour key, revision table, title block ---- */
   function keySVG(doc, kx, ky, maxRows, o) {
     const combos = usedColourCombos(doc);
@@ -1052,7 +1090,7 @@
       const yy = ky + 18 + i * 18, main = o.bw ? { hex: '#3a403c' } : colourById(doc, w.colour) || { hex: '#888' };
       out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="#262b28" stroke-width="6.5"/><line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${main.hex}" stroke-width="5"/>`;
       if (!o.bw) [w.tracer, w.tracer2].filter(Boolean).forEach((id, j) => { const t = colourById(doc, id); if (t) out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${t.hex}" stroke-width="3" stroke-dasharray="${w.tracer2 ? '4 8' : '6 6'}" stroke-dashoffset="${j * 6}"/>`; });
-      const what = uses.map((u) => u.circuit).filter(Boolean);
+      const what = [...new Set(uses.map((u) => u.circuit).filter(Boolean))];
       out += `<text x="${kx + 48}" y="${yy}" font-size="9" fill="${INK}"><tspan font-weight="700">${esc(code)}</tspan> ${esc(wireColourName(doc, w))}${what.length ? `<tspan fill="#5b625e"> · ${esc(what.join(', ').slice(0, 60))}</tspan>` : ''}</text>`;
     });
     if (shown.length < combos.length) out += `<text x="${kx}" y="${ky + 18 + shown.length * 18}" font-size="9" fill="#5b625e">+ ${combos.length - shown.length} more in the colour usage list</text>`;
@@ -1102,6 +1140,7 @@
       const tx = pg.W - inner - TB_W, ty = pg.H - inner - TB_H;
       out += revTableSVG(doc, tx, ty, TB_W).svg + titleBlockSVG(doc, tx, ty);
     }
+    out += disclaimerSVG(doc, pg.m, pg.H - pg.m / 2 + 4, pg.W - 2 * pg.m);
     return out + '</g>';
   }
 
@@ -1130,6 +1169,7 @@
       const tx = X + W - TB_W - 8, ty = Y + H - TB_H - 8;
       out += revTableSVG(doc, tx, ty, TB_W).svg + titleBlockSVG(doc, tx, ty);
     }
+    out += disclaimerSVG(doc, X + 18, Y + H - 16, Math.max(200, W - 36 - (tbH ? TB_W + 16 : 0)));
     return out + '</svg>';
   }
 
@@ -1392,6 +1432,7 @@
     allColours, colourById, colourCode, wireCode, wireColourName, gaugeInfo, gaugeWidth, voltageDrop,
     renderDiagram, exportSVG, bounds, sheetBounds, wireList, bom, cableTotals, validate, autoLayout, libraryList, eachView,
     PAGES, pageOf, zoneOf, frameSVG, sheetFurnitureSVG, xrefs, renderOptions, wireLabelPos, wireLabelText, cloudPath,
+    DISCLAIMER, MAINS_TYPES, disclaimerFor, wrapText,
     DEFAULT_SETTINGS, revisionState, nextRevision, issueRevision, revisionById, diffStates, compareRevisions, cloudsFor, describeDiff, restoreRevision,
   };
 });

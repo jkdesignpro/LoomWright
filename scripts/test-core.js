@@ -167,4 +167,54 @@ assert.strictEqual(L.wireCode({ settings: { standard: 'sae' } }, { colour: 'brow
   assert.ok(r, 'import reports what it did');
 }
 
+// 0.4: circuit solver, fault finding, planning, starter circuits, tidy routing, PDF
+{
+  const p = sample();
+  const sol = L.solveCircuit(p);
+  assert.ok(sol.ok && sol.loads.length > 0, 'the example solves');
+  sol.loads.forEach((x) => assert.ok(x.volts >= 0 && x.volts < 16, `${x.ref}: sensible voltage ${x.volts}`));
+  assert.ok(L.loadVoltages(p).length > 0, 'voltage at each load');
+  const targets = L.faultTargets(p);
+  assert.ok(targets.length > 0, 'fault targets');
+  L.FAULT_SYMPTOMS.forEach((sy) => {
+    const f = L.faultFind(p, targets.find((x) => x.kind === 'load').ref, sy.id);
+    assert.ok(f.steps.length > 0, `fault sheet "${sy.id}" has steps`);
+    assert.ok(L.faultSheetHTML(f, { project: p }).includes('<'), 'fault sheet renders');
+  });
+  const v = L.views(p)[1];
+  assert.ok(L.suggestColours(p, v.sheet.id, v.wires[0]).suggestions.length > 0, 'colour suggestions');
+  const sl = L.shoppingList(p, { cable: [{ gauge: '0.75', colour: 'black', metres: 100 }], items: [] });
+  assert.ok(sl.cable.length > 0 && sl.parts.length > 0, 'shopping list');
+  const w0 = v.wires[0];
+  w0.build = L.setBuild(w0, { cut: true, test: 'pass' });
+  assert.ok(L.buildProgress(p).harnesses.some((h) => h.cut > 0), 'build progress counts a cut wire');
+  // starter circuits draw cleanly on an empty sheet
+  L.templateList().forEach((tp) => {
+    const b = L.templateBlock(tp.id, p);
+    const ids = new Set(b.parts.map((x) => x.id));
+    b.wires.forEach((w) => assert.ok(ids.has(w.from.part) && ids.has(w.to.part), `${tp.id}: wire ends on its own parts`));
+  });
+  // tidy routing keeps every wire connected and square
+  const q = sample(), tv = L.view(q, 1);
+  const routed = L.tidyWires(tv, []);
+  assert.ok(routed > 0, 'tidy routes wires');
+  tv.wires.forEach((w) => {
+    const pts = L.wirePoints(tv, w);
+    assert.ok(pts, `${w.name}: still connected`);
+    for (let i = 1; i < pts.length; i++) assert.ok(pts[i].x === pts[i - 1].x || pts[i].y === pts[i - 1].y, `${w.name}: square corners`);
+  });
+  // PDF: a valid file with bookmarks, links and a correct cross-reference table
+  const pdf = Buffer.from(L.projectPDF(p, { date: '2026-11-10' })).toString('latin1');
+  assert.ok(pdf.startsWith('%PDF-1.4') && pdf.trimEnd().endsWith('%%EOF'), 'PDF header and trailer');
+  assert.ok(pdf.includes('/Outlines') && pdf.includes('/Subtype /Link'), 'PDF has bookmarks and links');
+  const xref = Number(/startxref\n(\d+)/.exec(pdf)[1]);
+  const rows = pdf.slice(xref).split('\n').slice(3).filter((r) => / 00000 n /.test(r));
+  rows.forEach((r, i) => assert.ok(pdf.startsWith(`${i + 1} 0 obj`, Number(r.slice(0, 10))), `PDF object ${i + 1} offset`));
+  assert.strictEqual(pdf.match(/\/Type \/Page /g).length, 3 + 5, 'three sheets and five table pages');
+  // disclaimers
+  assert.strictEqual(L.disclaimerFor(p).mains, false, 'vehicle projects get the general note');
+  p.settings.projectType = 'household';
+  assert.ok(L.disclaimerFor(p).mains && L.exportSVG(L.view(p, 0)).includes('BS 7671'), 'household drawings carry the disclaimer');
+}
+
 console.log(`ok: ${n} components, example project with ${s.sheets.length} sheets and ${L.wireList(s).length} wires`);

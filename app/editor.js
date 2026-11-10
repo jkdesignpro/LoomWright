@@ -1809,6 +1809,26 @@
     $('#pk-print').onclick = () => { const html = L.buildPackHTML(project, opts()); closeModal(); printHTML(`<style>${L.PACK_CSS}@page{size:A4;margin:12mm}</style>${html}`); };
     $('#pk-html').onclick = async () => { const html = L.buildPackHTML(project, opts()); closeModal(); await PF.exportFile(projSlug() + '-build-pack.html', packDocument(html, project.title + ' build pack'), 'text/html'); };
   }
+  /* A real PDF: vector sheets, then tables, with bookmarks and links that jump to parts. */
+  function pdfModal() {
+    if (!L.projectPDFAsync) return;
+    const T = L.PDF_TABLES, def = new Set(L.PDF_DEFAULT_TABLES);
+    showModal(t('Export PDF'), `<p class="muted">${esc(t('Every sheet as a sharp drawing you can zoom into, then the tables you pick. Bookmarks list each sheet and every part on it, and cross-references and wire list entries are links that jump to the part.'))}</p>
+      <label class="fld"><span>${esc(t('Sheets'))}</span><select id="pdf-sheets"><option value="all">${esc(t('All sheets'))} (${project.sheets.length})</option><option value="this">${esc(t('This sheet only'))}</option></select></label>
+      <h3 class="mh">${esc(t('Tables after the drawings'))}</h3>
+      <div class="checks2">${Object.keys(T).map((k) => `<label class="fld check"><input type="checkbox" data-pdft="${k}"${def.has(k) ? ' checked' : ''}><span>${esc(t(T[k].title))}</span></label>`).join('')}</div>
+      <label class="fld check"><input type="checkbox" id="pdf-bw"${project.settings.bw ? ' checked' : ''}><span>${esc(t('Drawings in black and white (wire colours written as codes)'))}</span></label>
+      <div class="row-btns"><button class="btn primary" id="pdf-go">${esc(t('Save PDF'))}</button><button class="btn" data-close>${esc(t('Cancel'))}</button></div>`);
+    $('#pdf-go').onclick = async () => {
+      const tables = $$('[data-pdft]').filter((x) => x.checked).map((x) => x.dataset.pdft);
+      const sheets = $('#pdf-sheets').value === 'this' ? [doc.sheet.id] : null;
+      closeModal();
+      try {
+        const bytes = await L.projectPDFAsync(project, { tables, sheets, bw: $('#pdf-bw') ? $('#pdf-bw').checked : project.settings.bw, date: new Date().toISOString().slice(0, 10) });
+        await PF.exportFile(projSlug() + '.pdf', bytes, 'application/pdf');
+      } catch (e) { showMessage(t('Export PDF'), `<p>${esc(e.message)}</p>`); }
+    };
+  }
   const LABEL_SIZES = [['38x21', '38 × 21 mm (65 per A4 sheet)'], ['64x34', '63.5 × 33.9 mm (24 per A4 sheet)'], ['46x11', '46 × 11.1 mm (84 per A4, wrap-around)'], ['25x10', '25 × 10 mm (heat-shrink sleeve)']];
   function labelsModal() {
     const n = project.sheets.reduce((a, s) => a + s.wires.length, 0);
@@ -2279,6 +2299,7 @@
     saveas: { label: 'Save as…', key: 'Ctrl+Shift+S', run: saveAs },
     print: { label: 'Print or save PDF (all sheets)', key: 'Ctrl+P', run: printDiagram, when: () => PF.canPrint },
     'print-pack': { label: 'Build pack (PDF)…', run: packModal },
+    'export-pdf': { label: 'Export PDF with bookmarks and links…', run: pdfModal },
     'print-labels': { label: 'Wire labels…', run: labelsModal },
     'import-csv': { label: 'Import wire list (spreadsheet)…', run: importWireListModal },
     'import-wireviz': { label: 'Import WireViz (YAML)…', run: importWireVizFile },
@@ -2382,7 +2403,7 @@
     about: { label: 'About LoomWright', run: aboutModal },
   };
   const MENUS = [
-    ['File', ['new', 'open', 'sample', 'close-tab', '-', 'save', 'saveas', '-', 'print', 'print-pack', 'print-labels', '-', 'import-csv', 'import-wireviz', 'import-kicad', 'import-lengths', '-', 'export-svg', 'export-png', 'export-dxf', 'export-wireviz', 'export-share']],
+    ['File', ['new', 'open', 'sample', 'close-tab', '-', 'save', 'saveas', '-', 'print', 'print-pack', 'print-labels', '-', 'import-csv', 'import-wireviz', 'import-kicad', 'import-lengths', '-', 'export-pdf', 'export-svg', 'export-png', 'export-dxf', 'export-wireviz', 'export-share']],
     ['Edit', ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'dup', 'delete', '-', 'select-all', 'find', 'replace', 'renumber', '-', 'block-save']],
     ['View', ['pane-parts', 'pane-project', 'pane-history', 'pane-props', 'tables', '-', 'zoom-in', 'zoom-out', 'fit', '-', 'junctions', 'xrefs', 'bw', '-', 'theme', 'language']],
     ['Arrange', ['rotate', 'flip', '-', 'align-left', 'align-centre', 'align-right', 'align-top', 'align-middle', 'align-bottom', '-', 'dist-h', 'dist-v', '-', 'tidy']],
@@ -2470,7 +2491,6 @@
     const b = e.target.closest('[data-cmd]');
     if (b && !b.disabled && !b.closest('#menubar')) runCommand(b.dataset.cmd);
   });
-  if (!PF.canPrint) $('#rb-print').hidden = true;
   window.addEventListener('beforeunload', (e) => { stash(); if (tabs.some((tb) => tb.dirty) && PF.kind === 'browser') { autosave(); e.preventDefault(); e.returnValue = ''; } });
   window.addEventListener('resize', () => renderOverlay());
 
