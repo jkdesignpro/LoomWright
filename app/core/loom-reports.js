@@ -287,6 +287,14 @@
         (sc.supplies.length ? '<h3>Supplies</h3>' + table(['Sheet', 'Supply', 'Type', 'Capacity', 'Rating A', 'Load A', '%', 'Hours at full load (50% usable)'], sc.supplies.map((f) => [f.sheet, f.ref, f.type, f.capacity, f.rating, f.load, f.pct, f.hours])) : '') +
         `<p class="muted">Loads come from each part's current or wattage at ${sc.volts} V, all switched on together. Use it as a worst case.</p>`);
     }
+    if (Loom.loadVoltages && want('voltages')) {
+      const lv = Loom.loadVoltages(project);
+      add('voltages', 'Voltage at each load', lv.length ? table(['Load', 'Sheet', 'Switched on by', 'Volts', 'Supply V', 'Drop %', 'Amps', 'Status'], lv.map((x) => [x.ref, x.sheet, x.state || 'always on', x.volts, x.supply, x.dropPct, x.amps, x.status || ''])) + '<p class="muted">Worked out from wire sizes, lengths and load ratings with a 12.6 V resting battery (scaled for other systems). A guide, not a measurement.</p>' : '');
+    }
+    if (Loom.faultFind && want('faults')) {
+      const ts = Loom.faultTargets(project).filter((x) => x.kind === 'load');
+      add('faults', 'Fault-finding sheets', ts.map((x) => Loom.faultSheetHTML(Loom.faultFind(project, x.part, 'dead'), { project: project.title })).join(''));
+    }
     const cb = costedBom(project);
     add('bom', 'Parts and costs', cb.parts.length ? table(['Qty', 'Component', 'Spec', 'Part number', 'Supplier', 'Unit', 'Total', 'References'], cb.parts.map((r) => [r.qty, r.name, r.spec, r.mpn, r.supplier, money(cur, r.unit), money(cur, r.total), r.refs.join(', ')])) +
       (cb.cable.length ? '<h3>Cable</h3>' + table(['Size mm²', 'Code', 'Colour', 'Insulation', 'Metres', 'Buy (+15%)', 'Per metre', 'Cost'], cb.cable.map((r) => [r.gauge, r.code, r.colour, r.insulation, r.metres.toFixed(1), (r.metres * 1.15).toFixed(1), money(cur, r.perMetre), money(cur, r.cost)])) : '') +
@@ -309,7 +317,7 @@
   }
 
   /* ---------------- Tables for CSV export (the app and the Claude add-on share these) ---------------- */
-  const REPORTS = ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cut', 'labels', 'locations', 'nets'];
+  const REPORTS = ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cut', 'labels', 'locations', 'nets', 'voltages'];
   function reportRows(d, kind, o = {}) {
     const project = projectOf(d);
     const insName = (id) => (Loom.INSULATION.find((x) => x.id === id) || {}).name || '';
@@ -357,6 +365,9 @@
         return [['Ref', 'Component', 'Location', 'Sheet', 'Marked on vehicle']].concat(locations(project).map((x) => [x.ref, x.type, x.location, x.sheet, x.marked ? 'yes' : '']));
       case 'nets':
         return [['Net', 'Pins', 'Wires']].concat(Loom.nets(project).map((n) => [n.name, n.pins.map((p) => p.label).join(' '), n.wires.map((x) => x.wire.name).join(' ')]));
+      case 'voltages':
+        if (!Loom.loadVoltages) throw new Error('The circuit module is not loaded.');
+        return [['Load', 'Sheet', 'Switched on by', 'Volts', 'Supply V', 'Drop %', 'Amps', 'Status']].concat(Loom.loadVoltages(project).map((x) => [x.ref, x.sheet, x.state || 'always on', x.volts, x.supply, x.dropPct, x.amps, x.status || '']));
       default:
         throw new Error(`Unknown report "${kind}". Use one of: ${REPORTS.join(', ')}`);
     }

@@ -923,7 +923,11 @@
       s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8" text-anchor="middle" fill="${o.bw ? INK : '#2b5fb8'}" font-family="${MONO}"${edit ? ` data-xref="${p.id}" class="xref"` : ''}>${esc(txt)}${edit ? '<title>Click to go there</title>' : ''}</text>`;
       ty += 10;
     }
-    if (o.states && o.states.has(p.id)) s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8.5" font-weight="700" text-anchor="middle" fill="#a35f00" font-family="${MONO}" pointer-events="none">${esc(o.states.get(p.id))}</text>`;
+    if (o.states && o.states.has(p.id)) { s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8.5" font-weight="700" text-anchor="middle" fill="#a35f00" font-family="${MONO}" pointer-events="none">${esc(o.states.get(p.id))}</text>`; ty += 10; }
+    if (o.badges && o.badges.has(p.id)) {
+      const bd = o.badges.get(p.id), col = bd.level === 'low' ? '#a3241b' : bd.level === 'check' ? '#9a5b00' : '#1e6b2e', tw = bd.text.length * 5.2 + 8;
+      s += `<rect x="${bb.x + bb.w / 2 - tw / 2}" y="${ty - 8}" width="${tw}" height="11" rx="2" fill="#ffffff" stroke="${col}" stroke-width=".8" pointer-events="none"/><text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8.5" font-weight="600" text-anchor="middle" fill="${col}" font-family="${MONO}" pointer-events="none">${esc(bd.text)}</text>`;
+    }
     return s;
   }
 
@@ -1320,7 +1324,7 @@
       if (d.cat === 'Annotation') return;
       const free = r.pins.filter((pn) => !conn.get(p.id + '|' + pn.id));
       if (free.length && free.length === r.pins.length && r.pins.length) out.push({ level: 'info', part: p.id, text: `${p.label || d.name} has no wires connected.` });
-      else if (free.length && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
+      else if (free.length && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas', 'pdm'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
       // Fuse rating against the wire it protects
       if (['fuse', 'fuse_maxi', 'breaker', 'fusible_link'].includes(p.type) || p.type === 'fuse_box') {
         const ratings = p.type === 'fuse_box' ? String(r.props.ratings || '').split(',').map(parseAmps) : null;

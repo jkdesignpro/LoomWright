@@ -196,6 +196,43 @@
     shapes: [R(8, 4, 64, 92, { rx: 3 }), ...[0, 1, 2, 3].flatMap((i) => { const y = 20 + i * 20; return [L(0, y, 20, y), L(60, y, 80, y), R(20, y - 4, 40, 8, { sw: 1.2, rx: 4 }), L(22, y, 58, y, { w: 1 }), T(14, y - 4, String(i * 2 + 1), { size: 6 }), T(66, y - 4, String(i * 2 + 2), { size: 6 })]; })],
   };
 
+  /* Electronic power distribution module (PDM): outputs switched by inputs, each with its own current limit.
+     Generic: set the channel limits and which input switches each output from the maker's configuration. */
+  lib.pdm = {
+    id: 'pdm', name: 'Power distribution module (electronic)', cat: 'Protection', prefix: 'PDM', tags: 'pdm solid state fuse box programmable can keypad power module',
+    props: [
+      { k: 'outputs', l: 'Outputs', d: 8, type: 'int', min: 1, max: 32 },
+      { k: 'inputs', l: 'Inputs', d: 4, type: 'int', min: 0, max: 16 },
+      { k: 'limits', l: 'Output limits, amps (comma list)', d: '15,15,15,15,10,10,5,5' },
+      { k: 'control', l: 'What switches each output (IN1, IN2… or ALWAYS)', d: 'IN1,IN2,IN3,IN4,ALWAYS,ALWAYS,IN1,IN2' },
+      { k: 'active', l: 'Inputs switch on when', d: 'high', type: 'select', options: [['high', 'fed with + (active high)'], ['low', 'earthed (active low)']] },
+      { k: 'can', l: 'CAN bus pins', d: 'yes', type: 'select', options: [['yes', 'Yes'], ['no', 'No']] },
+    ],
+    sub: '{outputs} outputs',
+    gen(p) {
+      const no = Math.max(1, parseInt(p.outputs, 10) || 1), ni = Math.max(0, parseInt(p.inputs, 10) || 0), can = p.can !== 'no';
+      const limits = String(p.limits || '').split(',').map((x) => x.trim()), ctl = String(p.control || '').split(',').map((x) => x.trim().toUpperCase());
+      const left = [['BAT', 'Battery + (main feed)'], ['GND', 'Ground']].concat(seq(ni, (i) => ['IN' + (i + 1), 'Input ' + (i + 1)])).concat(can ? [['CANH', 'CAN high'], ['CANL', 'CAN low']] : []);
+      const n = Math.max(left.length, no), h = n * 20 + 20, w = 140;
+      const shapes = [R(10, 0, 120, h, { rx: 4 }), T(70, 14, 'PDM', { size: 9, weight: 700 })];
+      const pins = [];
+      left.forEach(([id, nm], i) => { const y = 20 + i * 20; shapes.push(L(0, y, 10, y, { w: id === 'BAT' ? 3 : 2 }), T(14, y + 3, id, { size: 7, anchor: 'start' })); pins.push(pin(id, 0, y, nm)); });
+      for (let i = 0; i < no; i++) {
+        const y = 20 + i * 20, id = 'OUT' + (i + 1), lim = limits[i] ? limits[i].replace(/a$/i, '') + 'A' : '', c = ctl[i] || 'ALWAYS';
+        shapes.push(L(130, y, 140, y), T(126, y + 3, `${id}${lim ? ' ' + lim : ''}`, { size: 7, anchor: 'end' }), T(72, y + 3, c === 'ALWAYS' ? '' : c, { size: 6, anchor: 'middle', color: '#5b625e' }));
+        pins.push(pin(id, w, y, `Output ${i + 1}${lim ? ' (' + lim + ')' : ''}, ${c === 'ALWAYS' ? 'always on' : 'switched by ' + c}`));
+      }
+      return { w, h, pins, shapes };
+    },
+  };
+  /* CAN bus terminating resistor (one at each end of the bus). */
+  lib.can_term = {
+    id: 'can_term', name: 'CAN bus terminator (120 Ω)', cat: 'Electronics', prefix: 'RT', w: 60, h: 40, tags: 'can bus termination resistor 120 ohm',
+    props: [{ k: 'value', l: 'Value', d: '120Ω' }], sub: '{value}',
+    pins: [pin('CANH', 0, 10, 'CAN high'), pin('CANL', 0, 30, 'CAN low')],
+    shapes: [R(14, 4, 40, 32, { rx: 3 }), L(0, 10, 14, 10), L(0, 30, 14, 30), L(24, 10, 34, 10, { w: 1.2 }), L(24, 30, 34, 30, { w: 1.2 }), L(34, 6, 34, 34, { w: 1.2 }), R(30, 14, 8, 12, { sw: 1.2 }), T(46, 23, 'T', { size: 8, weight: 600 })],
+  };
+
   /* ---------------- Behaviour of parts in a circuit ---------------- */
   // links: pin pairs that are always joined (wiring parts).
   // switched(p, state): pin pairs joined in the given state.
@@ -237,6 +274,14 @@
     if (t === 'vsr') { B.kind = 'switch'; B.states = ['Open', 'Combined']; B.switched = (s) => (s ? [['A', 'B']] : []); B.ret = 'GND'; return B; }
     if (t === 'flasher') { B.kind = 'switch'; B.states = ['Off', 'Flashing (on)']; B.def = 1; B.switched = (s) => (s ? [['B', 'L']] : []); return B; }
     if (t === 'diode' || t === 'zener' || t === 'led') { B.kind = t === 'led' ? 'load' : 'diode'; if (t === 'led') { B.power = ['A']; B.earth = ['K']; } B.anode = 'A'; B.cathode = 'K'; return B; }
+    if (t === 'pdm') {
+      const no = Math.max(1, parseInt(pr.outputs, 10) || 1), ni = Math.max(0, parseInt(pr.inputs, 10) || 0);
+      const limits = String(pr.limits || '').split(',').map((x) => parseAmps(x)), ctl = String(pr.control || '').split(',').map((x) => x.trim().toUpperCase());
+      B.kind = 'pdm'; B.input = 'BAT'; B.ret = 'GND'; B.inputs = seq(ni, (i) => 'IN' + (i + 1));
+      B.outputs = seq(no, (i) => ({ pin: 'OUT' + (i + 1), rating: limits[i] || null, control: ctl[i] || 'ALWAYS', active: pr.active === 'low' ? 'low' : 'high' }));
+      return B;
+    }
+    if (t === 'can_term') { B.kind = 'other'; return B; }
     if (t === 'winch_control') { B.kind = 'switch'; B.states = ['Stop', 'Wind in', 'Wind out']; B.switched = (s) => (s ? [['+', 'A']] : []); B.ret = '-'; return B; }
     const def = r.def || {};
     if (def.cat === 'Annotation' || !ids.length) return B;

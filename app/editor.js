@@ -150,6 +150,10 @@
       o.sim = test.sim.wires; o.simLoads = test.sim.loads;
       o.states = new Map();
       doc.parts.forEach((p) => { const st = L.partStates(doc, p); if (st) { const v = test.state[st.key] != null ? test.state[st.key] : st.def; o.states.set(p.id, st.states[v]); } });
+      if (test.sol) {
+        o.badges = new Map();
+        doc.parts.forEach((p) => { const l = test.sol.load(sheetId, p.id); if (l && l.running && l.volts != null) o.badges.set(p.id, { text: `${l.volts.toFixed(1)} V · ${l.amps.toFixed(1)} A`, level: l.status }); });
+      }
     }
     return o;
   }
@@ -196,7 +200,7 @@
   }
   function rectOf(a, b) { return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) }; }
 
-  function refreshAll() { if (trace) retrace(); if (test) test.sim = L.simulate(project, test.state); render(); inspector(); tables(); sheetTabs(); projectPane(); historyPane(); status(); }
+  function refreshAll() { if (trace) retrace(); if (test) runTest(); render(); inspector(); tables(); sheetTabs(); projectPane(); historyPane(); status(); }
   function commit() { editRev++; autosave(); refreshAll(); }
 
   /* ---------------- Status bar ---------------- */
@@ -526,6 +530,7 @@
     trace.sheets = new Set(net.wires.map((x) => x.sheet.id).concat(net.pins.map((x) => x.sheet.id)));
   }
   function retrace() {
+    if (trace.fault) return;
     const s = project.sheets.find((x) => x.id === trace.seed.sid);
     const ok = s && s.parts.some((p) => p.id === trace.seed.end.part);
     const net = ok && L.netOf(project, trace.seed.sid, trace.seed.end);
@@ -539,7 +544,8 @@
   function startTest() {
     if (test) return;
     draft = null; svg.classList.remove('wiring'); trace = null;
-    test = { state: {}, sim: L.simulate(project, {}) };
+    test = { state: {}, sim: null, sol: null };
+    runTest();
     document.body.classList.add('testing');
     sel = { parts: new Set(), wires: new Set() };
     refreshAll(); setHint();
@@ -553,7 +559,12 @@
     $$('[data-cmd="test"]').forEach((b) => b.classList.remove('on'));
     if (!quiet) { refreshAll(); setHint(); }
   }
-  function setTestState(key, v) { test.state[key] = v; test.sim = L.simulate(project, test.state); render(); inspector.force = true; inspector(); inspector.force = false; }
+  function setTestState(key, v) { test.state[key] = v; runTest(); render(); inspector.force = true; inspector(); inspector.force = false; }
+  /* Connections first (what is live), then the solver for volts and amps. A solver problem never stops the test. */
+  function runTest() {
+    test.sim = L.simulate(project, test.state);
+    try { test.sol = L.solveCircuit ? L.solveCircuit(project, test.state, { battery: test.battery }) : null; } catch (e) { test.sol = null; console.warn('circuit solver', e); }
+  }
   function operate(p) {
     const st = L.partStates(doc, p);
     if (!st) return false;
@@ -1158,7 +1169,18 @@
     const loads = [...sim.loads].map(lab), relays = [...sim.relays].map((k) => k.split('|').pop());
     h += sec('Working now', `<div class="kv"><span>${esc(t('Loads on'))}</span><b>${loads.length}</b><span>${esc(t('Relays pulled in'))}</span><b>${relays.length}</b><span>${esc(t('Live wires'))}</span><b>${sim.wires.size}</b></div>${loads.length ? `<div class="mono" style="font-size:11.5px">${esc([...new Set(loads)].join(', '))}</div>` : ''}`);
     h += `<div class="row-btns"><button class="btn" data-act="test-reset">${esc(t('Reset all'))}</button><button class="btn primary" data-act="test-off">${esc(t('Stop test'))}</button></div>`;
-    h += `<p class="muted" style="margin:0;font-size:11.5px">${esc(t('The test follows connections only: it does not model voltage, current or timing. Loads light up when they have a live feed and an earth.'))}</p>`;
+    const sol = test.sol;
+    if (sol) {
+      const on = sol.loads.filter((x) => x.running);
+      const cls = (st) => (st === 'low' ? 'bad' : st === 'check' ? 'warnc' : '');
+      h += sec('Voltage at each load', on.length ? `<table class="mini"><tr><th>${esc(t('Load'))}</th><th>V</th><th>A</th><th>${esc(t('Drop'))}</th></tr>${on.map((x) => `<tr class="${cls(x.status)}"><td><button class="linkbtn" data-goto-part="${x.part}" data-goto-sheet="${x.sheetId}">${esc(x.ref)}</button></td><td>${x.volts == null ? '–' : x.volts.toFixed(2)}</td><td>${x.amps == null ? '–' : x.amps.toFixed(1)}</td><td>${x.dropPct == null ? esc(t('no rating')) : x.dropPct.toFixed(1) + '%'}</td></tr>`).join('')}</table>` : `<p class="muted" style="margin:0">${esc(t('Nothing is running.'))}</p>`);
+      if (sol.fuses.length) h += sec('Fuses carrying current', `<table class="mini"><tr><th>${esc(t('Fuse'))}</th><th>A</th><th>${esc(t('Rating'))}</th><th>%</th></tr>${sol.fuses.map((f) => `<tr class="${f.status === 'over' ? 'bad' : f.status === 'high' ? 'warnc' : ''}"><td>${esc(f.ref)}</td><td>${f.amps.toFixed(1)}</td><td>${f.rating || '?'}</td><td>${f.pct == null ? '' : f.pct}</td></tr>`).join('')}</table>`);
+      h += sec('Supplies', `<table class="mini"><tr><th></th><th>V</th><th>A</th><th></th></tr>${sol.sources.map((x) => `<tr><td>${esc(x.ref)}</td><td>${x.volts.toFixed(2)}</td><td>${x.amps.toFixed(1)}</td><td class="muted">${esc(t(x.state))}</td></tr>`).join('')}</table>
+        <label class="fld"><span>${esc(t('Battery at rest, V'))}</span><input type="number" step="0.1" min="0" data-testbat value="${esc(test.battery || '')}" placeholder="${(12.6 * (sol.system / 12)).toFixed(1)}"></label>`);
+      if (sol.notes.length) h += `<div class="callout">${sol.notes.map((n) => esc(n)).join('<br>')}</div>`;
+    }
+    h += `<p class="muted" style="margin:0;font-size:11.5px">${esc(t('Volts and amps are worked out from wire sizes, lengths and load ratings: a guide to what a meter should read, not a measurement. Pick a load and use Fault finding for a step-by-step test.'))}</p>`;
+    h += `<div class="row-btns"><button class="btn" data-cmd="fault">${esc(t('Fault finding…'))}</button></div>`;
     return h;
   }
   function partPanel(p) {
@@ -1185,6 +1207,7 @@
     }
     h += `<div class="row-btns"><button class="btn" data-act="rotate">${esc(t('Rotate'))}</button><button class="btn" data-act="flip">${esc(t('Flip'))}</button><button class="btn" data-act="dup">${esc(t('Duplicate'))}</button><button class="btn danger" data-act="delete">${esc(t('Delete'))}</button></div>`;
     if (d.custom) h += `<div class="row-btns"><button class="btn" data-act="edit-custom">${esc(t('Edit component design'))}</button></div>`;
+    if (L.faultFind && p.label && ['load', 'relay'].includes(L.behaviour(doc, p).kind)) h += `<div class="row-btns"><button class="btn" data-act="fault-part">${esc(t('Fault finding…'))}</button></div>`;
     if (r.pins.length) {
       h += `<div class="sec"><h3>${esc(t('Pins'))}</h3><ul class="pins">` + r.pins.map((pn) => {
         const ws = doc.wires.filter((w) => (w.from.part === p.id && w.from.pin === pn.id) || (w.to.part === p.id && w.to.pin === pn.id));
@@ -1270,6 +1293,7 @@
   insp.addEventListener('input', (e) => { if (e.target.matches('[data-field]') && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') applyField(e.target, true); });
   insp.addEventListener('change', (e) => {
     if (e.target.dataset.test != null) { setTestState(e.target.dataset.test, +e.target.value); return; }
+    if (e.target.dataset.testbat != null) { test.battery = parseFloat(e.target.value) || null; runTest(); render(); inspector.force = true; inspector(); inspector.force = false; return; }
     if (!e.target.matches('[data-field]')) return;
     if (snapBefore == null) snapBefore = snapshot();
     applyField(e.target, false);
@@ -1348,6 +1372,7 @@
     else if (act === 'reset-label') { const w = only('wire'); pushHistory(); delete w.lab; commit(); }
     else if (act === 'trace-wire') { const w = only('wire'); startTrace(sheetId, w.from); }
     else if (act === 'trace-off') clearTrace();
+    else if (act === 'fault-part') faultModal(only('part').id);
     else if (act === 'test-off') endTest();
     else if (act === 'test-reset') { test.state = {}; setTestState('__', 0); delete test.state.__; }
   });
@@ -1600,6 +1625,7 @@
   async function exportCable() { await saveCSV('cable', L.reportRows(project, 'cable')); }
   async function exportUsage() { await saveCSV('colour-usage', L.reportRows(project, 'usage')); }
   async function exportFuses() { await saveCSV('fuses-and-loads', L.reportRows(project, 'fuses')); }
+  async function exportVoltages() { await saveCSV('voltage-at-each-load', L.reportRows(project, 'voltages')); }
   async function exportConnectors() { await saveCSV('connectors', L.reportRows(project, 'connectors')); }
   async function exportCut() { await saveCSV('cut-list', L.reportRows(project, 'cut')); }
   async function exportLabels(single) { await saveCSV('labels', L.reportRows(project, 'labels', { single })); }
@@ -1690,14 +1716,14 @@
     const wl = L.wireList(project);
     printHTML(sheetsPrintHTML(project.settings.bw) + (wl.length ? `<div class="plist"><h3>${esc(t('Wire list'))}: ${esc(project.title)}</h3><table><thead><tr>${['Sheet', 'Wire', 'From', 'To', 'Code', 'Colour', 'mm²', 'm', 'A', 'Circuit', 'Harness', 'Notes'].map((x) => `<th>${esc(t(x))}</th>`).join('')}</tr></thead><tbody>${wl.map((r) => `<tr><td>${esc(r.sheet)}</td><td>${esc(r.name)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td><td>${esc(r.code)}</td><td>${esc(r.colour)}</td><td>${esc(r.gauge)}</td><td>${esc(r.length)}</td><td>${esc(r.current)}</td><td>${esc(r.circuit)}</td><td>${esc(r.harness)}</td><td>${esc(r.notes)}</td></tr>`).join('')}</tbody></table></div>` : ''));
   }
-  const PACK_SECTIONS = [['sheets', 'Drawings'], ['revisions', 'Revision history'], ['wires', 'Wire list'], ['cut', 'Cut lists by harness'], ['connectors', 'Connector tables'], ['fuses', 'Fuses, relays and load budget'], ['bom', 'Parts and costs'], ['cables', 'Multicore and screened cables'], ['locations', 'Component locations'], ['formboards', 'Harness formboards'], ['colours', 'Colour usage'], ['labels', 'Wire labels'], ['checks', 'Design checks']];
+  const PACK_SECTIONS = [['sheets', 'Drawings'], ['revisions', 'Revision history'], ['wires', 'Wire list'], ['cut', 'Cut lists by harness'], ['connectors', 'Connector tables'], ['fuses', 'Fuses, relays and load budget'], ['voltages', 'Voltage at each load'], ['faults', 'Fault-finding sheets'], ['bom', 'Parts and costs'], ['cables', 'Multicore and screened cables'], ['locations', 'Component locations'], ['formboards', 'Harness formboards'], ['colours', 'Colour usage'], ['labels', 'Wire labels'], ['checks', 'Design checks']];
   function packDocument(html, title) {
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><style>@page{size:A4;margin:12mm}body{margin:0;padding:12mm;background:#fff}@media print{body{padding:0}}${L.PACK_CSS}</style></head><body>${html}</body></html>`;
   }
   function packModal() {
     const V = window.LoomViews;
     showModal(t('Build pack'), `<p class="muted">${esc(t('Everything needed to build the loom in one document: drawings, wire and cut lists, connector tables, fuses and loads, parts and costs. Print it, or choose Save as PDF in the print window.'))}</p>
-      <div class="checks2">${PACK_SECTIONS.map(([k, l]) => `<label class="fld check"><input type="checkbox" data-pack="${k}"${k === 'labels' ? '' : ' checked'}><span>${esc(t(l))}</span></label>`).join('')}</div>
+      <div class="checks2">${PACK_SECTIONS.map(([k, l]) => `<label class="fld check"><input type="checkbox" data-pack="${k}"${k === 'labels' || k === 'faults' ? '' : ' checked'}><span>${esc(t(l))}</span></label>`).join('')}</div>
       <label class="fld check"><input type="checkbox" id="pk-bw"${project.settings.bw ? ' checked' : ''}><span>${esc(t('Drawings in black and white (wire colours written as codes)'))}</span></label>
       <div class="row-btns"><button class="btn primary" id="pk-print"${PF.canPrint ? '' : ' disabled'}>${esc(t('Print or save PDF'))}</button><button class="btn" id="pk-html">${esc(t('Save as web page'))}</button><button class="btn" data-close>${esc(t('Cancel'))}</button></div>`);
     const opts = () => {
@@ -1718,6 +1744,53 @@
     const size = () => { const [w, h] = $('#lb-size').value.split('x').map(Number); return { width: w === 64 ? 63.5 : w, height: h === 34 ? 33.9 : h === 11 ? 11.1 : h }; };
     $('#lb-print').onclick = () => { const html = `<div class="pack">${L.labelSheetHTML(L.wireLabels(project, { single: $('#lb-single').checked }), size())}</div>`; closeModal(); printHTML(`<style>${L.PACK_CSS}@page{size:A4 portrait;margin:8mm}</style>${html}`); };
     $('#lb-csv').onclick = () => { const s = $('#lb-single').checked; closeModal(); exportLabels(s); };
+  }
+
+  /* ---------------- Fault finding ---------------- */
+  function faultModal(ref, symptom) {
+    if (!L.faultFind) return;
+    const ts = L.faultTargets(project);
+    if (!ts.length) { showMessage(t('Fault finding'), `<p>${esc(t('Give your loads a reference (H1, M1 and so on) to fault-find them.'))}</p>`); return; }
+    const cur = { ref: ts.some((x) => x.part === ref) ? ref : ts[0].part, symptom: symptom || 'dead' };
+    if (ref && !ts.some((x) => x.part === ref)) { const p = partById(ref); const m = p && p.label && ts.find((x) => x.ref === p.label); if (m) cur.ref = m.part; }
+    showModal(t('Fault finding'), `<p class="muted">${esc(t('Pick a load and what it is doing wrong. LoomWright follows its feed, switches, fuses and earth through every sheet and writes a step-by-step test with the readings to expect.'))}</p>
+      <div class="ff-pick"><label class="fld"><span>${esc(t('Load'))}</span><select id="ff-ref">${ts.map((x) => `<option value="${esc(x.part)}"${x.part === cur.ref ? ' selected' : ''}>${esc(x.ref)} · ${esc(t(x.name))}${project.sheets.length > 1 ? ' · ' + esc(x.sheet) : ''}</option>`).join('')}</select></label>
+      <label class="fld"><span>${esc(t('Problem'))}</span><select id="ff-sym">${L.FAULT_SYMPTOMS.map((x) => `<option value="${x.id}"${x.id === cur.symptom ? ' selected' : ''}>${esc(t(x.name))}</option>`).join('')}</select></label></div>
+      <div id="ff-out" class="ff-out"></div>
+      <div class="row-btns"><button class="btn" id="ff-show">${esc(t('Show on drawing'))}</button><button class="btn" id="ff-print"${PF.canPrint ? '' : ' disabled'}>${esc(t('Print'))}</button><button class="btn" id="ff-save">${esc(t('Save as web page'))}</button><button class="btn primary" data-close>${esc(t('Close'))}</button></div>`);
+    $('#modal .modal-card').classList.add('wide');
+    let res = null;
+    const html = () => L.faultSheetHTML(res, { project: project.title });
+    const run = () => {
+      cur.ref = $('#ff-ref').value; cur.symptom = $('#ff-sym').value;
+      try { res = L.faultFind(project, cur.ref, cur.symptom); } catch (e) { console.warn(e); res = { error: t('Could not work out this circuit.') + ' ' + e.message }; }
+      $('#ff-out').innerHTML = `<style>${L.FAULT_CSS}</style>` + html();
+      ['ff-show', 'ff-print', 'ff-save'].forEach((id) => { $('#' + id).disabled = !!res.error || (id === 'ff-print' && !PF.canPrint); });
+    };
+    $('#ff-ref').onchange = run; $('#ff-sym').onchange = run;
+    $('#ff-out').onclick = (e) => {
+      const a = e.target.closest('.fs-go'); if (!a) return;
+      e.preventDefault();
+      const el = document.getElementById(a.getAttribute('href').slice(1));
+      if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1000); }
+    };
+    run();
+    $('#ff-show').onclick = () => { if (!res || res.error) return; const r = res; closeModal(); showFaultPath(r); };
+    $('#ff-print').onclick = () => { if (!res || res.error) return; const h = html(); closeModal(); printHTML(`<style>${L.FAULT_CSS}@page{size:A4;margin:12mm}</style>${h}`); };
+    $('#ff-save').onclick = async () => { if (!res || res.error) return; const h = html(), name = `${projSlug()}-fault-${String(res.ref).replace(/[^\w-]+/g, '_')}-${res.symptom}.html`; closeModal(); await PF.exportFile(name, packDocument(h, res.title), 'text/html'); };
+  }
+  /* Highlight the circuit a fault sheet follows, like a trace. */
+  function showFaultPath(f) {
+    const ws = new Set(f.highlight.wires), ps = new Set(f.highlight.parts), wires = [], pins = [];
+    project.sheets.forEach((s) => {
+      s.wires.forEach((w) => { if (ws.has(w.id)) wires.push({ sheet: s, wire: w }); });
+      s.parts.forEach((p) => { if (ps.has(p.id)) pins.push({ sheet: s, part: p, pin: '', label: p.label || p.type }); });
+    });
+    if (test) endTest(true);
+    trace = { fault: true, name: f.title };
+    fillTrace({ id: 'fault', name: f.title, wires, pins });
+    if (f.sheetId !== sheetId) goSheet(f.sheetId, true);
+    refreshTraceUI();
   }
 
   /* ---------------- Modals ---------------- */
@@ -2083,6 +2156,7 @@
     'export-cut': { label: 'Export cut list (CSV)', run: exportCut },
     'export-connectors': { label: 'Export connector tables (CSV)', run: exportConnectors },
     'export-fuses': { label: 'Export fuses and loads (CSV)', run: exportFuses },
+    'export-voltages': { label: 'Export voltage at each load (CSV)', run: exportVoltages },
     'export-labels': { label: 'Export wire labels (CSV)', run: () => exportLabels(false) },
     'export-usage': { label: 'Export colour usage (CSV)', run: exportUsage },
     undo: { label: 'Undo', key: 'Ctrl+Z', run: undo, enabled: () => hist.length > 0 },
@@ -2136,6 +2210,7 @@
       else { showTab('nets'); toast(t('Pick a circuit in the list, or Alt+click a wire or pin.')); }
     }, on: () => !!trace },
     test: { label: 'Live circuit test', run: () => (test ? endTest() : startTest()), on: () => !!test },
+    fault: { label: 'Fault finding…', run: () => faultModal(only('part') ? only('part').id : null) },
     formboard: { label: 'Harness formboard…', run: () => openFormboard() },
     locations: { label: 'Component locations (vehicle view)…', run: openVehicle },
     builder: { label: 'Component builder…', run: () => window.LoomBuilder.open(null) },
@@ -2165,8 +2240,8 @@
     ['View', ['pane-parts', 'pane-project', 'pane-history', 'pane-props', 'tables', '-', 'zoom-in', 'zoom-out', 'fit', '-', 'junctions', 'xrefs', 'bw', '-', 'theme', 'language']],
     ['Arrange', ['rotate', 'flip', '-', 'align-left', 'align-centre', 'align-right', 'align-top', 'align-middle', 'align-bottom', '-', 'dist-h', 'dist-v']],
     ['Sheet', ['sheet-new', 'sheet-dup', 'sheet-rename', 'sheet-del', '-', 'sheet-left', 'sheet-right', '-', 'sheet-prev', 'sheet-next']],
-    ['Tools', ['trace', 'test', '-', 'formboard', 'locations', '-', 'builder', 'colours', 'cables', '-', 'lib-import', 'lib-export', '-', 'check']],
-    ['Reports', ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cutlist', 'nets', '-', 'print-pack', 'print-labels', '-', 'export-wires', 'export-bom', 'export-cable', 'export-cut', 'export-connectors', 'export-fuses', 'export-labels', 'export-usage']],
+    ['Tools', ['trace', 'test', 'fault', '-', 'formboard', 'locations', '-', 'builder', 'colours', 'cables', '-', 'lib-import', 'lib-export', '-', 'check']],
+    ['Reports', ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cutlist', 'nets', '-', 'print-pack', 'print-labels', '-', 'export-wires', 'export-bom', 'export-cable', 'export-cut', 'export-connectors', 'export-fuses', 'export-voltages', 'export-labels', 'export-usage']],
     ['Revision', ['rev-issue', 'rev-compare', 'pane-history', '-', 'savepoint']],
     ['Help', ['claude', 'help', 'about']],
   ];
