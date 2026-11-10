@@ -22,9 +22,39 @@ Open the **Project** pane (the **Project** button on the tool rail). At the top 
 | Revision | REV |
 | Date | DATE |
 
-The title is also the name on the project tab. When you issue a revision, LoomWright sets the revision letter and date for you; see [Revision history and save points](17-revisions-and-save-points.md).
+The title is also the name on the project tab. When you issue a revision, LoomWright sets the revision letter and date for you; see [Revision history and save points](21-revisions-and-save-points.md).
 
 The **Totals** section at the bottom of the pane counts sheets, parts and wires, and the total length of cable, over the whole project.
+
+## Project type
+
+Each project has a **Project type**, which tells LoomWright what kind of work it is. To set it, click an empty part of the sheet so nothing is selected, and choose under **Drawing › Project type** in the Properties pane:
+
+| Project type | For |
+| --- | --- |
+| Vehicle (12/24 V) | Vehicle looms and other low-voltage DC work. New projects start as this. |
+| Household (UK mains) | Consumer units and final circuits in a home. See [Household wiring](18-household-wiring.md). |
+| Factory, workshop and control panels | Machines, motor starters and control panels. See [Factory, workshop and control panels](19-factory-and-control-panels.md). |
+| Electronics project | Small electronic builds. |
+| Mixed (show everything) | Anything that does not fit one type. Shows every part, list and check. |
+
+The project type changes:
+
+- which part categories come first in the Parts pane, and which start open,
+- which [starter circuits](03-drawing.md#starter-circuits) are offered,
+- the colour and size of the first new wire you draw. Vehicle and Mixed projects start with red 1.0 mm², Household with grey 2.5 mm², Factory with black 1.5 mm² and Electronics with red 0.5 mm²,
+- which extra tabs appear in the Lists pane and which extra commands appear in the menus,
+- which design checks run. Household and factory projects add the mains checks, and leave out some vehicle checks.
+
+Choosing **Household**, **Factory** or **Mixed** also does three things to the project's settings:
+
+- It adds the **Mains installation** settings. See [Sheet and drawing settings](#sheet-and-drawing-settings).
+- If the colour codes are **Land Rover / British**, it changes them to **DIN**.
+- For **Household** only, it sets the system voltage to 230 V if it was 12, 24 or 48 V.
+
+Changing the type back does not undo these. Set the colour codes and system voltage yourself if you need to.
+
+The first time a household, factory or mixed project opens on this computer, LoomWright shows the [Disclaimer](27-disclaimer.md) and asks you to read it. Click **I understand** to carry on. It does not ask again on this computer.
 
 ## Sheets
 
@@ -52,9 +82,10 @@ Under **Drawing**, for every sheet in the project:
 
 | Setting | What it does |
 | --- | --- |
+| Project type | What kind of work the project is. See [Project type](#project-type). |
 | Paper size, all sheets | The paper size for sheets left on **Project default**. |
 | Orientation | The orientation for sheets left on **Project default**. |
-| System voltage | 12, 24 or 48 V. Used for voltage drop and for working out current from wattage. |
+| System voltage | 12, 24, 48, 110, 230 or 400 V. Used for voltage drop, for working out current from wattage, and by the [live test](11-trace-and-live-test.md#volts-and-amps). |
 | Colour codes | Land Rover / British, DIN, SAE, or Custom only. See [Colour codes](04-wires-and-colours.md#colour-codes). |
 | Wire labels | What each wire's label shows: **Number, colour, size**, **Colour code only**, or **None**. |
 | Title block and revision table | Draws the title block, with the revision table above it. |
@@ -63,6 +94,17 @@ Under **Drawing**, for every sheet in the project:
 | Junction dots | Draws a dot where two or more wires meet at a pin. |
 | Black and white | Draws wires in dark grey for printing on a mono printer. See [Black and white drawings](#black-and-white-drawings). |
 | Only offer colours I stock | Limits the wire colour pickers to the colours you stock. |
+
+In household, factory and mixed projects, a note under **Project type** says that the checks are a planning aid only, with a link to the [Disclaimer](27-disclaimer.md). Below the orientation is a **Mains installation** section:
+
+| Setting | What it does |
+| --- | --- |
+| Building | Home (house or flat), House in multiple occupation, Flat in a high-rise residential building, Purpose-built student accommodation, Care home, or Commercial or industrial. Some household checks depend on it. |
+| Country (building rules) | England, Wales, Scotland or Northern Ireland. Used for the note on notifiable work. |
+| Usual installation method | How most cables are run, such as **C: clipped to a wall or floor**. Each cable uses this unless you set its own. |
+| Ambient temperature °C | The air temperature around the cables. It starts at 30 °C. |
+
+Earthing, Ze and the supply fuse are set on the **Supply** part, not here. See [Household wiring](18-household-wiring.md#the-supply-and-the-consumer-unit).
 
 Under **Build**, also for the whole project:
 
@@ -115,6 +157,8 @@ With **Title block and revision table** ticked, each sheet carries a title block
 - DRAWN BY, DATE, REV, SHEET (for example `2 of 5`) and DRAWN WITH LoomWright.
 
 Above it, once you have issued revisions, a revision table lists the latest six: revision, date, description and who issued it.
+
+In household, factory and mixed projects, each sheet also carries a short disclaimer line along the bottom left: "LoomWright is a basic planning tool. Its checks are guidance only, not proof that work meets BS 7671, IEC 60204 or any other code, and it does not replace a qualified electrician or engineer." It is on the screen for sheets with a fixed paper size, and on every print and export.
 
 ## Black and white drawings
 

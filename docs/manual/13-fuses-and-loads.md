@@ -18,7 +18,7 @@ Some parts are counted in a fixed way:
 
 Parts without a current or power field, such as motors, pumps, fans and the winch, count as 0 A. To include them, use a **Generic load** with its **Current** filled in, or give your own component a field called `amps` (such as `amps = 8A`) or `watts`.
 
-Set the system voltage (12, 24 or 48 V) in the drawing settings; it is used for every conversion from watts.
+Set the system voltage in the drawing settings; it is used for every conversion from watts.
 
 ## Fuses and breakers
 
@@ -37,6 +37,23 @@ The first table lists every fuse, circuit breaker, fusible link and fuse box way
 Each row is marked when the load is over the rating, or over 80% of it. A fuse with no rating is marked too. Fuses running near their rating blow on a warm day or when a motor starts; leave some margin.
 
 The design checks also flag a fuse bigger than the guide figure for a wire it feeds. See [Design checks](10-design-checks.md#checks).
+
+## Power distribution modules
+
+A **Power distribution module (electronic)**, in **Protection**, is a solid-state fuse box: each output is switched and protected by the module instead of a fuse and relay. Its fields are:
+
+| Field | What it does |
+| --- | --- |
+| Outputs | How many outputs, `OUT1`, `OUT2` and so on. |
+| Inputs | How many control inputs, `IN1`, `IN2` and so on. |
+| Output limits, amps (comma list) | The current limit of each output, in order, such as `15,15,15,15,10,10,5,5`. |
+| What switches each output (IN1, IN2… or ALWAYS) | For each output in order, the input that turns it on, or `ALWAYS` for an output that is on whenever the module has a supply. |
+| Inputs switch on when | **fed with + (active high)** or **earthed (active low)**. |
+| CAN bus pins | Adds `CANH` and `CANL` pins. |
+
+It also has a `BAT` pin for its main feed and a `GND` pin.
+
+In the **Fuses and breakers** table each output is a row of its own, such as `PDM1 OUT1`, with its limit as the rating. In the [live test](11-trace-and-live-test.md), an output comes on when the module's `BAT` pin is live and its control input is live (or earthed, for active low inputs), or when it is set to `ALWAYS`.
 
 ## Relays
 

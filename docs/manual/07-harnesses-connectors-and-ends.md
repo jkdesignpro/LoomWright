@@ -9,7 +9,7 @@ A **harness** is one bundle of wires that is made up on the bench and fitted as 
 Give each wire a harness in its Properties, under **Identity**. Pick one from the list or type a new name. LoomWright then:
 
 - makes a separate cut list for each harness,
-- lays each harness out on its own formboard (see [Harness formboard](15-harness-formboard.md)),
+- lays each harness out on its own formboard (see [Harness formboard](16-harness-formboard.md)),
 - shows in the **Colour usage** list which colours are used for different jobs inside one harness,
 - can export one harness at a time for WireViz.
 

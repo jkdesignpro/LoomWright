@@ -1,12 +1,48 @@
 # Build pack and wire labels
 
-When the drawing is done, LoomWright can put everything needed to build the loom into one printable document, and print a label for every wire.
+When the drawing is done, LoomWright can put everything needed to build the loom into one printable document, export the drawings and lists as a PDF, and print a label for every wire.
 
 ## Printing the drawings
 
-**File › Print or save PDF (all sheets)** (<kbd>Ctrl</kbd>+<kbd>P</kbd>, or **PDF** on the tool rail) prints every sheet, each on its own page at its paper size, followed by the wire list. To get a PDF, choose **Save as PDF** (or **Microsoft Print to PDF**) as the printer in the print window.
+**File › Print or save PDF (all sheets)** (<kbd>Ctrl</kbd>+<kbd>P</kbd>) prints every sheet, each on its own page at its paper size, followed by the wire list. To get a PDF, choose **Save as PDF** (or **Microsoft Print to PDF**) as the printer in the print window. For a sharper PDF with bookmarks and links, use [Export PDF](#export-pdf) instead.
 
-For a single sheet as a picture or for CAD, see [Import and export](18-import-and-export.md#exporting-drawings).
+For a single sheet as a picture or for CAD, see [Import and export](22-import-and-export.md#exporting-drawings).
+
+## Export PDF
+
+**File › Export PDF with bookmarks and links…**, or **PDF** on the tool rail, saves the project as one PDF file without going through the print window. Every sheet is a sharp drawing you can zoom right into, then come the tables you pick.
+
+In the **Export PDF** dialog:
+
+- **Sheets**: **All sheets**, or **This sheet only**.
+- **Tables after the drawings**: tick the lists to add after the drawings:
+
+| Table | What it holds |
+| --- | --- |
+| Wire list | Every wire, with both ends, colour, size, length, current, voltage drop, circuit and harness. |
+| Connectors | Every connector, cavity by cavity. |
+| Fuses, relays and supplies | The fuse and relay schedule and the supplies. |
+| Voltage at each load | The volts each load gets when it runs. See [Voltage at each load](14-lists-and-reports.md#voltage-at-each-load). |
+| Parts and costs | The parts to buy, with prices. |
+| Cable totals | The cable to buy, by size and colour. |
+| Where parts are fitted | Each part's location. |
+| Circuit schedule (household) | Household projects only. See [The circuit schedule](18-household-wiring.md#the-circuit-schedule). |
+| Motors, PLC inputs and outputs | Factory projects only. See [Lists for panels](19-factory-and-control-panels.md#lists-for-panels). |
+| Terminal plan | Factory projects, or once you place a terminal strip. |
+
+Which tables start ticked depends on the project type. A household project starts with the wire list, circuit schedule and parts. A factory project starts with the wire list, motors, terminal plan, PLC inputs and outputs, and parts. Other projects start with the wire list, connectors, fuses, voltage at each load and parts.
+
+- **Drawings in black and white (wire colours written as codes)** draws the sheets for a mono printer.
+- **Save PDF** saves the file, named after the project.
+
+In the PDF:
+
+- Each sheet is a page at its own paper size. A **Fit to drawing** sheet is a page the size of the drawing.
+- The tables are on A4 landscape pages. Each table page has the project name, the page number and a short disclaimer line along the bottom.
+- The bookmarks list every sheet, with every part on it by reference, and every table. Click one to go there.
+- Cross-references on the drawings, such as `→ 2/B4`, are links that jump to the other end. In the wire list, the wire number jumps to the wire, and **From** and **To** jump to the parts. In the other tables, the reference jumps to the part.
+
+The PDF uses the standard PDF fonts, so a few symbols are written in letters: Ω becomes `ohm` and → becomes `->`. Characters outside Western European alphabets come out as `?`.
 
 ## The build pack
 
@@ -20,6 +56,8 @@ For a single sheet as a picture or for CAD, see [Import and export](18-import-an
 | Cut lists by harness | One cut list per harness, with the length to cut and both ends' terminals. |
 | Connector tables | Every connector, cavity by cavity, with housing, wedge lock, terminal and the number of cavity plugs needed. |
 | Fuses, relays and load budget | The fuse and relay schedule and the supplies. |
+| Voltage at each load | The volts each load gets when it runs, worked out from the drawing. See [Voltage at each load](14-lists-and-reports.md#voltage-at-each-load). |
+| Fault-finding sheets | A **Does not work** fault sheet for each load with a reference. Not ticked to start with. See [Fault finding](12-fault-finding.md). |
 | Parts and costs | The parts to buy and the cable to buy, with prices and totals. |
 | Multicore and screened cables | Each cable, its type and cores, how many are used and spare, and its wires. |
 | Component locations | The vehicle picture with its markers, and where each part is fitted. |
@@ -30,7 +68,7 @@ For a single sheet as a picture or for CAD, see [Import and export](18-import-an
 
 The pack starts with a cover page giving the project title, vehicle, revision, date, who drew it and how many sheets and wires it has.
 
-A section with nothing in it is left out. The formboard section only includes harnesses you have laid out in the formboard view; see [Harness formboard](15-harness-formboard.md).
+A section with nothing in it is left out. The formboard section only includes harnesses you have laid out in the formboard view; see [Harness formboard](16-harness-formboard.md).
 
 **Drawings in black and white (wire colours written as codes)** prints the drawings for a mono printer, whatever the drawing setting is. See [Black and white drawings](05-projects-and-sheets.md#black-and-white-drawings).
 

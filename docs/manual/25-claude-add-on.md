@@ -15,8 +15,12 @@ Some examples of what you can ask:
 - "Trace the AUX FEED circuit and list every wire on it."
 - "Issue revision B, 'fridge feed moved to 6 mm²', and tell me what changed since A."
 - "Give me the cut list for the engine bay harness."
+- "The spot lamps are dim. Write me a fault-finding sheet for them, with the voltages I should read."
+- "What voltage will the fridge get at the end of 6 m of 4 mm² cable?"
+- "Add a direct-on-line starter for a 2.2 kW motor to the panel sheet, and number the wires by potential."
+- "Plan the air for my garage: a 300 l/min piston compressor, a 100 l receiver, a 15 m run and an impact wrench."
 
-Claude uses the same component library, checks, trace, live test, reports and revision history as the app.
+Claude uses the same component library, checks, trace, live test, circuit solver, reports and revision history as the app. For household, factory and compressed air work it gives the same guidance as the app, with the same limits: see the [Disclaimer](27-disclaimer.md).
 
 ## How it works with the app
 

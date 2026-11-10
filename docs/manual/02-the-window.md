@@ -8,7 +8,7 @@ This chapter names the parts of the LoomWright window, so the rest of the manual
 
 Along the top of the window:
 
-- **Menus**: File, Edit, View, Arrange, Sheet, Tools, Reports, Revision and Help. Every command in LoomWright is in one of these menus. Menu items show their keyboard shortcut on the right.
+- **Menus**: File, Edit, View, Arrange, Sheet, Tools, Reports, Revision and Help. Every command in LoomWright is in one of these menus. Menu items show their keyboard shortcut on the right. A few commands only appear when the project needs them: for example, **Reports › Circuit schedule (household)** appears in household projects, and **Tools › Number wires by potential…** in factory projects.
 - **Search** (<kbd>Ctrl</kbd>+<kbd>K</kbd>): see [Search everything](#search-everything) below.
 - **The project name**, followed by the file name once the project has been saved. A dot (•) after the name means there are changes not yet saved to the file.
 - **The moon button** switches between the light and dark themes. The drawing sheet stays white in both, so wire colours look the same.
@@ -42,8 +42,8 @@ The narrow column of buttons on the far left gives one-click access to the comma
 | Formboard | Open the harness formboard. |
 | Vehicle | Open the component locations view. |
 | Lists | Show or hide the Lists pane under the sheet. |
-| Pack | Make a build pack to print or save as PDF. |
-| PDF | Print every sheet, or save them as a PDF. |
+| Pack | Make a build pack to print or save as PDF. See [Build pack and wire labels](15-build-pack-and-labels.md). |
+| PDF | Export the drawings and lists as one PDF with bookmarks and links. See [Export PDF](15-build-pack-and-labels.md#export-pdf). |
 | Claude | How to use the optional Claude add-on. |
 
 ## The left pane
@@ -52,7 +52,7 @@ The left pane has three tabs. Click the same tool rail button again to hide the 
 
 - **Parts** is the component library, with a search box at the top. Parts are grouped by category; click a heading to fold it away. **My blocks** and **My components** at the top hold the circuits and symbols you have saved yourself. See [Drawing](03-drawing.md#placing-parts).
 - **Project** holds the project details (title, vehicle, drawn by, revision, date), the list of sheets, the harnesses, the multicore cables and the totals for the whole project. See [Projects and sheets](05-projects-and-sheets.md).
-- **History** holds issued revisions and the save points kept on this computer. See [Revision history and save points](17-revisions-and-save-points.md).
+- **History** holds issued revisions and the save points kept on this computer. See [Revision history and save points](21-revisions-and-save-points.md).
 
 ## Project tabs and sheet tabs
 
@@ -78,22 +78,24 @@ How to move around:
 
 The pane on the right shows the details of whatever is selected, and is where you change them:
 
-- **Nothing selected**: settings for the sheet and for the whole drawing (paper size, colour codes, wire labels, title block and so on). See [Projects and sheets](05-projects-and-sheets.md#sheet-and-drawing-settings).
+- **Nothing selected**: settings for the sheet and for the whole drawing (project type, paper size, colour codes, wire labels, title block and so on). See [Projects and sheets](05-projects-and-sheets.md#sheet-and-drawing-settings).
 - **A part**: its reference, its fields, its part data and a list of its pins with the wires on each.
-- **A wire**: its number, circuit, harness, colours, size, length, current, insulation and how each end is finished. See [Wires and colours](04-wires-and-colours.md).
+- **A wire**: its number, circuit, harness, colours, size, length, current, insulation, how each end is finished and its build progress. See [Wires and colours](04-wires-and-colours.md).
 - **Several things**: buttons to rotate, duplicate, align or delete them together, and fields to set the colour, size, circuit, harness or insulation of every selected wire at once.
 
 **View › Properties** hides or shows this pane.
 
 ## The Lists pane
 
-Under the sheet is the Lists pane, with a tab for each list LoomWright keeps up to date as you draw: **Wire list**, **Parts & costs**, **Cable totals**, **Colour usage**, **Fuses & loads**, **Connectors**, **Cut list**, **Circuits** and **Checks**. The number on a tab is a count, for example how many wires there are.
+Under the sheet is the Lists pane, with a tab for each list LoomWright keeps up to date as you draw: **Wire list**, **Parts & costs**, **Cable totals**, **Colour usage**, **Fuses & loads**, **Connectors**, **Cut list**, **Build**, **Shopping**, **Circuits** and **Checks**. The number on a tab is a count, for example how many wires there are.
+
+A few more tabs appear when the project needs them: **Circuit schedule** in household projects, **Motors** and **PLC I/O** in factory projects, and **Terminal plan** in factory projects or once you place a terminal strip.
 
 - **All sheets** shows the whole project; untick it to list only the sheet you are looking at.
 - Click a row to select that wire or part on the drawing, going to its sheet if need be.
 - The arrow at the right-hand end folds the pane away. The **Lists** tool rail button brings it back.
 
-[Lists and reports](13-lists-and-reports.md) describes each list.
+[Lists and reports](14-lists-and-reports.md) describes each list.
 
 ## The status bar
 
