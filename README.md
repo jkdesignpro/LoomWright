@@ -11,6 +11,35 @@ It works just as well for general electronics.
 
 ![LoomWright](docs/screenshot.png)
 
+LoomWright is a planning and drawing tool. Its checks are guidance only and it does not replace a
+qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
+
+## Quick start
+
+1. **Get the app.** Download the installer for your computer from the Releases page
+   (see [Getting the app](#getting-the-app)), or run it in a browser from the source with `npm run serve`.
+2. **Look round the example.** The first time it starts, LoomWright opens an example project: the
+   auxiliary electrics of a Land Rover Defender 110 on three sheets. Click a wire to see its details,
+   or press <kbd>Alt</kbd> and click a wire to trace its circuit.
+3. **Start your own.** Choose *File → New project*. Drag parts from the *Parts* pane onto the sheet,
+   then click one pin and then another to draw a wire.
+4. **Fill in the wires.** Select a wire and set its colour, size, length, circuit and harness in
+   *Properties*. The *Wire list* at the bottom fills in as you go.
+5. **Save** with <kbd>Ctrl</kbd>+<kbd>S</kbd>. Projects are `.loom` files.
+6. **Get help.** The user manual is built in: press <kbd>F1</kbd> or use the *Help* menu.
+
+## Documentation
+
+- **[User manual](docs/manual/01-getting-started.md)**: every feature, step by step. The same manual
+  is built into the app.
+- **[Documentation index](docs/README.md)**: the manual's chapters and the guides below.
+- [Disclaimer](docs/manual/23-disclaimer.md): what LoomWright can and cannot tell you.
+- [The Claude add-on](docs/claude-addon.md): setting up the optional add-on.
+- [Building LoomWright](docs/building.md): running from the source, tests, the desktop app and releases.
+- [The .loom file format](docs/file-format.md) and [Components](docs/components.md): for reading
+  and writing projects and symbols from other programs.
+- [Contributing](CONTRIBUTING.md).
+
 ## Features
 
 - **88 built-in components** across power and charging, protection, switches, relays,
@@ -95,10 +124,12 @@ npm install
 npm run dev      # run the desktop app with live reload
 npm run build    # build an installer for this computer
 npm test         # check the component library and example
+npm run manual   # rebuild the in-app manual after editing docs/manual
 ```
 
 To build the Windows and Mac installers in the cloud, push a tag like `v0.3.0` or run the
 *Desktop builds* workflow by hand. The installers land on a draft release.
+[docs/building.md](docs/building.md) has the details.
 
 ## Project layout
 
@@ -114,15 +145,35 @@ To build the Windows and Mac installers in the cloud, push a tag like `v0.3.0` o
 | `app/editor.js`, `app/views.js` | The editor, and the formboard and vehicle views |
 | `app/i18n.js` | Interface languages |
 | `app/builder.js` | Component builder |
+| `app/manual-viewer.js`, `app/manual.css` | The built-in user manual viewer |
+| `app/manual.js` | The user manual, built from `docs/manual/` by `scripts/build-manual.js` (do not edit by hand) |
 | `src-tauri/` | Desktop app shell (Rust, Tauri 2): native open/save dialogs and live reload of edited files |
 | `mcp/` | Optional Claude add-on (MCP server) |
-| `docs/` | Guides |
+| `docs/` | The user manual (`docs/manual/`) and guides |
 
 ## Contributing
 
-Issues and pull requests are welcome, especially new component symbols. A built-in component is
-a short entry in `app/core/loom-core.js` (or `loom-data.js` for connector-type parts): a name, category, size (multiples of 20), pins (on a
-10-unit grid) and a list of shapes. Run `npm test` before sending a change.
+Issues and pull requests are welcome, especially new component symbols and corrections to the
+translations. A built-in component is a short entry in `app/core/loom-core.js` (or `loom-data.js`
+for connector-type parts): a name, category, size (multiples of 20), pins (on a 10-unit grid) and a
+list of shapes; see [docs/components.md](docs/components.md). Run `npm test` before sending a change.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
+
+## Disclaimer
+
+LoomWright is a basic tool for planning and drawing wiring.
+
+- Its design checks, load figures, wire size guide figures and other hints are **guidance only**. They are rules
+  of thumb and do not show that a design or an installation meets BS 7671, IEC 60204, the Building
+  Regulations or any other standard, regulation or code. The wire size figures assume single PVC
+  automotive cable. Check wire sizes, fuse ratings and part numbers against the cable, fuse and
+  component makers' data.
+- It does **not replace a qualified electrician or engineer**.
+- Work on **mains electricity or compressed air** systems must be designed, installed, inspected and
+  tested by a competent person.
+- LoomWright is free software under the GPL and comes with **no warranty**, as far as the law allows.
+  The authors and contributors accept no responsibility for any loss, damage, injury or death arising
+  from its use.
 
 ## Licence
 
@@ -131,6 +182,3 @@ GNU General Public License version 3, or (at your option) any later version. See
 
 The bundled IBM Plex fonts are under the SIL Open Font License (`app/fonts/OFL.txt`).
 The bundled js-yaml (`app/vendor/js-yaml.min.js`, used for WireViz files) is under the MIT License (`app/vendor/js-yaml.LICENSE`).
-
-Design checks are a rule of thumb for single PVC automotive cable. Always check your cable maker's
-ratings and fuse to protect the wire.

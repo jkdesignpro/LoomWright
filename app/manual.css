@@ -1,0 +1,116 @@
+/* LoomWright user manual viewer (manual-viewer.js). GPL-3.0-or-later.
+   Uses the colour tokens from styles.css, so it follows the light and dark themes. */
+
+.lm { position: fixed; inset: 0; z-index: 70; background: var(--bg); display: flex; flex-direction: column; color: var(--ink); }
+.lm-head { display: flex; align-items: center; gap: 4px; height: 38px; padding: 0 6px; background: var(--head); border-bottom: 1px solid var(--line); flex: none; }
+.lm-head h2 { margin: 0 10px 0 4px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.lm-head .iconbtn:disabled { opacity: .35; cursor: default; background: none; }
+.lm-head .btn svg.i { width: 15px; height: 15px; }
+.lm-search { display: flex; align-items: center; gap: 6px; width: min(360px, 40vw); height: 26px; padding: 0 0 0 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); color: var(--muted); }
+.lm-search:focus-within { border-color: var(--accent); }
+.lm-search svg.i { width: 14px; height: 14px; }
+.lm-search input { flex: 1; border: 0; height: 24px; padding: 0 6px 0 0; background: none; color: var(--ink); }
+.lm-search input:focus { outline: none; }
+
+.lm-main { flex: 1; display: grid; grid-template-columns: 290px minmax(0, 1fr); min-height: 0; }
+.lm-nav { background: var(--panel); border-right: 1px solid var(--line); overflow: auto; padding: 6px 0 12px; min-height: 0; }
+.lm-doc { position: relative; overflow: auto; background: var(--panel); min-height: 0; }
+.lm-doc:focus { outline: none; }
+
+/* Contents */
+.lm-toc, .lm-subs, .lm-results { list-style: none; margin: 0; padding: 0; }
+.lm-toc a, .lm-results a { display: flex; gap: 8px; padding: 4px 12px; color: var(--ink); text-decoration: none; border-left: 2px solid transparent; }
+.lm-toc a:hover, .lm-results a:hover { background: var(--soft); }
+.lm-toc a:focus-visible, .lm-results a:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.lm-toc .lm-n { width: 18px; flex: none; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lm-toc > li.on > a { background: var(--accent2); border-left-color: var(--accent); font-weight: 600; }
+.lm-subs { margin: 2px 0 6px; }
+.lm-subs a { padding: 3px 12px 3px 38px; color: var(--muted); }
+.lm-subs a:hover { color: var(--ink); }
+.lm-subs a.on { color: var(--ink); border-left-color: var(--line); }
+
+/* Search results */
+.lm-res-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 12px 8px; color: var(--muted); border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.lm-results a { flex-direction: column; gap: 2px; padding: 6px 12px; border-bottom: 1px solid var(--soft); }
+.lm-results a.on { background: var(--accent2); border-left-color: var(--accent); }
+.lm-where { font-weight: 600; }
+.lm-snip { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.lm-nav mark, .lm-article mark.lm-hit { background: var(--warn-bg); color: inherit; border-radius: 2px; box-shadow: 0 0 0 1px var(--warn-bg); }
+.lm-article mark.lm-hit { box-shadow: 0 0 0 1px var(--warn); }
+.lm-empty { padding: 8px 12px; margin: 0; color: var(--muted); }
+
+/* The chapter */
+.lm-article { max-width: 820px; padding: 22px 36px 40px; font-size: 13.5px; line-height: 1.6; }
+.lm-article h1 { font-size: 21px; line-height: 1.3; font-weight: 600; margin: 0 0 14px; }
+.lm-article h2 { font-size: 16px; line-height: 1.35; font-weight: 600; margin: 28px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.lm-article h3 { font-size: 14px; font-weight: 600; margin: 20px 0 6px; }
+.lm-article h4, .lm-article h5, .lm-article h6 { font-size: 13.5px; font-weight: 600; margin: 16px 0 4px; }
+.lm-article h1 + h2 { margin-top: 18px; }
+.lm-article [data-anchor] { scroll-margin-top: 12px; }
+.lm-article .lm-flash { animation: lm-flash 1.4s ease-out; }
+@keyframes lm-flash { from { background: var(--accent2); } to { background: transparent; } }
+.lm-article p { margin: 0 0 10px; }
+.lm-article ul, .lm-article ol { margin: 0 0 10px; padding-left: 24px; }
+.lm-article li { margin: 2px 0; }
+.lm-article li > p { margin: 0 0 6px; }
+.lm-article li > ul, .lm-article li > ol { margin: 4px 0; }
+.lm-article a { color: var(--accent); text-decoration: none; }
+.lm-article a:hover { text-decoration: underline; }
+.lm-article a.lm-ext::after { content: ' ↗'; font-size: 11px; color: var(--muted); }
+.lm-article code { font: 12px var(--mono); background: var(--raise); border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; white-space: nowrap; }
+.lm-article pre.lm-code { margin: 0 0 12px; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r); padding: 8px 12px; overflow-x: auto; }
+.lm-article pre.lm-code code { border: 0; padding: 0; background: none; white-space: pre; font-size: 12px; line-height: 1.5; }
+.lm-article kbd { font: 11.5px/1 var(--mono); color: var(--ink); background: var(--raise); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 1px 5px; white-space: nowrap; }
+.lm-article .lm-path code { white-space: normal; }
+.lm-article strong { font-weight: 600; }
+.lm-article hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
+.lm-article blockquote.lm-note { margin: 0 0 12px; padding: 8px 12px; background: var(--raise); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0 var(--r) var(--r) 0; }
+.lm-article blockquote.lm-note > :last-child { margin-bottom: 0; }
+.lm-table { overflow-x: auto; margin: 0 0 12px; }
+.lm-article table { border-collapse: collapse; font-size: 12.5px; line-height: 1.45; min-width: 50%; }
+.lm-article th, .lm-article td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
+.lm-article th { background: var(--head); font-weight: 600; white-space: nowrap; }
+.lm-article td code { white-space: nowrap; }
+.lm-article img { max-width: 100%; height: auto; }
+.lm-fig { margin: 4px 0 16px; overflow-x: auto; }
+.lm-fig img { display: block; border: 1px solid var(--line); cursor: zoom-in; }
+.lm-fig img.lm-zoom { max-width: none; cursor: zoom-out; }
+.lm-fig figcaption { margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+.lm-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 32px; padding-top: 14px; border-top: 1px solid var(--line); }
+.lm-pager a { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r); color: var(--ink); }
+.lm-pager a:hover { background: var(--soft); text-decoration: none; }
+.lm-pager a.next { text-align: right; grid-column: 2; }
+.lm-pager .muted { font-size: 11.5px; }
+
+.lm-note-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); max-width: min(720px, calc(100% - 32px)); padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); word-break: break-all; }
+
+@media (max-width: 860px) {
+  .lm-head h2 { display: none; }
+  .lm-head .btn span { display: none; }
+  .lm-search { flex: 1; width: auto; }
+  .lm-head .grow { display: none; }
+  .lm-main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 32vh) minmax(0, 1fr); }
+  .lm-nav { border-right: 0; border-bottom: 1px solid var(--line); }
+  .lm-article { padding: 16px 16px 32px; }
+}
+
+/* Printing one chapter: the viewer fills #print-area (see styles.css) */
+@media print {
+  .print-area .lm-print { font: 10.5pt/1.45 var(--sans); color: #000; }
+  .print-area .lm-print .lm-print-src { font-size: 8.5pt; color: #555; margin: 0 0 4mm; }
+  .print-area .lm-print h1 { font-size: 16pt; margin: 0 0 4mm; }
+  .print-area .lm-print h2 { font-size: 12.5pt; margin: 6mm 0 2mm; border-bottom: 0.5pt solid #999; break-after: avoid; }
+  .print-area .lm-print h3 { font-size: 11pt; margin: 4mm 0 1.5mm; break-after: avoid; }
+  .print-area .lm-print a { color: #000; text-decoration: none; }
+  .print-area .lm-print code, .print-area .lm-print kbd { font: 9pt var(--mono); }
+  .print-area .lm-print kbd { border: 0.5pt solid #999; border-radius: 2px; padding: 0 2px; }
+  .print-area .lm-print pre { font: 8.5pt/1.4 var(--mono); border: 0.5pt solid #999; padding: 2mm; white-space: pre-wrap; }
+  .print-area .lm-print table { border-collapse: collapse; font-size: 9pt; break-inside: auto; }
+  .print-area .lm-print th, .print-area .lm-print td { border: 0.5pt solid #999; padding: 1mm 2mm; text-align: left; vertical-align: top; }
+  .print-area .lm-print tr { break-inside: avoid; }
+  .print-area .lm-print blockquote { margin: 0 0 3mm; padding: 1.5mm 3mm; border-left: 2pt solid #666; }
+  .print-area .lm-print figure { margin: 2mm 0 4mm; break-inside: avoid; }
+  .print-area .lm-print img { max-width: 100%; border: 0.5pt solid #999; }
+  .print-area .lm-print figcaption { font-size: 8.5pt; color: #555; }
+}
