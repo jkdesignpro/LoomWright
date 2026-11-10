@@ -9,7 +9,8 @@
     "dev": "tauri dev",
     "build": "tauri build",
     "serve": "node scripts/serve.js",
-    "test": "node scripts/test-core.js",
+    "test": "node scripts/test-core.js && node scripts/test-air.js",
+    "test:air": "node scripts/test-air.js",
     "manual": "node scripts/build-manual.js"
   },
   "devDependencies": {

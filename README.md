@@ -80,6 +80,10 @@ qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
 - **Harness formboard.** Lay out each harness as branches with lengths and sleeving, see bundle sizes,
   export it 1:1 as DXF, and copy the routed lengths back onto the wires.
 - **Component locations** on a photo or outline of the vehicle.
+- **Compressed air planner.** Plan a workshop or garage air system: compressor, receiver, air
+  treatment, pipe runs, drops and tools. It estimates demand, pipe pressure drop and air speed,
+  pressure at each tool, receiver size, running and leak costs and water to drain, with plain-English
+  checks. Planning estimates only: see the [Disclaimer](#disclaimer).
 - **Import and export.** SVG, PNG, DXF, PDF, CSV for every list, WireViz YAML both ways, KiCad netlists,
   spreadsheet wire lists, measured lengths, and a read-only web page anyone can open.
 - **Comforts.** Several projects open in tabs, reusable circuit blocks, align and distribute with guide
@@ -141,8 +145,10 @@ To build the Windows and Mac installers in the cloud, push a tag like `v0.3.0` o
 | `app/core/loom-nets.js` | Nets, circuit trace, live test, fuse and load schedule, project checks |
 | `app/core/loom-reports.js` | Cut lists, connector tables, labels, costed parts list, formboards, build pack, CSV tables |
 | `app/core/loom-io.js` | Import and export: CSV wire lists, WireViz, KiCad, DXF, read-only web page |
+| `app/core/loom-air.js` | Compressed air planning: demand, pipe pressure drop, receiver size, costs and checks |
 | `app/core/loom.js` | Loads all of the core in Node, for the Claude add-on and the tests |
 | `app/editor.js`, `app/views.js` | The editor, and the formboard and vehicle views |
+| `app/air-view.js` | The compressed air planner |
 | `app/i18n.js` | Interface languages |
 | `app/builder.js` | Component builder |
 | `app/manual-viewer.js`, `app/manual.css` | The built-in user manual viewer |
