@@ -2559,6 +2559,16 @@
     svgToPng,
     harnesses: harnessesInUse,
     pickImage: () => PF.pickImage(),
+    openText: (ext, what) => PF.openText(ext, what),
+    /* For add-on modules: register a command and put it in a menu (after an existing item, or at the end). */
+    addCommand(id, cmd, menu, after) {
+      COMMANDS[id] = cmd;
+      const m = MENUS.find((x) => x[0] === menu);
+      if (m && !m[1].includes(id)) { const i = after ? m[1].indexOf(after) : -1; if (i >= 0) m[1].splice(i + 1, 0, id); else m[1].push(id); }
+      buildMenus();
+    },
+    runCommand: (id) => runCommand(id),
+    refresh: () => { refreshAll(); },
   };
 
   /* ---------------- Start ---------------- */

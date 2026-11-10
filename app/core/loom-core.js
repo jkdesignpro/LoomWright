@@ -1192,7 +1192,7 @@
   /* ------------------------------------------------------------------ */
   /* Revisions: issue, compare, restore                                  */
   /* ------------------------------------------------------------------ */
-  const STATE_KEYS = ['title', 'meta', 'settings', 'harnesses', 'cables', 'customColours', 'customParts', 'harnessLayouts', 'sheets'];
+  const STATE_KEYS = ['title', 'meta', 'settings', 'harnesses', 'cables', 'customColours', 'customParts', 'harnessLayouts', 'sheets', 'air'];
   function revisionState(project) { const o = {}; STATE_KEYS.forEach((k) => { if (project[k] !== undefined) o[k] = JSON.parse(JSON.stringify(project[k])); }); return o; }
   function nextRevision(rev) {
     const r = String(rev || '').trim();
