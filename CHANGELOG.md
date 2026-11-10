@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.4.0
+
+LoomWright is still mainly for vehicle looms, and now also covers household wiring, factory control
+panels, electronics projects and compressed air. Every mains and compressed air check is planning
+guidance only: see the disclaimer.
+
+**Volts and amps**
+- A circuit solver works out the voltage, current and drop at every load, wire and fuse, with battery,
+  alternator, solar and DC-DC charger models, diodes and contact resistances.
+- The live test shows volts and amps at each running load, fuse currents and supplies.
+- Fault finding: a step-by-step test sheet for a load that does not work, will not switch off, keeps
+  blowing its fuse, or is dim or slow, with the readings to expect.
+- Power distribution modules (PDM) and CAN terminators; CAN bus checks for swapped H/L, terminators,
+  twisted pair and long stubs.
+
+**Colours, stock and the build**
+- Colour helper: suggested colours for a wire from its circuit, the standard's feed and earth
+  conventions, clashes in the same harness, and the cable you stock.
+- My stock (cable and parts, shared by all projects), a Shopping tab with what to buy, and Take from stock.
+- Build progress: tick cut, ends, fitted and test result for each wire, also from a phone checklist
+  whose progress imports back.
+- Wire ratings derated for harness temperature and bundled wires; grommet holes with bundle fill.
+- Starter circuits (spot lamps, split charge, winch, compressor, reversing camera and more) and Tidy
+  wires (Shift+T), which lays wires out on the grid with square corners and few bends.
+- PDF export with every sheet as a vector page, the tables you choose, bookmarks, and
+  cross-references you can click.
+
+**Project types**
+- Vehicle, household, factory, electronics or mixed. The type picks the parts, tabs and checks shown first.
+- Household (UK mains): consumer unit parts, sockets, lights, showers, cookers, EV charge points, solar
+  and batteries. Guidance checks drawn from selected BS 7671 rules: cable rating with derating, ring
+  circuits, RCD and AFDD needs, earth loop impedance, voltage drop, bathrooms, Part P notification and
+  maximum demand. A circuit schedule lists each breaker's figures.
+- Factory and control panels: isolators, motor circuit breakers, contactors with auxiliary contacts that
+  follow their coil, overloads, motors, buttons, emergency stops, PLC cards and drives. Guidance checks
+  from selected BS EN 60204-1 recommendations, motor, terminal plan and PLC I/O lists, and wire numbering
+  by potential.
+- A loads library of machines, household appliances and solar parts with typical ratings.
+- Sources and known limits for every rule are listed in docs/standards-sources.md.
+
+**Compressed air planner**
+- Plan a workshop or garage air system: compressors, receivers, air treatment, pipe runs, drops and
+  tools. It estimates air demand, pipe pressure drop and air speed, pressure at each tool, receiver size,
+  compressor duty, running and leak costs and water to drain, with plain-English checks.
+- Leak test and calculators, and CSV, SVG and PDF export.
+
+**Help and disclaimers**
+- A built-in user manual (Help, or F1 for the chapter about what is on screen) with search.
+- A disclaimer that must be read before household, factory or compressed air work, and on every
+  mains sheet, report and PDF: LoomWright is a basic planning tool, its checks are not proof that work
+  meets any code, and it does not replace a qualified electrician.
+
+**Claude add-on**
+- New tools for solving circuits, fault finding, colour suggestions, stock and shopping lists, build
+  progress, starter circuits, tidying wires, numbering by potential, PDF export, household and factory
+  projects, and compressed air systems.
+
+**Smaller changes and fixes**
+- Open a .loom file by double-clicking it on a Mac, or by dropping it on the window.
+- Black-and-white drawings always show colour codes, even with wire labels turned off.
+- Motors, pumps, compressors, fans and wiper motors have a current draw field.
+- Closing the last tab opens a blank project rather than the example.
+- KiCad import reads an MPN field from any symbol.
+- The component builder and the new screens are translated (first pass).
+
 ## 0.3.0
 
 Everything from the feature review against professional harness tools (items 1 to 19 and the later list).

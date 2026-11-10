@@ -1,13 +1,15 @@
 # LoomWright
 
-Free, open-source wiring diagram software for vehicle builds and electronics projects.
+Free, open-source wiring diagram software, mainly for vehicle builds, and also for household
+wiring, workshop and factory control panels, and electronics projects.
 Draw a loom the way you will build it: real components, real wire colours with tracers,
 real cable sizes, and a wire list you can take to the bench.
 
 LoomWright was started for a fully custom Land Rover Defender build, so it speaks 12 V
 automotive: DIN relay terminals (30, 85, 86, 87, 87a), blade and MIDI fuses, fuse boxes,
 split charge, winches, and Land Rover style colour codes such as `NR` (brown with red tracer).
-It works just as well for general electronics.
+It also draws household circuits, control panels and electronics projects, and plans
+compressed air systems.
 
 ![LoomWright](docs/screenshot.png)
 
@@ -42,8 +44,9 @@ qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
 
 ## Features
 
-- **88 built-in components** across power and charging, protection, switches, relays,
-  lighting, motors and loads, gauges and sensors, connectors and electronics.
+- **129 built-in components** across power and charging, protection, switches, relays,
+  lighting, motors and loads, gauges and sensors, connectors, electronics, household wiring
+  and control panels, plus starter circuits that drop in ready drawn.
   Parametric parts (fuse boxes, connectors, busbars, terminal strips, modules, ICs) take any number of pins.
 - **Real connectors.** Deutsch DT/DTM/DTP, Superseal, Econoseal, Metri-Pack, Lucar, bullets and Anderson,
   with ways, plug or receptacle side, housing and wedge-lock part numbers, terminals and cavity plugs.
@@ -69,7 +72,10 @@ qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
 - **Proper sheets.** A4 to A1, landscape or portrait, with a frame, zone grid, and cross-references that
   say which sheet and zone an off-sheet link continues on. Black-and-white mode writes the colour codes.
 - **Trace and test.** Click a wire to light up the whole circuit across sheets. The live test flicks
-  switches and blows fuses to show what runs (connections only, not voltages).
+  switches and blows fuses to show what runs, with the volts and amps at each load worked out from
+  wire sizes and lengths.
+- **Fault finding.** A step-by-step test sheet for a load that does not work, will not switch off,
+  keeps blowing its fuse, or is dim, with the readings to expect at each point.
 - **Design checks.** Fuse rating against cable size, current, voltage drop over 3 %, unconnected pins,
   duplicate references, loads with no fuse or no earth, supplies shorted to earth, terminals that do not
   suit the wire, mixed colours on one net.
@@ -80,11 +86,21 @@ qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
 - **Harness formboard.** Lay out each harness as branches with lengths and sleeving, see bundle sizes,
   export it 1:1 as DXF, and copy the routed lengths back onto the wires.
 - **Component locations** on a photo or outline of the vehicle.
+- **Stock and build progress.** Keep a list of the cable and parts you have, get a shopping list
+  of what to buy, and tick off each wire as it is cut, terminated, fitted and tested, also from a phone.
+- **Household wiring (UK).** Consumer units, sockets, lights, showers, cookers, EV chargers and solar,
+  with a circuit schedule and guidance checks drawn from selected BS 7671 rules: cable rating, rings,
+  RCDs, earth loop impedance, voltage drop and maximum demand. Guidance only: see the
+  [Disclaimer](#disclaimer).
+- **Factory and control panels.** Isolators, motor breakers, contactors, overloads, motors, e-stops,
+  PLC cards and drives, with guidance checks from selected BS EN 60204-1 recommendations, motor,
+  terminal and PLC I/O lists, and wire numbering by potential.
+- **Loads library.** Machines, household appliances and solar parts with typical ratings.
 - **Compressed air planner.** Plan a workshop or garage air system: compressor, receiver, air
   treatment, pipe runs, drops and tools. It estimates demand, pipe pressure drop and air speed,
   pressure at each tool, receiver size, running and leak costs and water to drain, with plain-English
   checks. Planning estimates only: see the [Disclaimer](#disclaimer).
-- **Import and export.** SVG, PNG, DXF, PDF, CSV for every list, WireViz YAML both ways, KiCad netlists,
+- **Import and export.** SVG, PNG, DXF, PDF with bookmarks and clickable cross-references, CSV for every list, WireViz YAML both ways, KiCad netlists,
   spreadsheet wire lists, measured lengths, and a read-only web page anyone can open.
 - **Comforts.** Several projects open in tabs, reusable circuit blocks, align and distribute with guide
   lines, find and replace, renumbering, and the interface in English, German, French, Spanish or Dutch
@@ -93,7 +109,8 @@ qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
   A portable Windows copy runs from a folder or USB stick.
 - **Optional Claude add-on.** An MCP server that lets Claude draw and edit projects from a
   plain-English description, turn a picture of a component's pinout into a custom component
-  in your library, issue and compare revisions, trace and test circuits, and produce the build lists.
+  in your library, issue and compare revisions, trace, test and solve circuits, write fault-finding
+  sheets, plan compressed air systems, and produce the build lists.
   See [docs/claude-addon.md](docs/claude-addon.md).
 
 Projects are saved as `.loom` files, which are plain JSON, so they work well with Git.
@@ -131,7 +148,7 @@ npm test         # check the component library and example
 npm run manual   # rebuild the in-app manual after editing docs/manual
 ```
 
-To build the Windows and Mac installers in the cloud, push a tag like `v0.3.0` or run the
+To build the Windows and Mac installers in the cloud, push a tag like `v0.4.0` or run the
 *Desktop builds* workflow by hand. The installers land on a draft release.
 [docs/building.md](docs/building.md) has the details.
 
