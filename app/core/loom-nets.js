@@ -237,7 +237,7 @@
       if (!root || !firstSupply(it)) return;
       const acc = seenLoads(root), loads = [...acc.values()].filter((x) => x.it.p.id !== it.p.id);
       const load = loads.reduce((a, x) => a + x.amps, 0);
-      supplies.push({ sheet: it.sheet.name, sheetId: it.sheet.id, part: it.p.id, ref: it.p.label, type: (Loom.partDef(it.v, it.p.type) || {}).name, capacity: pr.ah || '', rating, load: +load.toFixed(2), pct: rating ? Math.round((load / rating) * 100) : null, loads: loads.map((x) => ({ ref: x.it.p.label || x.it.p.type, amps: +x.amps.toFixed(2) })), hours: pr.ah && load ? +(parseFloat(pr.ah) * 0.5 / load).toFixed(1) : null });
+      supplies.push({ sheet: it.sheet.name, sheetId: it.sheet.id, part: it.p.id, ref: it.p.label, type: (Loom.partDef(it.v, it.p.type) || {}).name, capacity: pr.ah ? String(parseFloat(pr.ah) || pr.ah) : '', rating, load: +load.toFixed(2), pct: rating ? Math.round((load / rating) * 100) : null, loads: loads.map((x) => ({ ref: x.it.p.label || x.it.p.type, amps: +x.amps.toFixed(2) })), hours: pr.ah && load ? +(parseFloat(pr.ah) * 0.5 / load).toFixed(1) : null });
     });
     return { fuses, relays, supplies, volts };
   }

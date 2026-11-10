@@ -354,21 +354,21 @@
 
   // ---- Motors & loads ----
   const motorLike = (letter) => [L(0, 20, 6, 20), L(34, 20, 40, 20), C(20, 20, 14), T(20, 25, letter, { size: 13, weight: 600 })];
-  def('motor', { name: 'Motor', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, pins: [pin(1, 0, 20), pin(2, 40, 20)], shapes: motorLike('M') });
-  def('pump', { name: 'Pump (fuel / water)', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'what', l: 'Use', d: 'Fuel' }], sub: '{what}', pins: [pin(1, 0, 20), pin(2, 40, 20)], shapes: motorLike('P') });
-  def('compressor', { name: 'Air compressor', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, pins: [pin('+', 0, 20, '+'), pin('-', 40, 20, '−')], shapes: motorLike('C') });
+  def('motor', { name: 'Motor', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'amps', l: 'Current draw (A)', d: '' }], pins: [pin(1, 0, 20), pin(2, 40, 20)], shapes: motorLike('M') });
+  def('pump', { name: 'Pump (fuel / water)', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'what', l: 'Use', d: 'Fuel' }, { k: 'amps', l: 'Current draw (A)', d: '' }], sub: '{what}', pins: [pin(1, 0, 20), pin(2, 40, 20)], shapes: motorLike('P') });
+  def('compressor', { name: 'Air compressor', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'amps', l: 'Current draw (A)', d: '' }], pins: [pin('+', 0, 20, '+'), pin('-', 40, 20, '−')], shapes: motorLike('C') });
   def('fan', {
-    name: 'Fan', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, pins: [pin(1, 0, 20), pin(2, 40, 20)],
+    name: 'Fan', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'amps', l: 'Current draw (A)', d: '' }], pins: [pin(1, 0, 20), pin(2, 40, 20)],
     shapes: [L(0, 20, 6, 20), L(34, 20, 40, 20), C(20, 20, 14), P('M20 20 q-2 -10 6 -10 q-2 6 -6 10 M20 20 q10 -2 10 6 q-6 -2 -10 -6 M20 20 q2 10 -6 10 q2 -6 6 -10 M20 20 q-10 2 -10 -6 q6 2 10 6', { w: 1.2, fill: 'ink' })],
   });
   def('wiper_motor', {
-    name: 'Wiper motor', cat: 'Motors & loads', prefix: 'M', w: 80, h: 80,
+    name: 'Wiper motor', cat: 'Motors & loads', prefix: 'M', w: 80, h: 80, props: [{ k: 'amps', l: 'Current draw (A)', d: '' }],
     pins: [pin('53', 0, 20, '53 slow'), pin('53b', 0, 40, '53b fast'), pin('31b', 0, 60, '31b park'), pin('31', 80, 60, '31 earth'), pin('53a', 80, 20, '53a park feed')],
     shapes: [R2(0, 0, 80, 80, { rx: 4 }), C(44, 40, 16), T(44, 45, 'M', { size: 13, weight: 600 }), T(6, 16, '53', { size: 7, anchor: 'start' }), T(6, 36, '53b', { size: 7, anchor: 'start' }), T(6, 56, '31b', { size: 7, anchor: 'start' }), T(74, 76, '31', { size: 7, anchor: 'end' }), T(74, 16, '53a', { size: 7, anchor: 'end' })],
   });
   def('winch', {
     name: 'Winch motor', cat: 'Motors & loads', prefix: 'M', w: 60, h: 60,
-    props: [{ k: 'lbs', l: 'Rating', d: '9500lb' }], sub: '{lbs}',
+    props: [{ k: 'lbs', l: 'Rating', d: '9500lb' }, { k: 'amps', l: 'Current draw (A), full load', d: '' }], sub: '{lbs}',
     pins: [pin('A', 30, 0, 'A armature'), pin('F1', 0, 40, 'F1 field'), pin('F2', 60, 40, 'F2 field'), pin('-', 30, 60, '− earth')],
     shapes: [C(30, 30, 18), T(30, 35, 'M', { size: 13, weight: 600 }), L(30, 0, 30, 12), L(30, 48, 30, 60), L(0, 40, 13, 40), L(47, 40, 60, 40), T(5, 35, 'F1', { size: 7, anchor: 'start' }), T(55, 35, 'F2', { size: 7, anchor: 'end' }), T(34, 8, 'A', { size: 7, anchor: 'start' })],
   });
@@ -971,7 +971,10 @@
     return (mode === 'code' ? wireCode(doc, w) : [w.name, wireCode(doc, w), w.gauge ? w.gauge + 'mm²' : ''].filter(Boolean).join(' ')) + (cab ? ` [${cab}]` : '');
   }
   function wireLabelSVG(doc, w, o) {
-    const mode = (doc.settings && doc.settings.labels) || 'full';
+    let mode = (doc.settings && doc.settings.labels) || 'full';
+    // A black-and-white drawing has no colours to tell wires apart, so it
+    // always shows at least the colour code.
+    if (mode === 'none' && o && o.bw) mode = 'code';
     if (mode === 'none') return '';
     const q = wireLabelPos(doc, w);
     if (!q) return '';

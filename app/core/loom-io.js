@@ -338,7 +338,10 @@
       }
       const p = { id: Loom.uid('p'), type, x: 0, y: 0, rot: 0, label: ref, props, _unplaced: true };
       if (value && !props.value) p.notes = value;
-      const fp = val(c, 'footprint'); if (fp) p.mpn = val(child(c, 'fields') || [], 'MPN') || '';
+      // part number from a field such as (field (name "MPN") "1-480700-0")
+      const mf = children(child(c, 'fields'), 'field').find((f) => /^(mpn|manufacturer[ _]?part[ _]?(number|no)?|part[ _]?(number|no))$/i.test(String(val(f, 'name')).trim()));
+      const mv = mf ? mf.slice(1).find((x) => typeof x === 'string') : '';
+      if (mv) p.mpn = mv;
       v.parts.push(p); parts.set(ref, p);
     });
     let n = 0;

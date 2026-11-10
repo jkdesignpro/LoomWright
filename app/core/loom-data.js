@@ -306,7 +306,7 @@
   function partCurrent(doc, p) {
     const pr = Loom.resolved(doc, p).props || {}, v = parseFloat((doc.settings || {}).volts) || 12;
     if (pr.amps && /A/i.test(String(pr.amps)) && !/Ah/i.test(String(pr.amps))) return parseFloat(String(pr.amps)) || 0;
-    if (p.type === 'load' && pr.amps) return parseFloat(pr.amps) || 0;
+    if (['load', 'motor', 'pump', 'compressor', 'fan', 'wiper_motor', 'winch'].includes(p.type) && pr.amps) return parseFloat(pr.amps) || 0;
     if (pr.watts) {
       const s = String(pr.watts), mul = /(\d+)\s*[×x*]\s*([\d.]+)/.exec(s);
       const w = mul ? +mul[1] * parseFloat(mul[2]) : parseFloat(s);

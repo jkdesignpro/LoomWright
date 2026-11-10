@@ -222,7 +222,7 @@
   /* ---------------- Status bar ---------------- */
   function setHint() {
     let h;
-    if (test) h = t('Live test: click a switch, fuse or relay to change it. Powered wires glow. Esc to stop.');
+    if (test) h = t('Live test: click a switch or fuse to change it. Relays pull in when their coil is powered. Powered wires glow. Esc to stop.');
     else if (draft) h = t('Click a pin to finish the wire. Click empty space to add a bend. Esc cancels.');
     else if (trace) h = t('Tracing a circuit across all sheets. Esc to clear.');
     else if (only('wire')) h = t('Drag the handle to move the wire, or drag its label. Double-click the wire to add a bend. Alt+click traces the circuit.');
@@ -237,7 +237,7 @@
     $('#st-count').textContent = `${plural(doc.parts.length, t('part'))}, ${plural(doc.wires.length, t('wire'))}`;
     const issues = checks().filter((c) => c.level !== 'info').length;
     const st = $('#st-check');
-    st.textContent = issues ? `${issues} ${t('checks to review')}` : t('Checks passed');
+    st.textContent = issues ? plural(issues, t('check')) + ' ' + t('to review') : t('Checks passed');
     st.style.setProperty('--stc', issues ? 'var(--warn)' : 'var(--ok)');
     st.title = t('Show design checks');
     $('#st-mode').textContent = `${test ? t('LIVE TEST') + ' · ' : ''}${PF.kind === 'desktop' ? t('Desktop') : PF.kind === 'preview' ? t('Preview') : t('Browser')} · ${L.VERSION}`;
@@ -274,7 +274,8 @@
   function closeTab(i) {
     const go = () => {
       tabs.splice(i, 1);
-      if (!tabs.length) { project = null; loadDoc(window.LoomSample(), null, null, true); markClean(); return; }
+      // closing the last project leaves a fresh, empty one rather than the example
+      if (!tabs.length) { project = null; const d = L.newDoc(t('Untitled project')); d.customColours = clone(userLib.colours || []); loadDoc(d, null, null, true); markClean(); return; }
       active = Math.min(active > i ? active - 1 : active, tabs.length - 1);
       const tb = tabs[active]; project = null; tabs[active] = tb;
       activateNoStash(active);
@@ -521,7 +522,7 @@
   }
   function distribute(axis) {
     const items = selectedBoxes();
-    if (items.length < 3) { toast(t('Select three or more parts to distribute.')); return; }
+    if (items.length < 3) { toast(t('Select three or more parts to space evenly.')); return; }
     pushHistory();
     const key = axis === 'h' ? (i) => i.b.x + i.b.w / 2 : (i) => i.b.y + i.b.h / 2;
     items.sort((a, b) => key(a) - key(b));
@@ -587,7 +588,7 @@
     sel = { parts: new Set(), wires: new Set() };
     refreshAll(); setHint();
     $$('[data-cmd="test"]').forEach((b) => b.classList.add('on'));
-    toast(t('Live test on. Click switches, fuses and relays to operate them.'));
+    toast(t('Live test on. Click switches and fuses to operate them.'));
   }
   function endTest(quiet) {
     if (!test) return;
@@ -1218,7 +1219,7 @@
       items.push({ p, v, st, cur: test.state[st.key] != null ? test.state[st.key] : st.def });
     }));
     const lab = (id) => { for (const s of project.sheets) { const p = s.parts.find((x) => x.id === id); if (p) return p.label || p.type; } return id; };
-    let h = `<div><span class="kicker">${esc(t('Live circuit test'))}</span><h2>${esc(t('Operate the circuit'))}</h2><p class="sub">${esc(t('Supplies are live. Change switches, fuses and relays here or by clicking them on the sheet.'))}</p></div>`;
+    let h = `<div><span class="kicker">${esc(t('Live circuit test'))}</span><h2>${esc(t('Operate the circuit'))}</h2><p class="sub">${esc(t('Supplies are live. Change switches and fuses here or by clicking them on the sheet. Relays and contactors pull in when their coil is powered.'))}</p></div>`;
     if (sim.shorts.length) h += `<div class="callout warn">${esc(t('Short circuit'))}: ${esc(sim.shorts.join(', '))} ${esc(t('is connected straight to earth in this state.'))}</div>`;
     h += sec('Controls', items.length ? items.map((x) => `<label class="fld"><span title="${esc((L.partDef(x.v, x.p.type) || {}).name || '')}">${esc(x.p.label || x.p.type)}</span><select data-test="${esc(x.st.key)}">${x.st.states.map((s, i) => `<option value="${i}"${i === x.cur ? ' selected' : ''}>${esc(s)}</option>`).join('')}</select></label>`).join('') : `<p class="muted" style="margin:0">${esc(t('No switches, fuses or relays to operate.'))}</p>`);
     const loads = [...sim.loads].map(lab), relays = [...sim.relays].map((k) => k.split('|').pop());
@@ -1345,7 +1346,7 @@
         ${selFld('Paper size', 'sheet:page', doc.sheet.page || '', [['', `${t('Project default')} (${(pages.find((x) => x[0] === (s.page || 'fit')) || pages[0])[1]})`]].concat(pages))}
         ${selFld('Orientation', 'sheet:orientation', doc.sheet.orientation || '', [['', `${t('Project default')} (${t(s.orientation === 'portrait' ? 'Portrait' : 'Landscape')})`], ['landscape', t('Landscape')], ['portrait', t('Portrait')]])}
         <div class="kv"><span>${esc(t('Parts'))}</span><b>${doc.parts.length}</b><span>${esc(t('Wires'))}</span><b>${doc.wires.length}</b><span>${esc(t('Cable on this sheet'))}</span><b>${metres.toFixed(1)} m</b></div>
-        ${issues.length ? `<button class="callout warn" data-act="show-checks">${issues.length} ${esc(t('design checks to review on this sheet'))}</button>` : ''}`)}
+        ${issues.length ? `<button class="callout warn" data-act="show-checks">${esc(plural(issues.length, t('check')))} ${esc(t('to review on this sheet'))}</button>` : ''}`)}
       ${sec('Drawing', `
         ${selFld('Project type', 'settings:projectType', s.projectType || 'vehicle', L.PROJECT_TYPES.map((x) => [x.id, t(x.name)]))}
         ${L.disclaimerFor(project).mains ? `<p class="callout warn small">${esc(t('Planning aid only. Checks are guidance, not proof the work meets BS 7671, IEC 60204 or any other code. Not a certificate. Use a qualified electrician.'))} <a href="#" data-act="disclaimer">${esc(t('Disclaimer'))}</a></p>` : ''}
@@ -1830,7 +1831,7 @@
     runImport(() => L.importKiCad(project, r.text, { sheetName: r.name.replace(/\.\w+$/, '') }));
   }
   function importLengthsModal() {
-    showModal(t('Import wire lengths'), `<p class="muted">${esc(t('Measured the harness routes in a CAD model, or on the vehicle? Bring the lengths in from a list of wire number and length. Lengths over 30 are read as millimetres, otherwise metres, unless the header says mm.'))}</p>
+    showModal(t('Import wire lengths'), `<p class="muted">${esc(t('Measured the harness routes in a CAD model, or on the vehicle? Bring the lengths in from a list of wire number and length. If the header row says mm, or every length is over 30, the whole list is read as millimetres; otherwise as metres.'))}</p>
       <label class="fld stack"><span>${esc(t('Paste the list here'))}</span><textarea id="ln-text" rows="8" class="mono" placeholder="Wire,Length mm&#10;101,1850&#10;102,2240"></textarea></label>
       <div class="row-btns"><button class="btn primary" id="ln-go">${esc(t('Import'))}</button><button class="btn" id="ln-file">${esc(t('Choose a file…'))}</button><button class="btn" data-close>${esc(t('Cancel'))}</button></div>`);
     const go = (text) => {
@@ -1875,10 +1876,12 @@
     showModal(t('Build pack'), `<p class="muted">${esc(t('Everything needed to build the loom in one document: drawings, wire and cut lists, connector tables, fuses and loads, parts and costs. Print it, or choose Save as PDF in the print window.'))}</p>
       <div class="checks2">${PACK_SECTIONS.map(([k, l]) => `<label class="fld check"><input type="checkbox" data-pack="${k}"${k === 'labels' || k === 'faults' ? '' : ' checked'}><span>${esc(t(l))}</span></label>`).join('')}</div>
       <label class="fld check"><input type="checkbox" id="pk-bw"${project.settings.bw ? ' checked' : ''}><span>${esc(t('Drawings in black and white (wire colours written as codes)'))}</span></label>
+      <label class="fld"><span>${esc(t('Label size'))}</span><select id="pk-lsize">${LABEL_SIZES.map(([v, l]) => `<option value="${v}"${v === labelSize ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
       <div class="row-btns"><button class="btn primary" id="pk-print"${PF.canPrint ? '' : ' disabled'}>${esc(t('Print or save PDF'))}</button><button class="btn" id="pk-html">${esc(t('Save as web page'))}</button><button class="btn" data-close>${esc(t('Cancel'))}</button></div>`);
     const opts = () => {
       const sections = $$('[data-pack]').filter((x) => x.checked).map((x) => x.dataset.pack);
-      return { sections, bw: $('#pk-bw').checked, labels: sections.includes('labels'), vehicleSVG: V && V.vehicleSVG ? V.vehicleSVG(project) : '', formboardSVG: V && V.formboardSVG ? (h) => V.formboardSVG(project, h) : null };
+      labelSize = $('#pk-lsize').value;
+      return { sections, bw: $('#pk-bw').checked, labels: sections.includes('labels'), labelSize: labelDims(labelSize), vehicleSVG: V && V.vehicleSVG ? V.vehicleSVG(project) : '', formboardSVG: V && V.formboardSVG ? (h) => V.formboardSVG(project, h) : null };
     };
     $('#pk-print').onclick = () => { const html = L.buildPackHTML(project, opts()); closeModal(); printHTML(`<style>${L.PACK_CSS}@page{size:A4;margin:12mm}</style>${html}`); };
     $('#pk-html').onclick = async () => { const html = L.buildPackHTML(project, opts()); closeModal(); await PF.exportFile(projSlug() + '-build-pack.html', packDocument(html, project.title + ' build pack'), 'text/html'); };
@@ -1905,15 +1908,17 @@
       } catch (e) { showMessage(t('Export PDF'), `<p>${esc(e.message)}</p>`); }
     };
   }
+  let labelSize = '38x21';
+  const labelDims = (v) => { const [w, h] = String(v).split('x').map(Number); return { width: w === 64 ? 63.5 : w, height: h === 34 ? 33.9 : h === 11 ? 11.1 : h }; };
   const LABEL_SIZES = [['38x21', '38 × 21 mm (65 per A4 sheet)'], ['64x34', '63.5 × 33.9 mm (24 per A4 sheet)'], ['46x11', '46 × 11.1 mm (84 per A4, wrap-around)'], ['25x10', '25 × 10 mm (heat-shrink sleeve)']];
   function labelsModal() {
     const n = project.sheets.reduce((a, s) => a + s.wires.length, 0);
     showModal(t('Wire labels'), `<p class="muted">${esc(t('One label for each end of every wire: the wire number, then where this end goes and where the other end goes. Print on plain paper to check, then on label sheets or heat-shrink sleeves. For a label printer, save the CSV and open it in the printer software.'))}</p>
-      <label class="fld"><span>${esc(t('Label size'))}</span><select id="lb-size">${LABEL_SIZES.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select></label>
+      <label class="fld"><span>${esc(t('Label size'))}</span><select id="lb-size">${LABEL_SIZES.map(([v, l]) => `<option value="${v}"${v === labelSize ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
       <label class="fld check"><input type="checkbox" id="lb-single"><span>${esc(t('One label per wire instead of one per end'))}</span></label>
       <p class="muted">${plural(n, t('wire'))}.</p>
       <div class="row-btns"><button class="btn primary" id="lb-print"${PF.canPrint ? '' : ' disabled'}>${esc(t('Print labels'))}</button><button class="btn" id="lb-csv">${esc(t('Save CSV for a label printer'))}</button><button class="btn" data-close>${esc(t('Cancel'))}</button></div>`);
-    const size = () => { const [w, h] = $('#lb-size').value.split('x').map(Number); return { width: w === 64 ? 63.5 : w, height: h === 34 ? 33.9 : h === 11 ? 11.1 : h }; };
+    const size = () => { labelSize = $('#lb-size').value; return labelDims(labelSize); };
     $('#lb-print').onclick = () => { const html = `<div class="pack">${L.labelSheetHTML(L.wireLabels(project, { single: $('#lb-single').checked }), size())}</div>`; closeModal(); printHTML(`<style>${L.PACK_CSS}@page{size:A4 portrait;margin:8mm}</style>${html}`); };
     $('#lb-csv').onclick = () => { const s = $('#lb-single').checked; closeModal(); exportLabels(s); };
   }
@@ -2250,6 +2255,7 @@
     showModal(t('Language'), `<p class="muted">${esc(t('Menus, panels and messages. Drawings and reports keep the words you type.'))}</p>
       <div class="list">${langs.map(([c, n]) => `<label class="list-row"><input type="radio" name="lang" value="${c}"${c === I18N.lang ? ' checked' : ''}> <span>${esc(n)}</span></label>`).join('')}</div>
       <p class="muted">${esc(t('Translations are a first pass. Corrections are welcome on GitHub.'))}</p>
+      <p class="muted">${esc(t('LoomWright reloads to change language. Your open projects are kept, but undo starts again.'))}</p>
       <div class="row-btns"><button class="btn primary" id="lg-go">${esc(t('Apply'))}</button><button class="btn" data-close>${esc(t('Cancel'))}</button></div>`);
     $('#lg-go').onclick = () => {
       const c = ($('input[name="lang"]:checked') || {}).value;
@@ -2503,7 +2509,7 @@
     cables: { label: 'Cables (multicore, screened)…', run: cablesModal },
     'lib-import': { label: 'Import components and blocks…', run: importLibrary },
     'lib-export': { label: 'Export my components and blocks…', run: exportLibrary, enabled: () => userLib.parts.length > 0 || (userLib.blocks || []).length > 0 },
-    check: { label: 'Run design checks', run: () => { showTab('checks'); const n = checks().filter((c) => c.level !== 'info').length; toast(n ? `${n} ${t('checks to review')}` : t('No problems found')); } },
+    check: { label: 'Run design checks', run: () => { showTab('checks'); const n = checks().filter((c) => c.level !== 'info').length; toast(n ? plural(n, t('check')) + ' ' + t('to review') : t('No problems found')); } },
     wires: { label: 'Wire list', run: () => showTab('wires') },
     bom: { label: 'Parts and costs', run: () => showTab('bom') },
     cable: { label: 'Cable totals', run: () => showTab('cable') },
