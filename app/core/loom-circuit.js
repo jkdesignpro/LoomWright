@@ -535,6 +535,9 @@
         const afterSw = firstSw < 0 ? [] : describe(after.slice(firstSw + 1).map((s) => s.e)).filter((x) => /^wire|^connector/.test(x));
         const sch = Loom.schedule(project).fuses.find((x) => x.part === fe.it.p.id && x.ref === fe.it.p.label + (fe.it.p.type === 'fuse_box' ? ' way ' + pinOf(fe.b) : fe.it.b.kind === 'pdm' ? ' ' + pinOf(fe.b) : fe.it.p.type === 'fuse_box_lucas' ? ' way ' + parseInt(pinOf(fe.b), 10) / 2 : ''));
         const onWay = sch ? sch.loads.map((x) => `${x.ref} (${x.amps} A)`) : [tref];
+        const gm = Loom.wireGrommets ? Loom.wireGrommets(project) : new Map();
+        const through = path.steps.slice(f.i + 1).filter((s) => s.e.kind === 'wire' && gm.has(s.e.wire.id)).map((s) => `${s.e.wire.name} through ${gm.get(s.e.wire.id).join(', ')}`);
+        if (through.length) notes.push(`Wires on this fuse that pass through grommets or bulkheads, the usual places for chafing: ${list(through)}.`);
         const smallest = sch && sch.smallest ? Loom.gaugeInfo(sch.smallest) : null;
         const w = add({ id: 'when', text: `Note when ${fref}${rating ? ' (' + rating + ' A)' : ''} blows. Straight away when fitted with everything off: go to step {A}. Only when ${tref} is switched on: go to step {B}. After running a while, or under heavy load: go to step {C}.`, expect: '' });
         const A = add({ id: 'A', text: `Take the fuse out and switch everything off. Measure resistance from ${label(out)} (the load side of the fuse holder) to chassis earth.`, expect: 'open circuit, or many ohms through other loads' });

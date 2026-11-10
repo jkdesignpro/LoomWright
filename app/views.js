@@ -101,7 +101,7 @@
   const fb = { harness: null, sel: null, scale: false, connect: null, allowance: 50 };
   const P = () => E().project;
   function lay() { return L.harnessLayout(P(), fb.harness); }
-  function fbData() { return L.formboard(P(), fb.harness); }
+  function fbData() { const d = L.formboard(P(), fb.harness); d.grommets = L.grommetFill ? L.grommetFill(P()).filter((g) => g.harness === fb.harness) : []; return d; }
   function fbPositions(data) {
     if (!fb.scale) return new Map(data.nodes.map((n) => [n.id, { x: n.x, y: n.y }]));
     return L.formboardGeometry(data.layout);
@@ -147,6 +147,9 @@
       if (n.kind === 'end') {
         const w = (Math.max(40, n.label.length * 7 + 14)) * s1, h = 20 * s1;
         g += `<g data-node="${n.id}" style="cursor:${fb.scale ? 'pointer' : 'move'}"><rect x="${p.x - w / 2}" y="${p.y - h / 2}" width="${w}" height="${h}" rx="${3 * s1}" fill="${on || conn ? '#e3ecfb' : '#ffffff'}" stroke="${on || conn ? ACC : INK}" stroke-width="${1.4 * s1}"${linked ? '' : ` stroke-dasharray="${4 * s1} ${3 * s1}"`}/><text x="${p.x}" y="${p.y + 3.8 * s1}" text-anchor="middle" font-size="${11 * s1}" font-family="${MONO}" font-weight="600" fill="${INK}">${esc(n.label)}</text></g>`;
+      } else if (n.kind === 'grommet') {
+        const gf = (data.grommets || []).find((x) => x.node === n.id), bad = gf && (gf.status === 'too small' || gf.status === 'tight');
+        g += `<g data-node="${n.id}" style="cursor:${fb.scale ? 'pointer' : 'move'}"><circle cx="${p.x}" cy="${p.y}" r="${10 * s1}" fill="${on || conn ? '#e3ecfb' : '#ffffff'}" stroke="${bad ? '#c0392b' : on || conn ? ACC : INK}" stroke-width="${3 * s1}"/><circle cx="${p.x}" cy="${p.y}" r="${4.5 * s1}" fill="${INK}"/><text x="${p.x + 13 * s1}" y="${p.y - 10 * s1}" font-size="${10 * s1}" font-family="${MONO}" fill="${bad ? '#c0392b' : INK}">${esc((n.label || t('Grommet')) + (n.hole ? ' Ø' + n.hole : '') + (gf && gf.fill != null ? ' · ' + gf.fill + '%' : ''))}</text></g>`;
       } else {
         g += `<g data-node="${n.id}" style="cursor:${fb.scale ? 'pointer' : 'move'}"><circle cx="${p.x}" cy="${p.y}" r="${6 * s1}" fill="${on || conn ? ACC : '#ffffff'}" stroke="${on || conn ? ACC : INK}" stroke-width="${1.6 * s1}"/>${n.label ? `<text x="${p.x + 9 * s1}" y="${p.y - 8 * s1}" font-size="${10.5 * s1}" font-family="${MONO}" fill="${MUTED}">${esc(n.label)}</text>` : ''}</g>`;
       }
@@ -255,12 +258,19 @@
         <div class="row-btns"><button class="btn" data-v="split">${esc(t('Add a breakout point here'))}</button><button class="btn danger" data-v="delete">${esc(t('Delete branch'))}</button></div></div>`;
     } else if (fb.sel && fb.sel.node) {
       const n = data.nodes.find((x) => x.id === fb.sel.node);
-      if (n) h += `<div class="sec"><h3>${esc(n.kind === 'end' ? t('Connector end') : t('Breakout point'))}</h3>
-        ${n.kind === 'end' ? `<p class="sub">${esc(n.label)}</p>` : `<label class="fld"><span>${esc(t('Name'))}</span><input data-fb="label" value="${esc(n.label || '')}" placeholder="${esc(t('e.g. Bulkhead grommet'))}"></label>`}
+      const gf = n && (data.grommets || []).find((x) => x.node === n.id);
+      if (n) h += `<div class="sec"><h3>${esc(n.kind === 'end' ? t('Connector end') : n.kind === 'grommet' ? t('Grommet or bulkhead hole') : t('Breakout point'))}</h3>
+        ${n.kind === 'end' ? `<p class="sub">${esc(n.label)}</p>` : `<label class="fld"><span>${esc(t('Name'))}</span><input data-fb="label" value="${esc(n.label || '')}" placeholder="${esc(t('e.g. Bulkhead grommet'))}"></label>
+        <label class="fld"><span>${esc(t('Type'))}</span><select data-fb="kind"><option value="point"${n.kind === 'point' ? ' selected' : ''}>${esc(t('Breakout point'))}</option><option value="grommet"${n.kind === 'grommet' ? ' selected' : ''}>${esc(t('Grommet or bulkhead hole'))}</option></select></label>`}
+        ${n.kind === 'grommet' ? `<label class="fld"><span>${esc(t('Hole (mm)'))}</span><input type="number" min="0" step="0.5" data-fb="hole" value="${esc(n.hole || '')}" placeholder="${esc(t('inside diameter'))}"></label>
+        ${gf ? `<div class="kv"><span>${esc(t('Wires through'))}</span><b>${gf.wires.length}</b><span>${esc(t('Bundle diameter'))}</span><b>${gf.diameter} mm</b>${gf.fill != null ? `<span>${esc(t('Fill'))}</span><b>${gf.fill}%</b>` : ''}</div>${gf.status === 'too small' ? `<div class="callout warn">${esc(t('The bundle will not fit through this hole.'))}</div>` : gf.status === 'tight' ? `<div class="callout warn">${esc(t('Tight: keep the bundle under 80% of the hole for sleeving and a spare wire.'))}</div>` : ''}` : ''}` : ''}
         <div class="kv"><span>${esc(t('Branches'))}</span><b>${data.layout.branches.filter((b) => b.a === n.id || b.b === n.id).length}</b></div>
         <div class="row-btns"><button class="btn" data-v="connect">${esc(t('Join to another point…'))}</button>${n.kind === 'end' ? `<button class="btn" data-v="show">${esc(t('Show on drawing'))}</button>` : `<button class="btn danger" data-v="delete">${esc(t('Delete point'))}</button>`}</div></div>`;
     }
     const routed = data.wires.filter((w) => w.routed).length;
+    const amb = L.harnessAmbient ? L.harnessAmbient(P(), fb.harness) : null, hot = L.derating ? L.derating(P()).filter((x) => x.harness === fb.harness && x.status !== 'ok') : [];
+    if (amb != null) h += `<div class="sec"><h3>${esc(t('Heat'))}</h3><label class="fld"><span>${esc(t('Air around this harness (°C)'))}</span><input type="number" step="5" data-fb="ambient" value="${esc(((P().settings.harnessTemps || {})[fb.harness]) ?? '')}" placeholder="${amb}"></label>
+      ${hot.length ? `<div class="callout warn">${hot.map((x) => esc(x.fT === 0 ? `${x.name}: its insulation (${x.tmax} °C${x.assumed ? ', assumed' : ''}) is not rated for ${x.ambient} °C.` : `${x.name}: ${x.current} A, good for about ${x.capacity} A here${x.suggest ? ', use ' + x.suggest + ' mm²' : ''}.`)).join('<br>')}</div>` : `<p class="muted" style="margin:0;font-size:11.5px">${esc(t('Wire ratings are reduced for the heat and for loaded wires bundled together. Engine bay harnesses default to 80 °C.'))}</p>`}</div>`;
     h += `<div class="sec"><h3>${esc(fb.harness)}</h3><div class="kv"><span>${esc(t('Connector ends'))}</span><b>${data.ends.length}</b><span>${esc(t('Branches'))}</span><b>${data.branches.length}</b><span>${esc(t('Trunk and branches'))}</span><b>${data.total} m</b><span>${esc(t('Wires routed'))}</span><b>${routed} / ${data.wires.length}</b></div>
       ${routed < data.wires.length ? `<div class="callout warn">${esc(t('Some wires have no path between their ends. Join their connector ends to the layout.'))}</div>` : ''}</div>`;
     h += `<div class="sec"><h3>${esc(t('Wire lengths'))}</h3><div style="overflow:auto;max-height:260px"><table class="data"><thead><tr><th>${esc(t('Wire'))}</th><th>${esc(t('From'))}</th><th>${esc(t('To'))}</th><th>${esc(t('Routed m'))}</th><th>${esc(t('Now m'))}</th></tr></thead><tbody>${data.wires.map((w) => `<tr><td class="mono">${esc(w.name)}</td><td class="mono">${esc(w.from || '')}</td><td class="mono">${esc(w.to || '')}</td><td class="mono">${w.routed ? w.metres : `<span class="lvl warn">${esc(t('no path'))}</span>`}</td><td class="mono">${w.was == null ? '' : w.was}</td></tr>`).join('')}</tbody></table></div>
@@ -273,6 +283,8 @@
     const k = e.target.dataset && e.target.dataset.fb; if (!k || mode !== 'formboard') return;
     const ed = E(), l = lay(); ed.pushHistory();
     if (k === 'label') { const n = l.nodes.find((x) => x.id === fb.sel.node); if (n) n.label = e.target.value.trim(); }
+    else if (k === 'kind' || k === 'hole') { const n = l.nodes.find((x) => x.id === fb.sel.node); if (n && n.kind !== 'end') { if (k === 'kind') n.kind = e.target.value === 'grommet' ? 'grommet' : 'point'; else { const v = parseFloat(e.target.value); if (v > 0) n.hole = v; else delete n.hole; } } }
+    else if (k === 'ambient') { const pr = P(); pr.settings.harnessTemps = pr.settings.harnessTemps || {}; const v = parseFloat(e.target.value); if (isNaN(v)) delete pr.settings.harnessTemps[fb.harness]; else pr.settings.harnessTemps[fb.harness] = v; }
     else { const b = l.branches.find((x) => x.id === fb.sel.branch); if (b) b[k] = k === 'length' ? Math.max(0, parseFloat(e.target.value) || 0) : e.target.value; }
     e.target.blur(); ed.commit(); side(); redraw();
   });
@@ -293,6 +305,7 @@
     data.nodes.forEach((n) => {
       const p = pos.get(n.id); if (!p) return;
       if (n.kind === 'end') { const w = (n.label.length * 7 + 14) * u, h = 18 * u; s += `<rect x="${p.x - w / 2}" y="${p.y - h / 2}" width="${w}" height="${h}" fill="#fff" stroke="${INK}" stroke-width="${1.2 * u}"/><text x="${p.x}" y="${p.y + 3.6 * u}" text-anchor="middle" font-size="${10.5 * u}" font-weight="600" fill="${INK}">${esc(n.label)}</text>`; }
+      else if (n.kind === 'grommet') s += `<circle cx="${p.x}" cy="${p.y}" r="${9 * u}" fill="#fff" stroke="${INK}" stroke-width="${2.6 * u}"/><circle cx="${p.x}" cy="${p.y}" r="${4 * u}" fill="${INK}"/><text x="${p.x + 12 * u}" y="${p.y - 9 * u}" font-size="${9.5 * u}" fill="${INK}">${esc((n.label || 'Grommet') + (n.hole ? ' Ø' + n.hole + ' mm' : ''))}</text>`;
       else s += `<circle cx="${p.x}" cy="${p.y}" r="${5 * u}" fill="#fff" stroke="${INK}" stroke-width="${1.4 * u}"/>${n.label ? `<text x="${p.x + 8 * u}" y="${p.y - 7 * u}" font-size="${9.5 * u}" fill="${INK}">${esc(n.label)}</text>` : ''}`;
     });
     s += `<text x="${x0 + 20 * u}" y="${y0 + 24 * u}" font-size="${13 * u}" font-weight="600" fill="${INK}">${esc(project.title)}: ${esc(harness)}</text><text x="${x0 + 20 * u}" y="${y0 + 40 * u}" font-size="${9.5 * u}" fill="${INK}">${esc(t('Lengths in mm along each branch. Bundle Ø is an estimate.'))}</text>`;

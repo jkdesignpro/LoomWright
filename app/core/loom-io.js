@@ -483,12 +483,13 @@
   }
 
   /* ---------------- Read-only HTML page ---------------- */
-  function shareHTML(project) {
+  function shareHTML(project, opts = {}) {
     const vs = Loom.views(project), nets = Loom.nets ? Loom.nets(project) : [];
+    const build = Loom.buildChecklistData ? Loom.buildChecklistData(project) : null, startBuild = !!(opts.checklist && build);
     const netOf = {}; const info = nets.map((n, i) => { n.wires.forEach((x) => { netOf[x.wire.id] = i; }); return { name: n.name, wires: n.wires.map((x) => ({ s: x.sheet.name, n: x.wire.name, c: Loom.wireCode(Loom.view(project, x.sheet), x.wire), a: Loom.pinName(Loom.view(project, x.sheet), x.wire.from), b: Loom.pinName(Loom.view(project, x.sheet), x.wire.to) })) }; });
     const wl = Loom.wireList(project);
     const m = project.meta;
-    const data = JSON.stringify({ netOf, info }).replace(/</g, '\\u003c');
+    const data = JSON.stringify({ netOf, info, build }).replace(/</g, '\\u003c');
     return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(project.title)}</title>
@@ -511,17 +512,44 @@ aside h2{font-size:13px;margin:0 0 6px}aside ul{margin:0;padding-left:18px}aside
 table{border-collapse:collapse;width:100%;background:var(--panel);font-size:12px}th,td{border:1px solid var(--line);padding:4px 6px;text-align:left}th{background:var(--bg)}
 .mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}[hidden]{display:none!important}
 footer{padding:8px 16px 24px;color:var(--muted);font-size:12px}
+#build{grid-column:1/-1}#build .bt{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+#build h2{font-size:14px;margin:14px 0 6px}.prog{flex:1;min-width:160px;height:10px;background:var(--line);border-radius:5px;overflow:hidden}.prog i{display:block;height:100%;background:#2e8540}
+.bw{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:6px 0}.bw.done{border-color:#2e8540}.bw.fail{border-color:#c0392b}
+.bw .t{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.bw .t b{font-size:15px}.bw .r{color:var(--muted);font-size:12px}
+.bw .k{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}.bw .k button{font:inherit;font-size:14px;min-width:64px;min-height:40px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:4px 10px}
+.bw .k button.y{background:#2e8540;border-color:#2e8540;color:#fff}.bw .k button.n{background:#c0392b;border-color:#c0392b;color:#fff}
+.bw input{font:inherit;width:100%;margin-top:6px;padding:6px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
+.bbtn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:4px;padding:6px 10px}
 </style></head><body>
 <header><h1>${esc(project.title)}</h1><span>${esc(m.project || '')}</span><span>Rev ${esc(m.revision || '')} · ${esc(m.date || '')}</span><span>${vs.length} sheet${vs.length > 1 ? 's' : ''}, ${wl.length} wires</span></header>
-<nav>${vs.map((v, i) => `<button data-tab="s${i}"${i ? '' : ' class="on"'}>${i + 1} ${esc(v.sheet.name)}</button>`).join('')}<button data-tab="list">Wire list</button></nav>
+<nav>${vs.map((v, i) => `<button data-tab="s${i}"${i ? '' : ' class="on"'}>${i + 1} ${esc(v.sheet.name)}</button>`).join('')}<button data-tab="list">Wire list</button>${build ? '<button data-tab="build">Build checklist</button>' : ''}</nav>
 <main><div>${vs.map((v, i) => `<div class="sheet" id="s${i}"${i ? ' hidden' : ''}>${Loom.exportSVG(v, { tag: true })}</div>`).join('')}
 <div id="list" hidden><table><thead><tr><th>Sheet</th><th>Wire</th><th>From</th><th>To</th><th>Code</th><th>mm²</th><th>m</th><th>Circuit</th><th>Harness</th></tr></thead><tbody>${wl.map((r) => `<tr><td>${esc(r.sheet)}</td><td class="mono">${esc(r.name)}</td><td class="mono">${esc(r.from)}</td><td class="mono">${esc(r.to)}</td><td class="mono">${esc(r.code)}</td><td class="mono">${esc(r.gauge)}</td><td class="mono">${esc(r.length)}</td><td>${esc(r.circuit)}</td><td>${esc(r.harness)}</td></tr>`).join('')}</tbody></table></div></div>
+${build ? `<div id="build" hidden><div class="bt"><span class="prog"><i id="bp"></i></span><span id="bpt"></span><button class="bbtn" id="bexp">Export progress</button><button class="bbtn" id="bclr">Clear ticks on this device</button></div><p class="r" style="color:var(--muted)">Tick each wire as you go. Ticks are kept on this device; Export progress and import the file in LoomWright (Lists, Build) to bring them back.</p><div id="bl"></div></div>` : ''}
 <aside id="info"><h2>Trace a circuit</h2><p>Click any wire to see everything it connects to, on every sheet.</p></aside></main>
 <footer>Read-only copy made with LoomWright ${esc(Loom.VERSION)}, free and open-source wiring software (GPL-3.0).</footer>
 <script>
 const D=${data};
 const tabs=document.querySelectorAll('nav button');
-tabs.forEach(b=>b.onclick=()=>{tabs.forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.sheet,#list').forEach(el=>el.hidden=el.id!==b.dataset.tab);});
+function show(id){tabs.forEach(x=>x.classList.toggle('on',x.dataset.tab===id));document.querySelectorAll('.sheet,#list,#build').forEach(el=>el.hidden=el.id!==id);const a=document.getElementById('info');if(a)a.hidden=id==='build';}
+tabs.forEach(b=>b.onclick=()=>show(b.dataset.tab));
+if(D.build){
+const KEY='loomwright-build-'+(D.build.project||D.build.title);let S={};
+try{S=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){S={};}
+D.build.harnesses.forEach(h=>h.wires.forEach(w=>{if(!S[w.id])S[w.id]=Object.assign({},w.build||{});}));
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
+const STEPS=[['cut','Cut'],['ends','Ends'],['fitted','Fitted']];
+function draw(){let tot=0,done=0;document.getElementById('bl').innerHTML=D.build.harnesses.map(h=>'<h2>'+esc(h.harness)+'</h2>'+h.wires.map(w=>{const s=S[w.id]||{};tot+=4;done+=(s.cut?1:0)+(s.ends?1:0)+(s.fitted?1:0)+(s.test==='pass'?1:0);
+const all=s.cut&&s.ends&&s.fitted&&s.test==='pass';return '<div class="bw'+(all?' done':'')+(s.test==='fail'?' fail':'')+'" data-w="'+esc(w.id)+'"><div class="t"><b class="mono">'+esc(w.name)+'</b><span class="mono">'+esc(w.code)+' '+esc(w.gauge)+' mm²</span>'+(w.cut?'<span class="mono">cut '+esc(w.cut)+' m</span>':'')+'</div><div class="r mono">'+esc(w.from)+' → '+esc(w.to)+'</div><div class="k">'+STEPS.map(([k,l])=>'<button data-k="'+k+'" class="'+(s[k]?'y':'')+'">'+l+'</button>').join('')+'<button data-k="test" class="'+(s.test==='pass'?'y':s.test==='fail'?'n':'')+'">'+(s.test==='pass'?'Test ✓':s.test==='fail'?'Test ✗':'Test')+'</button></div><input data-n placeholder="Note" value="'+esc(s.note||'')+'"></div>';}).join('')).join('');
+const pct=tot?Math.round(done/tot*100):0;document.getElementById('bp').style.width=pct+'%';document.getElementById('bpt').textContent=pct+'% done';}
+document.getElementById('bl').addEventListener('click',e=>{const b=e.target.closest('button[data-k]');if(!b)return;const id=b.closest('[data-w]').dataset.w,s=S[id]=S[id]||{},k=b.dataset.k;
+if(k==='test')s.test=s.test==='pass'?'fail':s.test==='fail'?'':'pass';else s[k]=!s[k];s.at=new Date().toISOString().slice(0,10);save();draw();});
+document.getElementById('bl').addEventListener('change',e=>{if(!e.target.matches('[data-n]'))return;const id=e.target.closest('[data-w]').dataset.w;(S[id]=S[id]||{}).note=e.target.value;save();});
+document.getElementById('bexp').onclick=()=>{const blob=new Blob([JSON.stringify({format:'loomwright-build-progress',project:D.build.project,title:D.build.title,at:new Date().toISOString(),wires:S},null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(D.build.title||'loom').replace(/[^A-Za-z0-9-]+/g,'-')+'-progress.json';document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),500);};
+document.getElementById('bclr').onclick=()=>{if(!confirm('Clear the ticks kept on this device?'))return;S={};D.build.harnesses.forEach(h=>h.wires.forEach(w=>{S[w.id]=Object.assign({},w.build||{});}));save();draw();};
+draw();
+}
+${startBuild ? "show('build');" : ''}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 document.addEventListener('click',e=>{const t=e.target.closest('[data-wire]');if(!t)return;const n=D.netOf[t.dataset.wire];
 document.querySelectorAll('.on').forEach(x=>x.classList.remove('on'));if(n==null)return;const net=D.info[n];

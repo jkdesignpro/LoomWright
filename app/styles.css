@@ -415,3 +415,23 @@ table.mini .linkbtn { font-family: var(--mono); }
 .ff-out { max-height: 56vh; overflow: auto; border: 1px solid var(--line); border-radius: var(--r); padding: 10px; margin: 8px 0; background: #fff; color: #222; }
 .ff-out .fault-sheet { margin: 0; page-break-after: auto; }
 .ff-out .fs-steps li.flash { outline: 2px solid #2f6fde; }
+
+/* Colour helper, build tracking, shopping list */
+.sugg { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 2px; }
+.sugg .muted { font-size: 11.5px; margin-right: 2px; }
+.sugg .chip { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); }
+.build-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.build-head { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.build-head .bh { display: inline-flex; gap: 6px; align-items: center; }
+.build-head .bh-btns { margin-left: auto; display: inline-flex; gap: 6px; }
+.build-head .bad { color: var(--err); }
+.pbar { display: inline-block; width: 90px; height: 7px; border-radius: 4px; background: var(--soft); overflow: hidden; vertical-align: middle; }
+.pbar i { display: block; height: 100%; background: var(--ok); }
+table.data tr.failrow td { background: var(--err-bg); }
+table.data tr.muted-row td { color: var(--muted); }
+table.data input.note-in { width: 100%; min-width: 120px; height: 22px; }
+table.data td input[type=checkbox] { margin: 0; }
+table.data td select { height: 22px; padding: 0 4px; }
+table.data.stock td { padding: 2px 4px; }
+table.data.stock input, table.data.stock select { width: 100%; }
+.mh { font-size: 12.5px; margin: 10px 0 4px; }

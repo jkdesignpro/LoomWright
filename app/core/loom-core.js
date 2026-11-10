@@ -1255,7 +1255,11 @@
     const r = revisionById(project, id);
     if (!r || !r.snapshot) throw new Error('No such revision');
     const snap = JSON.parse(JSON.stringify(r.snapshot));
+    // build and test progress belongs to the loom on the bench, not the drawing: keep it
+    const built = new Map();
+    (project.sheets || []).forEach((s) => s.wires.forEach((w) => { if (w.build) built.set(w.id, w.build); }));
     STATE_KEYS.forEach((k) => { if (snap[k] !== undefined) project[k] = snap[k]; });
+    (project.sheets || []).forEach((s) => s.wires.forEach((w) => { if (built.has(w.id)) w.build = built.get(w.id); else delete w.build; }));
     project.settings.clouds = '';
     return project;
   }

@@ -382,6 +382,9 @@
     pushHistory();
     const w = L.addWire(doc, draft.from, end, { colour: lastWire.colour, tracer: lastWire.tracer, gauge: lastWire.gauge, harness: lastWire.harness || '' });
     if (draft.points.length) w.points = draft.points.slice();
+    if (project.settings.autoColour && L.suggestColours) {
+      try { const sg = L.suggestColours(project, sheetId, w, { inventory: userLib.inventory, limit: 1 }).suggestions[0]; if (sg) { w.colour = sg.colour; if (sg.tracer) w.tracer = sg.tracer; else delete w.tracer; } } catch (e) { console.warn(e); }
+    }
     draft = null;
     svg.classList.remove('wiring');
     select([], [w.id]);
@@ -1231,6 +1234,13 @@
     h += sec('Identity', `${fld('Wire number', 'name', w.name)}${fld('Circuit', 'circuit', w.circuit, 'text', 'list="dl-circuit" placeholder="e.g. Spot lamps"')}${fld('Harness', 'harness', w.harness, 'text', 'list="dl-harness" placeholder="e.g. Engine bay"')}${harnessList()}${circuitList()}`);
     let col = `${colourField('Main', 'colour', w.colour, false)}${colourField('Tracer', 'tracer', w.tracer, true)}${colourField('Second tracer', 'tracer2', w.tracer2 || '', true)}`;
     if (otherUses.length) col += `<div class="callout ${clash.length ? 'warn' : ''}" style="${clash.length ? '' : 'background:var(--raise);border-color:var(--line)'}"><b>${esc(code)}</b> ${esc(t('is also used for'))} ${otherUses.map((u) => esc([u.circuit || t('no circuit'), u.harness].filter(Boolean).join(' in '))).join('; ')}.${clash.length ? ' ' + esc(t('Same harness, different circuit: make sure they can be told apart, for example with wire numbers or sleeves.')) : ''}</div>`;
+    if (L.suggestColours) {
+      try {
+        const sg = L.suggestColours(project, sheetId, w, { inventory: userLib.inventory, limit: 6 }).suggestions.filter((x) => !(x.colour === w.colour && (x.tracer || '') === (w.tracer || '')));
+        if (sg.length) col += `<div class="sugg"><span class="muted">${esc(t('Suggested'))}</span>${sg.slice(0, 5).map((x) => { const tr = x.tracer && L.colourById(doc, x.tracer); return `<button class="chip" data-sugg="${esc(x.colour)}|${esc(x.tracer || '')}" title="${esc(x.name + (x.reasons.length ? ': ' + x.reasons.join('; ') : ''))}"><span class="swatch" style="background:${tr ? `repeating-linear-gradient(90deg, ${x.hex} 0 5px, ${tr.hex} 5px 8px)` : x.hex}"></span>${esc(x.code)}</button>`; }).join('')}</div>`;
+      } catch (e) { console.warn(e); }
+      col += `<label class="fld check"><input type="checkbox" data-field="settings:autoColour"${project.settings.autoColour ? ' checked' : ''}><span>${esc(t('Pick colours for new wires automatically'))}</span></label>`;
+    }
     h += sec('Colour', col);
     let cab = `<label class="fld"><span>${esc(t('Size'))}</span><select id="f-gauge" data-field="gauge">${gaugeOptions(w.gauge)}</select></label>`;
     cab += selFld('Insulation', 'insulation', w.insulation || '', L.INSULATION.map((x) => [x.id, x.id ? `${x.name}${x.temp ? ', ' + x.temp : ''}` : t('Not set')]));
@@ -1249,6 +1259,10 @@
         `<div class="two">${fld('Strip (mm)', `end:${k}:strip`, e.strip, 'number', 'min="0" step="0.5"')}${selFld('Seal', `end:${k}:seal`, e.seal || '', L.SEALS.map(([v, l]) => [v, t(l)]))}</div>` +
         fld('Heat shrink', `end:${k}:shrink`, e.shrink, 'text', 'placeholder="e.g. 6 mm adhesive, 25 mm"'));
     });
+    const bd = w.build || {};
+    h += sec('Build and test', `<div class="build-row">${['cut', 'ends', 'fitted'].map((k) => `<label class="fld check"><input type="checkbox" data-field="build:${k}"${bd[k] ? ' checked' : ''}><span>${esc(t((L.BUILD_STEPS.find((x) => x[0] === k) || [k, k])[1]))}</span></label>`).join('')}</div>
+      ${selFld('Test', 'build:test', bd.test || '', [['', t('Not tested')], ['pass', t('Pass')], ['fail', t('Fail')]])}
+      ${fld('Build note', 'build:note', bd.note || '', 'text', `placeholder="${esc(t('e.g. reads 0.3 Ω end to end'))}"`)}`);
     h += `<div class="row-btns"><button class="btn" data-act="trace-wire">${esc(t('Trace circuit'))}</button><button class="btn" data-act="swap">${esc(t('Swap ends'))}</button><button class="btn" data-act="clear-bends">${esc(t('Clear bends'))}</button>${w.lab ? `<button class="btn" data-act="reset-label">${esc(t('Reset label'))}</button>` : ''}<button class="btn danger" data-act="delete">${esc(t('Delete'))}</button></div>`;
     return h;
   }
@@ -1333,7 +1347,10 @@
       }
     } else if (only('wire')) {
       const w = only('wire');
-      if (f.startsWith('end:')) {
+      if (f.startsWith('build:')) {
+        if (live && f !== 'build:note') return;
+        L.setBuild(w, { [f.slice(6)]: v });
+      } else if (f.startsWith('end:')) {
         const [, end, k] = f.split(':');
         w.ends = w.ends || {}; w.ends[end] = w.ends[end] || {};
         if (v === '' || v == null) delete w.ends[end][k]; else w.ends[end][k] = v;
@@ -1358,6 +1375,13 @@
     if (gs) { goSheet(gs.dataset.gotoSheet, true); return; }
     const tp = e.target.closest('[data-trace-pin]');
     if (tp) { startTrace(sheetId, { part: only('part').id, pin: tp.dataset.tracePin }); return; }
+    const sg = e.target.closest('[data-sugg]');
+    if (sg && only('wire')) {
+      const w = only('wire'), [c, tr] = sg.dataset.sugg.split('|');
+      pushHistory(); w.colour = c; if (tr) w.tracer = tr; else delete w.tracer;
+      lastWire.colour = c; lastWire.tracer = tr || '';
+      commit(); inspector.force = true; inspector(); inspector.force = false; return;
+    }
     const a = e.target.closest('[data-act]');
     if (!a) return;
     const act = a.dataset.act;
@@ -1456,6 +1480,20 @@
         const on = trace && trace.net && trace.net.id === n.id;
         return `<tr class="click${on ? ' sel' : ''}" data-net="${i}"><td><b>${esc(n.name)}</b></td><td class="mono">${n.wires.length}</td><td class="mono">${n.pins.length}</td><td class="mono">${esc(sheets.map(sheetNo).sort((a, b) => a - b).join(', '))}</td><td class="mono wrap">${esc([...new Set(pins)].slice(0, 14).join('  ') + (pins.length > 14 ? '  …' : ''))}</td></tr>`;
       }).join('')}</tbody></table>${note('Click a circuit to trace it: every wire on it lights up, on every sheet. Alt+click a wire or pin on the drawing does the same.')}` : empty('No circuits yet.');
+    } else if (tab === 'build') {
+      const pr = L.buildProgress(project), rows = L.cutList(project).map((g) => ({ ...g, rows: g.rows.filter((r) => inScope(r.sheetId)) })).filter((g) => g.rows.length);
+      const wb = new Map(); project.sheets.forEach((s) => s.wires.forEach((w) => wb.set(w.id, w.build || {})));
+      const bar = (g) => `<span class="pbar" title="${g.pct}%"><i style="width:${g.pct}%"></i></span> <span class="mono">${g.pct}%</span>`;
+      h = rows.length ? `<div class="build-head">${[pr.total].concat(pr.harnesses.length > 1 ? pr.harnesses : []).map((g) => `<span class="bh"><b>${esc(t(g.harness))}</b> ${bar(g)} <span class="muted">${g.cut}/${g.wires} ${esc(t('cut'))}, ${g.pass} ${esc(t('passed'))}${g.fail ? `, <b class="bad">${g.fail} ${esc(t('failed'))}</b>` : ''}</span></span>`).join('')}
+        <span class="bh-btns"><button class="btn sm" data-cmd="build-share">${esc(t('Phone checklist…'))}</button><button class="btn sm" data-cmd="build-import">${esc(t('Import phone progress…'))}</button></span></div>
+        <table class="data">${th(['Wire', 'Code', 'Size', 'Cut m', 'From', 'To', 'Cut', 'Ends', 'Fitted', 'Test', 'Note'])}<tbody>${rows.map((g) => `<tr class="grp"><td colspan="11">${esc(g.harness)}</td></tr>` + g.rows.map((r) => { const b = wb.get(r.id) || {}; return `<tr class="click${b.test === 'fail' ? ' failrow' : ''}" data-wire="${r.id}" data-sheet="${r.sheetId}"><td class="mono">${esc(r.name)}</td><td class="mono">${esc(r.code)}</td><td class="mono">${esc(r.gauge)}</td><td class="mono">${r.cut == null ? '' : r.cut}</td><td class="mono">${esc(r.from)}</td><td class="mono">${esc(r.to)}</td>${['cut', 'ends', 'fitted'].map((k) => `<td><input type="checkbox" data-build="${r.id}|${k}"${b[k] ? ' checked' : ''} aria-label="${esc(t(k))}"></td>`).join('')}<td><select data-build="${r.id}|test"><option value="">–</option><option value="pass"${b.test === 'pass' ? ' selected' : ''}>${esc(t('Pass'))}</option><option value="fail"${b.test === 'fail' ? ' selected' : ''}>${esc(t('Fail'))}</option></select></td><td><input class="note-in" data-build="${r.id}|note" value="${esc(b.note || '')}"></td></tr>`; }).join('')).join('')}</tbody></table>` : empty('No wires yet.');
+    } else if (tab === 'shop') {
+      const sl = L.shoppingList(project, userLib.inventory), cur = sl.currency;
+      const m = (v) => (v == null ? '' : cur + Number(v).toFixed(2));
+      h = `<div class="build-head"><span class="bh"><b>${esc(t('To buy'))}</b> ${sl.toBuy} ${esc(t('lines'))}${sl.total ? `, ${esc(t('about'))} ${m(sl.total)}` : ''}${sl.unknown ? ` <span class="muted">(${plural(sl.unknown, t('wire'))} ${esc(t('without a length'))})</span>` : ''}</span><span class="bh-btns"><button class="btn sm" data-cmd="stock">${esc(t('Edit my stock…'))}</button><button class="btn sm" data-cmd="stock-take">${esc(t('Take from stock…'))}</button><button class="btn sm" data-cmd="export-shop">${esc(t('Export CSV'))}</button></span></div>`;
+      h += `<table class="data">${th(['Cable', 'Code', 'Colour', 'Need m', 'In stock m', 'Buy m', 'Reel', 'Cost'])}<tbody>${sl.cable.map((c) => `<tr class="${c.buy > 0 ? '' : 'muted-row'}"><td class="mono">${esc(c.gauge)} mm²</td><td class="mono">${esc(c.code)}</td><td>${esc(c.name)}</td><td class="mono">${c.need}${c.unknown ? ' +?' : ''}</td><td class="mono">${c.have || ''}</td><td class="mono"><b>${c.buy || ''}</b></td><td class="mono">${c.reel ? c.reel + ' m' : ''}</td><td class="mono">${m(c.cost)}</td></tr>`).join('')}</tbody></table>`;
+      h += `<table class="data">${th(['Component', 'Spec', 'Part number', 'Supplier', 'Need', 'In stock', 'Buy', 'Cost'])}<tbody>${sl.parts.map((r) => `<tr class="${r.buy > 0 ? '' : 'muted-row'}"><td>${esc(r.name)}</td><td>${esc(r.spec)}</td><td class="mono">${esc(r.mpn)}</td><td>${esc(r.supplier)}</td><td class="mono">${r.need}</td><td class="mono">${r.have || ''}</td><td class="mono"><b>${r.buy || ''}</b></td><td class="mono">${m(r.cost)}</td></tr>`).join('')}</tbody></table>`;
+      h += note('Cable needed includes the cut allowance plus 10% spare. Stock is kept on this computer and shared by all your projects.');
     } else if (tab === 'checks') {
       const list = checks().filter((c) => all || !c.sheetId || c.sheetId === sheetId);
       h = list.length ? `<table class="data">${th(['Level', 'Finding'])}<tbody>${list.map((c) => `<tr class="click" data-sheet="${c.sheetId || ''}" ${c.wire ? `data-wire="${c.wire}"` : c.part ? `data-part="${c.part}"` : ''}><td><span class="lvl ${c.level}">${esc(t(c.level === 'warn' ? 'check' : c.level))}</span></td><td class="wrap">${esc(c.text)}</td></tr>`).join('')}</tbody></table>${note('Size guidance is a rule of thumb for single PVC automotive cable. Always check your cable maker\'s ratings.')}` : empty('No problems found.');
@@ -1489,12 +1527,21 @@
       return;
     }
     const tr = e.target.closest('tr[data-wire], tr[data-part]');
-    if (!tr || e.target.closest('input')) return;
+    if (!tr || e.target.closest('input, select')) return;
     if (tr.dataset.sheet && tr.dataset.sheet !== sheetId) goSheet(tr.dataset.sheet);
     if (tr.dataset.wire) select([], [tr.dataset.wire]); else select([tr.dataset.part]);
     centreOnSelection();
   });
   $('#table-wrap').addEventListener('change', (e) => {
+    const bk = e.target.dataset.build;
+    if (bk) {
+      const [id, k] = bk.split('|'), f = findWireAnywhere(id);
+      if (!f) return;
+      pushHistory();
+      L.setBuild(f.wire, { [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+      markDirty(); autosave(); render(); tables(); if (only('wire') === f.wire) { inspector.force = true; inspector(); inspector.force = false; }
+      return;
+    }
     const g = e.target.dataset.cableCost;
     if (g == null) return;
     pushHistory();
@@ -1590,9 +1637,9 @@
       if (!fresh) return;
       const parts = (fresh.parts || []).map((p) => ({ ...p, custom: true, cat: 'My components' }));
       const blocks = fresh.blocks || [];
-      if (JSON.stringify(parts) === JSON.stringify(userLib.parts) && JSON.stringify(blocks) === JSON.stringify(userLib.blocks || [])) return;
+      if (JSON.stringify(parts) === JSON.stringify(userLib.parts) && JSON.stringify(blocks) === JSON.stringify(userLib.blocks || []) && JSON.stringify(fresh.inventory || null) === JSON.stringify(userLib.inventory || null)) return;
       const added = parts.filter((p) => !userLib.parts.some((u) => u.id === p.id));
-      userLib.parts = parts; userLib.colours = fresh.colours || userLib.colours; userLib.blocks = blocks;
+      userLib.parts = parts; userLib.colours = fresh.colours || userLib.colours; userLib.blocks = blocks; if (fresh.inventory) userLib.inventory = fresh.inventory;
       buildLibrary();
       if (added.length) toast(`${t('New in My components')}: ${added.map((p) => p.name).join(', ')}`);
     } catch (e) { /* ignore */ }
@@ -1744,6 +1791,69 @@
     const size = () => { const [w, h] = $('#lb-size').value.split('x').map(Number); return { width: w === 64 ? 63.5 : w, height: h === 34 ? 33.9 : h === 11 ? 11.1 : h }; };
     $('#lb-print').onclick = () => { const html = `<div class="pack">${L.labelSheetHTML(L.wireLabels(project, { single: $('#lb-single').checked }), size())}</div>`; closeModal(); printHTML(`<style>${L.PACK_CSS}@page{size:A4 portrait;margin:8mm}</style>${html}`); };
     $('#lb-csv').onclick = () => { const s = $('#lb-single').checked; closeModal(); exportLabels(s); };
+  }
+
+  /* ---------------- Stock and shopping list ---------------- */
+  function stockModal() {
+    const inv = L.normaliseInventory(userLib.inventory);
+    const gaugeSel = (v) => `<select data-k="gauge">${L.GAUGES.map((g) => `<option value="${g.mm2}"${g.mm2 === String(v) ? ' selected' : ''}>${g.mm2} mm²</option>`).join('')}</select>`;
+    const colSel = (k, v, none) => `<select data-k="${k}">${none ? `<option value="">–</option>` : ''}${L.COLOURS.concat(project.customColours || []).map((c) => `<option value="${esc(c.id)}"${c.id === v ? ' selected' : ''}>${esc(L.colourCode(doc, c) || c.name)} · ${esc(c.name)}</option>`).join('')}</select>`;
+    const cableRow = (c) => `<tr data-row="cable"><td>${gaugeSel(c.gauge || '1.0')}</td><td>${colSel('colour', c.colour || 'black')}</td><td>${colSel('tracer', c.tracer || '', true)}</td><td><input type="number" min="0" step="0.5" data-k="metres" value="${c.metres || ''}" style="width:70px"></td><td><button class="iconbtn sm" data-del title="${esc(t('Remove'))}">×</button></td></tr>`;
+    const itemRow = (x) => `<tr data-row="item"><td><input data-k="name" value="${esc(x.name || '')}" placeholder="${esc(t('e.g. Relay (4-pin)'))}"></td><td><input data-k="mpn" value="${esc(x.mpn || '')}"></td><td><input type="number" min="0" step="1" data-k="qty" value="${x.qty || ''}" style="width:60px"></td><td><button class="iconbtn sm" data-del title="${esc(t('Remove'))}">×</button></td></tr>`;
+    showModal(t('My stock'), `<p class="muted">${esc(t('What you have on the shelf. The shopping list takes it off what each project needs, and the colour helper prefers colours you have. Kept on this computer for all your projects.'))}</p>
+      <h3 class="mh">${esc(t('Cable'))}</h3><table class="data stock"><thead><tr><th>${esc(t('Size'))}</th><th>${esc(t('Main'))}</th><th>${esc(t('Tracer'))}</th><th>${esc(t('Metres'))}</th><th></th></tr></thead><tbody id="stk-cable">${inv.cable.map(cableRow).join('')}</tbody></table>
+      <div class="row-btns"><button class="btn sm" id="stk-add-c">${esc(t('Add cable'))}</button><button class="btn sm" id="stk-from-proj">${esc(t('Add every cable this project uses'))}</button></div>
+      <h3 class="mh">${esc(t('Parts'))}</h3><table class="data stock"><thead><tr><th>${esc(t('Component'))}</th><th>${esc(t('Part number'))}</th><th>${esc(t('Qty'))}</th><th></th></tr></thead><tbody id="stk-items">${inv.items.map(itemRow).join('')}</tbody></table>
+      <div class="row-btns"><button class="btn sm" id="stk-add-i">${esc(t('Add part'))}</button></div>
+      <div class="row-btns"><button class="btn primary" id="stk-save">${esc(t('Save stock'))}</button><button class="btn" data-close>${esc(t('Cancel'))}</button></div>`);
+    $('#modal .modal-card').classList.add('wide');
+    $('#stk-add-c').onclick = () => $('#stk-cable').insertAdjacentHTML('beforeend', cableRow({}));
+    $('#stk-add-i').onclick = () => $('#stk-items').insertAdjacentHTML('beforeend', itemRow({}));
+    $('#stk-from-proj').onclick = () => {
+      const have = new Set($$('#stk-cable tr').map((r) => ['gauge', 'colour', 'tracer'].map((k) => r.querySelector(`[data-k="${k}"]`).value).join('|')));
+      L.shoppingList(project, null).cable.forEach((c) => { const k = [c.gauge, c.colour, c.tracer].join('|'); if (!have.has(k)) { have.add(k); $('#stk-cable').insertAdjacentHTML('beforeend', cableRow({ gauge: c.gauge, colour: c.colour, tracer: c.tracer, metres: '' })); } });
+    };
+    $('#modal-body').onclick = (e) => { const d = e.target.closest('[data-del]'); if (d) d.closest('tr').outerHTML = ''; };
+    $('#stk-save').onclick = async () => {
+      const val = (r, k) => (r.querySelector(`[data-k="${k}"]`) || {}).value || '';
+      userLib.inventory = L.normaliseInventory({
+        cable: $$('#stk-cable tr').map((r) => ({ gauge: val(r, 'gauge'), colour: val(r, 'colour'), tracer: val(r, 'tracer'), metres: val(r, 'metres') })),
+        items: $$('#stk-items tr').map((r) => ({ name: val(r, 'name'), mpn: val(r, 'mpn'), qty: val(r, 'qty') })),
+      });
+      await PF.saveUserLibrary(userLib); closeModal(); tables(); inspector.force = true; inspector(); inspector.force = false;
+      toast(t('Stock saved'));
+    };
+  }
+  function takeStockModal() {
+    const r = L.takeFromStock(project, userLib.inventory);
+    if (!r.changes.length) { showMessage(t('Take from stock'), `<p>${esc(t('Nothing this project uses is in your stock list.'))}</p>`); return; }
+    showModal(t('Take from stock'), `<p>${esc(t('Take what this project uses out of your stock list? Do this once the loom is built.'))}</p><ul class="mono" style="font-size:12px;max-height:40vh;overflow:auto">${r.changes.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>
+      <div class="row-btns"><button class="btn primary" id="tk-go">${esc(t('Take from stock'))}</button><button class="btn" data-close>${esc(t('Cancel'))}</button></div>`);
+    $('#tk-go').onclick = async () => { const before = userLib.inventory; userLib.inventory = r.inventory; await PF.saveUserLibrary(userLib); closeModal(); tables(); toast(t('Stock updated'), { label: t('Undo'), run: async () => { userLib.inventory = before; await PF.saveUserLibrary(userLib); tables(); } }); };
+  }
+  async function exportShopping() {
+    const sl = L.shoppingList(project, userLib.inventory);
+    const rows = [['Type', 'Item', 'Spec', 'Part number', 'Supplier', 'Need', 'In stock', 'Buy', 'Unit', 'Cost']]
+      .concat(sl.cable.map((c) => ['Cable', `${c.gauge} mm² ${c.code}`, c.name, '', '', c.need, c.have, c.buy, 'm', c.cost == null ? '' : c.cost]))
+      .concat(sl.parts.map((r) => ['Part', r.name, r.spec, r.mpn, r.supplier, r.need, r.have, r.buy, 'each', r.cost == null ? '' : r.cost]));
+    await saveCSV('shopping-list', rows);
+  }
+  /* The shared page with a tick list for the bench, and reading the ticks back in. */
+  async function exportBuildChecklist() {
+    const html = L.shareHTML(project, { checklist: true });
+    await PF.exportFile(projSlug() + '-build-checklist.html', html, 'text/html');
+    toast(t('Open it on your phone. Ticks stay on the phone; use Export progress there and Import phone progress here.'));
+  }
+  async function importBuildProgress() {
+    const f = await PF.openText('.json', 'Build progress');
+    if (!f) return;
+    try {
+      const data = JSON.parse(f.text);
+      pushHistory();
+      const n = L.importBuildProgress(project, data);
+      commit(); showTab('build');
+      toast(`${t('Progress updated on')} ${plural(n, t('wire'))}`);
+    } catch (e) { showMessage(t('Import phone progress'), `<p>${esc(e.message)}</p>`); }
   }
 
   /* ---------------- Fault finding ---------------- */
@@ -2211,6 +2321,13 @@
     }, on: () => !!trace },
     test: { label: 'Live circuit test', run: () => (test ? endTest() : startTest()), on: () => !!test },
     fault: { label: 'Fault finding…', run: () => faultModal(only('part') ? only('part').id : null) },
+    stock: { label: 'My stock…', run: stockModal },
+    'stock-take': { label: 'Take this project from stock…', run: takeStockModal },
+    'export-shop': { label: 'Export shopping list (CSV)', run: exportShopping },
+    shop: { label: 'Shopping list', run: () => showTab('shop') },
+    build: { label: 'Build and test progress', run: () => showTab('build') },
+    'build-share': { label: 'Phone build checklist…', run: exportBuildChecklist },
+    'build-import': { label: 'Import phone progress…', run: importBuildProgress },
     formboard: { label: 'Harness formboard…', run: () => openFormboard() },
     locations: { label: 'Component locations (vehicle view)…', run: openVehicle },
     builder: { label: 'Component builder…', run: () => window.LoomBuilder.open(null) },
@@ -2240,8 +2357,8 @@
     ['View', ['pane-parts', 'pane-project', 'pane-history', 'pane-props', 'tables', '-', 'zoom-in', 'zoom-out', 'fit', '-', 'junctions', 'xrefs', 'bw', '-', 'theme', 'language']],
     ['Arrange', ['rotate', 'flip', '-', 'align-left', 'align-centre', 'align-right', 'align-top', 'align-middle', 'align-bottom', '-', 'dist-h', 'dist-v']],
     ['Sheet', ['sheet-new', 'sheet-dup', 'sheet-rename', 'sheet-del', '-', 'sheet-left', 'sheet-right', '-', 'sheet-prev', 'sheet-next']],
-    ['Tools', ['trace', 'test', 'fault', '-', 'formboard', 'locations', '-', 'builder', 'colours', 'cables', '-', 'lib-import', 'lib-export', '-', 'check']],
-    ['Reports', ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cutlist', 'nets', '-', 'print-pack', 'print-labels', '-', 'export-wires', 'export-bom', 'export-cable', 'export-cut', 'export-connectors', 'export-fuses', 'export-voltages', 'export-labels', 'export-usage']],
+    ['Tools', ['trace', 'test', 'fault', '-', 'formboard', 'locations', '-', 'builder', 'colours', 'cables', '-', 'stock', 'build-share', 'build-import', '-', 'lib-import', 'lib-export', '-', 'check']],
+    ['Reports', ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cutlist', 'build', 'shop', 'nets', '-', 'print-pack', 'print-labels', '-', 'export-wires', 'export-bom', 'export-cable', 'export-cut', 'export-connectors', 'export-fuses', 'export-voltages', 'export-shop', 'export-labels', 'export-usage']],
     ['Revision', ['rev-issue', 'rev-compare', 'pane-history', '-', 'savepoint']],
     ['Help', ['claude', 'help', 'about']],
   ];

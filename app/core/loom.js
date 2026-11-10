@@ -12,4 +12,5 @@ require('./loom-nets.js');
 require('./loom-reports.js');
 require('./loom-io.js');
 require('./loom-circuit.js');
+require('./loom-plan.js');
 module.exports = require('./loom-core.js');
