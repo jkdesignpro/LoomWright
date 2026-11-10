@@ -1,6 +1,6 @@
 /*
  * Component builder: draw your own symbol, place pins, save it to your library.
- * Copyright (C) 2026 Loomwright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
  */
 (function () {
   'use strict';
@@ -232,7 +232,7 @@
       if (s.t === 'rect') h += `<div class="two">${num('x', 'x', s.x)}${num('y', 'y', s.y)}${num('Width', 'width', s.width)}${num('Height', 'h', s.h)}${num('Corner radius', 'rx', s.rx || 0, 1)}</div>`;
       if (s.t === 'circle') h += `<div class="two">${num('Centre x', 'cx', s.cx)}${num('Centre y', 'cy', s.cy)}${num('Radius', 'r', s.r, 1)}</div>`;
       if (s.t === 'text') h += `<label class="fld"><span>Text</span><input id="bs-text" data-s="text" value="${esc(s.text)}"></label><div class="two">${num('x', 'x', s.x)}${num('y', 'y', s.y)}${num('Size', 'size', s.size || 9, 1)}<label class="fld"><span>Align</span><select data-s="anchor">${['start', 'middle', 'end'].map((a) => `<option${(s.anchor || 'middle') === a ? ' selected' : ''}>${a}</option>`).join('')}</select></label></div>`;
-      if (s.t === 'path') h += `<label class="fld"><span>Path data</span><input data-s="d" value="${esc(s.d)}" style="font-family:var(--f-mono)"></label>`;
+      if (s.t === 'path') h += `<label class="fld"><span>Path data</span><input data-s="d" value="${esc(s.d)}" style="font-family:var(--mono)"></label>`;
       if (s.t !== 'text') {
         const swKey = s.t === 'rect' ? 'sw' : 'w';
         const swVal = s[swKey] != null ? s[swKey] : 2;
@@ -251,7 +251,7 @@
     const dupIds = comp.pins.map((p) => p.id).filter((id, i, a) => a.indexOf(id) !== i);
     h += `<div class="fields"><h3>Pins (${comp.pins.length})</h3>${dupIds.length ? `<div class="callout warn">Pin ids must be unique: ${esc(dupIds.join(', '))}</div>` : ''}${comp.pins.length ? `<div class="b-list">${comp.pins.map((p, i) => `<button data-pick="pin:${i}" class="${selected && selected.kind === 'pin' && selected.i === i ? 'on' : ''}">${esc(p.id)} · ${esc(p.n || '')} (${p.x}, ${p.y})</button>`).join('')}</div>` : '<p class="muted" style="margin:0;font-size:12px">Use the Pin tool and click on the edge of the symbol where wires should attach.</p>'}</div>`;
     h += `<div class="fields"><h3>Shapes (${comp.shapes.length})</h3><div class="b-list">${comp.shapes.map((s, i) => `<button data-pick="shape:${i}" class="${selected && selected.kind === 'shape' && selected.i === i ? 'on' : ''}">${s.t}${s.t === 'text' ? ' “' + esc(s.text) + '”' : ''}</button>`).join('')}</div></div>`;
-    h += `<div class="fields"><h3>Preview</h3><div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px">${previewSVG()}</div></div>`;
+    h += `<div class="fields"><h3>Preview</h3><div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px">${previewSVG()}</div></div>`;
     side.innerHTML = h;
     if (active && document.getElementById(active)) { const el = document.getElementById(active); el.focus(); if (el.setSelectionRange && el.type === 'text') { const n = el.value.length; el.setSelectionRange(n, n); } }
   }

@@ -1,5 +1,5 @@
-// Loomwright desktop shell: native file dialogs and file access for the editor.
-// Copyright (C) 2026 Loomwright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+// LoomWright desktop shell: native file dialogs and file access for the editor.
+// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
 
 use base64::Engine;
 use serde::Serialize;
@@ -36,7 +36,7 @@ async fn open_diagram(app: AppHandle) -> Result<Option<Opened>, String> {
     let picked = app
         .dialog()
         .file()
-        .add_filter("Loomwright diagram", &["loom", "json"])
+        .add_filter("LoomWright diagram", &["loom", "json"])
         .blocking_pick_file();
     match picked {
         Some(fp) => read_opened(fp.into_path().map_err(|e| e.to_string())?).map(Some),
@@ -80,7 +80,7 @@ async fn save_diagram(app: AppHandle, path: Option<String>, contents: String, su
         None => app
             .dialog()
             .file()
-            .add_filter("Loomwright diagram", &["loom"])
+            .add_filter("LoomWright diagram", &["loom"])
             .set_file_name(&suggested)
             .blocking_save_file()
             .map(|fp| fp.into_path())
@@ -160,5 +160,5 @@ pub fn run() {
             initial_file
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Loomwright");
+        .expect("error while running LoomWright");
 }

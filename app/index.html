@@ -4,98 +4,138 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!--PAGE-->
-<title>Loomwright</title>
+<title>LoomWright</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Free, open-source wiring diagram editor for vehicles and electronics.">
 <link rel="stylesheet" href="styles.css">
 <link rel="icon" href="icon.png">
 </head>
 <body>
-<header class="bar" id="topbar">
-  <div class="brand">
-    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 10h8m10 0h8M3 22h8m10 0h8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="11" y="6" width="10" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 22c3-6 7 6 10 0" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>
-    <span class="brand-name">Loomwright</span>
-    <input id="doc-title" class="title-input" aria-label="Diagram title" spellcheck="false">
-    <span id="dirty" class="dirty" hidden title="Unsaved changes">●</span>
-  </div>
-  <nav class="tools" aria-label="Main tools">
-    <div class="group">
-      <button class="btn" data-cmd="new" id="btn-new" title="New diagram">New</button>
-      <button class="btn" data-cmd="open" title="Open (Ctrl+O)">Open</button>
-      <button class="btn" data-cmd="save" title="Save (Ctrl+S)">Save</button>
-      <button class="btn" data-cmd="saveas" title="Save as (Ctrl+Shift+S)">Save as</button>
-    </div>
-    <div class="group menu-wrap">
-      <button class="btn" id="export-btn" aria-haspopup="true" aria-expanded="false">Export ▾</button>
-      <div class="menu" id="export-menu" hidden>
-        <button data-cmd="export-svg">Diagram as SVG</button>
-        <button data-cmd="export-png">Diagram as PNG</button>
-        <button data-cmd="print" id="btn-print">Print or save as PDF</button>
-        <hr>
-        <button data-cmd="export-wires">Wire list (CSV)</button>
-        <button data-cmd="export-bom">Parts list (CSV)</button>
-        <button data-cmd="export-cable">Cable totals (CSV)</button>
-      </div>
-    </div>
-    <div class="group">
-      <button class="btn icon" data-cmd="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 20 20"><path d="M7 5 3 9l4 4M3 9h9a5 5 0 0 1 0 10h-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="btn icon" data-cmd="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 20 20"><path d="m13 5 4 4-4 4m4-4H8a5 5 0 0 0 0 10h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-    </div>
-    <div class="group">
-      <button class="btn icon" data-cmd="zoom-out" title="Zoom out (-)" aria-label="Zoom out">−</button>
-      <button class="btn zoom" data-cmd="fit" id="zoom-label" title="Fit to screen (0)">100%</button>
-      <button class="btn icon" data-cmd="zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
-    </div>
-    <div class="group">
-      <button class="btn" data-cmd="builder" title="Design your own component">Component builder</button>
-      <button class="btn" data-cmd="colours" title="Wire colour standard and custom colours">Wire colours</button>
-      <button class="btn icon" data-cmd="help" title="Help and shortcuts" aria-label="Help">?</button>
-    </div>
-  </nav>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-new" viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/></symbol>
+  <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></symbol>
+  <symbol id="i-parts" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><path d="M16.5 13v7M13 16.5h7"/></symbol>
+  <symbol id="i-project" viewBox="0 0 24 24"><path d="M4 5h6l2 2h8v12H4z"/><path d="M8 12h8M8 15h5"/></symbol>
+  <symbol id="i-sheet" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M5 16h14M12 16v5"/></symbol>
+  <symbol id="i-builder" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1"/><path d="M3 10h4M3 14h4M17 10h4M17 14h4"/><path d="m10 12 2-2 2 2"/></symbol>
+  <symbol id="i-colours" viewBox="0 0 24 24"><path d="M3 8h18M3 12h18M3 16h18"/><path d="M6 8v0M10 12v0" stroke-width="3"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.4 3.4 8 8 9 4.6-1 8-4.6 8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+  <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4v-8h16v8h-2"/><rect x="6" y="14" width="12" height="7"/></symbol>
+  <symbol id="i-claude" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 10h18M3 15h18M9 5v14"/></symbol>
+</svg>
+
+<header id="titlebar">
+  <div class="brand"><span class="mark">LW</span>LoomWright</div>
+  <nav id="menubar" aria-label="Menu"></nav>
+  <button id="cmdbtn" type="button" title="Search commands, parts and sheets (Ctrl+K)"><svg class="i"><use href="#i-search"/></svg><span>Search</span><kbd>Ctrl+K</kbd></button>
+  <span class="mc" id="mc-project" title="Project"></span>
+  <button class="iconbtn" data-cmd="theme" title="Light or dark" aria-label="Light or dark"><svg class="i"><use href="#i-moon"/></svg></button>
 </header>
 
-<main class="work">
-  <aside class="panel library" id="library" aria-label="Component library">
-    <div class="lib-head">
-      <input id="lib-search" type="search" placeholder="Search 80+ components" aria-label="Search components">
+<div id="shell">
+  <nav id="ribbon" aria-label="Tools">
+    <button class="rb primary" data-cmd="new" title="New project"><svg class="i"><use href="#i-new"/></svg><span>New</span></button>
+    <button class="rb" data-cmd="open" title="Open project (Ctrl+O)"><svg class="i"><use href="#i-open"/></svg><span>Open</span></button>
+    <button class="rb" data-cmd="save" title="Save project (Ctrl+S)"><svg class="i"><use href="#i-save"/></svg><span>Save</span></button>
+    <div class="sep"></div>
+    <button class="rb" data-cmd="pane-parts" id="rb-parts" title="Component library"><svg class="i"><use href="#i-parts"/></svg><span>Parts</span></button>
+    <button class="rb" data-cmd="pane-project" id="rb-project" title="Project, sheets and harnesses"><svg class="i"><use href="#i-project"/></svg><span>Project</span></button>
+    <button class="rb" data-cmd="sheet-new" title="Add a sheet"><svg class="i"><use href="#i-sheet"/></svg><span>Sheet</span></button>
+    <div class="sep"></div>
+    <button class="rb" data-cmd="builder" title="Component builder"><svg class="i"><use href="#i-builder"/></svg><span>Builder</span></button>
+    <button class="rb" data-cmd="colours" title="Wire colours"><svg class="i"><use href="#i-colours"/></svg><span>Colours</span></button>
+    <button class="rb" data-cmd="tables" title="Wire list and reports"><svg class="i"><use href="#i-table"/></svg><span>Lists</span></button>
+    <button class="rb" data-cmd="check" title="Run design checks"><svg class="i"><use href="#i-check"/></svg><span>Check</span></button>
+    <button class="rb" data-cmd="print" id="rb-print" title="Print or save all sheets as PDF"><svg class="i"><use href="#i-pdf"/></svg><span>PDF</span></button>
+    <div class="grow"></div>
+    <button class="rb" data-cmd="claude" title="Use LoomWright with Claude"><svg class="i"><use href="#i-claude"/></svg><span>Claude</span></button>
+  </nav>
+
+  <aside id="task" class="pane" aria-label="Library and project">
+    <div class="pane-tabs"><button class="ptab on" data-pane="parts">Parts</button><button class="ptab" data-pane="project">Project</button></div>
+    <div id="pane-parts" class="pane-body">
+      <div class="pane-search"><svg class="i"><use href="#i-search"/></svg><input id="lib-search" type="search" placeholder="Search parts" aria-label="Search parts"></div>
+      <div id="lib-list" class="lib-list"></div>
     </div>
-    <div id="lib-list" class="lib-list"></div>
+    <div id="pane-project" class="pane-body" hidden></div>
   </aside>
 
-  <section class="stage" id="stage">
-    <svg id="canvas" tabindex="0" aria-label="Diagram canvas">
-      <defs>
-        <pattern id="g-minor" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#edf0ec" stroke-width="1"/></pattern>
-        <pattern id="g-major" width="100" height="100" patternUnits="userSpaceOnUse"><rect width="100" height="100" fill="url(#g-minor)"/><path d="M100 0H0V100" fill="none" stroke="#dbe1dc" stroke-width="1"/></pattern>
-      </defs>
-      <g id="vp">
-        <rect x="-20000" y="-20000" width="40000" height="40000" fill="url(#g-major)"/>
-        <g id="content"></g>
-        <g id="overlay"></g>
-      </g>
-    </svg>
-    <div class="hint" id="hint" role="status"></div>
-    <div class="toast" id="toast" role="status" hidden></div>
-  </section>
+  <main id="work">
+    <div id="doc">
+      <div id="sheetbar">
+        <div id="sheet-tabs" class="sheet-tabs" role="tablist" aria-label="Sheets"></div>
+        <button class="iconbtn sm" data-cmd="sheet-new" title="Add sheet" aria-label="Add sheet"><svg class="i"><use href="#i-plus"/></svg></button>
+        <div class="grow"></div>
+        <div class="seg"><div class="bt">
+          <button data-cmd="zoom-out" title="Zoom out (-)">−</button>
+          <button data-cmd="fit" id="zoom-label" title="Fit to window (0)">100%</button>
+          <button data-cmd="zoom-in" title="Zoom in (+)">+</button>
+        </div></div>
+      </div>
+      <div class="stage" id="stage">
+        <svg id="canvas" tabindex="0" aria-label="Diagram sheet">
+          <defs>
+            <pattern id="g-minor" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#eef0f2" stroke-width="1"/></pattern>
+            <pattern id="g-major" width="100" height="100" patternUnits="userSpaceOnUse"><rect width="100" height="100" fill="url(#g-minor)"/><path d="M100 0H0V100" fill="none" stroke="#dde1e6" stroke-width="1"/></pattern>
+          </defs>
+          <g id="vp">
+            <rect x="-20000" y="-20000" width="40000" height="40000" fill="url(#g-major)"/>
+            <g id="content"></g>
+            <g id="overlay"></g>
+          </g>
+        </svg>
+        <div class="toast" id="toast" role="status" hidden></div>
+      </div>
+    </div>
+    <section class="tables" id="tables">
+      <div class="tabs" role="tablist">
+        <button role="tab" class="tab on" data-tab="wires">Wire list <span class="count" id="c-wires"></span></button>
+        <button role="tab" class="tab" data-tab="bom">Parts list <span class="count" id="c-bom"></span></button>
+        <button role="tab" class="tab" data-tab="cable">Cable totals</button>
+        <button role="tab" class="tab" data-tab="usage">Colour usage</button>
+        <button role="tab" class="tab" data-tab="checks">Checks <span class="count" id="c-checks"></span></button>
+        <div class="grow"></div>
+        <label class="scope"><input type="checkbox" id="scope-all" checked> All sheets</label>
+        <button class="iconbtn sm" id="tables-toggle" aria-expanded="true" title="Hide lists" aria-label="Hide lists"><svg class="i"><use href="#i-down"/></svg></button>
+      </div>
+      <div class="table-wrap" id="table-wrap"></div>
+    </section>
+  </main>
 
-  <aside class="panel inspector" id="inspector" aria-label="Properties"></aside>
-</main>
+  <aside id="props" class="pane" aria-label="Properties">
+    <div class="pane-head">Properties</div>
+    <div id="inspector" class="pane-body inspector"></div>
+  </aside>
+</div>
 
-<section class="tables" id="tables">
-  <div class="tabs" role="tablist">
-    <button role="tab" class="tab on" data-tab="wires">Wire list <span class="count" id="c-wires"></span></button>
-    <button role="tab" class="tab" data-tab="bom">Parts list <span class="count" id="c-bom"></span></button>
-    <button role="tab" class="tab" data-tab="cable">Cable totals</button>
-    <button role="tab" class="tab" data-tab="checks">Checks <span class="count" id="c-checks"></span></button>
-    <button class="tab collapse" id="tables-toggle" aria-expanded="true" title="Show or hide">▾</button>
-  </div>
-  <div class="table-wrap" id="table-wrap"></div>
-</section>
+<footer id="statusbar">
+  <span id="st-xy">X 0  Y 0</span>
+  <span id="st-sheet"></span>
+  <span id="st-count"></span>
+  <span id="st-check" class="st-check"></span>
+  <span id="st-hint" class="st-hint"></span>
+  <span id="st-mode"></span>
+</footer>
 
 <div class="modal" id="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="modal-head"><h2 id="modal-title"></h2><button class="btn icon" id="modal-x" aria-label="Close">✕</button></div>
+    <div class="modal-head"><h2 id="modal-title"></h2><button class="iconbtn" id="modal-x" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+
+<div class="palette" id="palette" hidden>
+  <div class="palette-card" role="dialog" aria-label="Search">
+    <div class="palette-input"><svg class="i"><use href="#i-search"/></svg><input id="palette-input" placeholder="Type a command, part or sheet" autocomplete="off" spellcheck="false"></div>
+    <div id="palette-list" class="palette-list" role="listbox"></div>
   </div>
 </div>
 

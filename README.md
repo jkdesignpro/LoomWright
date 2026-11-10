@@ -1,15 +1,15 @@
-# Loomwright
+# LoomWright
 
 Free, open-source wiring diagram software for vehicle builds and electronics projects.
 Draw a loom the way you will build it: real components, real wire colours with tracers,
 real cable sizes, and a wire list you can take to the bench.
 
-Loomwright was started for a fully custom Land Rover Defender build, so it speaks 12 V
+LoomWright was started for a fully custom Land Rover Defender build, so it speaks 12 V
 automotive: DIN relay terminals (30, 85, 86, 87, 87a), blade and MIDI fuses, fuse boxes,
 split charge, winches, and Land Rover style colour codes such as `NR` (brown with red tracer).
 It works just as well for general electronics.
 
-![Loomwright](docs/screenshot.png)
+![LoomWright](docs/screenshot.png)
 
 ## Features
 
@@ -22,17 +22,26 @@ It works just as well for general electronics.
 - **Wire colours your way.** Land Rover / British (B, U, N, R, G…), DIN 72551 / IEC 60757 (BK, BU, BN…)
   or SAE (BLK, BLU, BRN…) codes, a main colour plus up to two tracers, and fully custom colours
   with your own names, codes and shades for a non-standard loom.
+- **Projects and sheets.** A project holds as many sheets as you need (charging, lighting, dash,
+  trailer…). Sheet tabs, a project pane, off-sheet references between sheets, wire numbers that stay
+  unique across the project, and a title block that says *Sheet 2 of 5*.
+- **Colour reuse for limited stock.** Tick the cable colours you actually have and LoomWright offers
+  only those. Give each wire a circuit and a harness; the *Colour usage* list shows every job a colour
+  does, and flags the same colour used for different circuits inside one harness.
 - **Wiring.** Click pin to pin. Square-cornered routing, draggable runs, bend points, straight lines.
-- **Wire data.** Number, circuit, size in mm² (with AWG), length, current and notes on every wire.
+- **Wire data.** Number, circuit, harness, size in mm² (with AWG), length, current and notes on every wire.
 - **Design checks.** Fuse rating against cable size, current against cable size, voltage drop over 3 %,
   unconnected pins.
-- **Reports.** Wire list, parts list and cable totals (how many metres of each colour and size to buy).
-- **Exports.** SVG, PNG, print or PDF (with title block and wire colour key), and CSV for every report.
+- **Reports.** Wire list, parts list, cable totals (how many metres of each colour and size to buy) and
+  colour usage, for one sheet or the whole project.
+- **Exports.** SVG and PNG per sheet, print or PDF of every sheet (with title block and wire colour key),
+  and CSV for every report.
 - **Desktop app** for Windows and Apple Silicon Macs (and Linux), fully offline, built with Tauri.
-- **Optional Claude add-on.** An MCP server that lets Claude draw and edit diagrams from a
-  plain-English description. See [docs/claude-addon.md](docs/claude-addon.md).
+- **Optional Claude add-on.** An MCP server that lets Claude draw and edit projects from a
+  plain-English description, and turn a picture of a component's pinout into a custom component
+  in your library. See [docs/claude-addon.md](docs/claude-addon.md).
 
-Diagrams are saved as `.loom` files, which are plain JSON, so they work well with Git.
+Projects are saved as `.loom` files, which are plain JSON, so they work well with Git.
 
 ## Getting the app
 
@@ -62,7 +71,7 @@ npm run build    # build an installer for this computer
 npm test         # check the component library and example
 ```
 
-To build the Windows and Mac installers in the cloud, push a tag like `v0.1.0` or run the
+To build the Windows and Mac installers in the cloud, push a tag like `v0.2.0` or run the
 *Desktop builds* workflow by hand. The installers land on a draft release.
 
 ## Project layout
@@ -84,7 +93,7 @@ a short entry in `app/core/loom-core.js`: a name, category, size (multiples of 2
 
 ## Licence
 
-Loomwright is free software: you can redistribute it and/or modify it under the terms of the
+LoomWright is free software: you can redistribute it and/or modify it under the terms of the
 GNU General Public License version 3, or (at your option) any later version. See [LICENSE](LICENSE).
 
 The bundled IBM Plex fonts are under the SIL Open Font License (`app/fonts/OFL.txt`).

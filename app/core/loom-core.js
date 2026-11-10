@@ -1,11 +1,11 @@
 /*
- * Loomwright core: component library, wire colour standards, diagram model,
+ * LoomWright core: component library, wire colour standards, diagram model,
  * SVG renderer and design checks.
  *
  * Shared by the editor (browser / Tauri, as window.Loom) and the optional
  * Claude MCP add-on (Node, via require). No dependencies.
  *
- * Copyright (C) 2026 Loomwright contributors
+ * Copyright (C) 2026 LoomWright contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 (function (root, factory) {
@@ -14,7 +14,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
   const FORMAT = 'loomwright';
   const GRID = 10;
   const INK = '#1d2320';
@@ -617,14 +617,37 @@
   /* ------------------------------------------------------------------ */
   /* Model                                                               */
   /* ------------------------------------------------------------------ */
+  /* A project (.loom file) holds one or more sheets. Each sheet has its own
+     parts and wires; colours, custom components, harnesses and the title block
+     details are shared across the project. */
+  function newSheet(name) { return { id: uid('s'), name: name || 'Sheet 1', parts: [], wires: [] }; }
   function newDoc(title) {
     return {
-      format: FORMAT, version: 1, title: title || 'Untitled diagram',
-      meta: { project: '', drawnBy: '', revision: 'A', date: new Date().toISOString().slice(0, 10), sheet: '1 of 1', notes: '' },
-      settings: { standard: 'lr', labels: 'full', titleBlock: true, colourKey: true },
-      customColours: [], customParts: [], parts: [], wires: [],
+      format: FORMAT, version: 2, title: title || 'Untitled project',
+      meta: { project: '', drawnBy: '', revision: 'A', date: new Date().toISOString().slice(0, 10), notes: '' },
+      settings: { standard: 'lr', labels: 'full', titleBlock: true, colourKey: true, stock: [], stockOnly: false },
+      harnesses: [], customColours: [], customParts: [], sheets: [newSheet('Sheet 1')],
     };
   }
+  const SHARED = ['format', 'version', 'title', 'meta', 'settings', 'harnesses', 'customColours', 'customParts', 'sheets'];
+  /* A view of one sheet that reads and writes through to the project, so every
+     function that takes a "doc" (parts + wires + settings) works on a sheet. */
+  function view(project, sheetRef) {
+    const sheets = project.sheets;
+    let sheet = typeof sheetRef === 'object' && sheetRef ? sheetRef : null;
+    if (!sheet && typeof sheetRef === 'number') sheet = sheets[sheetRef]; // 0-based index
+    if (!sheet && sheetRef != null) sheet = sheets.find((x) => x.id === sheetRef) || sheets.find((x) => x.name.toLowerCase() === String(sheetRef).toLowerCase()) || sheets[parseInt(sheetRef, 10) - 1];
+    if (!sheet) sheet = sheets[0];
+    if (!sheet) throw new Error('No sheet ' + sheetRef);
+    const v = { project, sheet };
+    SHARED.forEach((k) => Object.defineProperty(v, k, { get: () => project[k], set: (x) => { project[k] = x; }, enumerable: false }));
+    ['parts', 'wires'].forEach((k) => Object.defineProperty(v, k, { get: () => sheet[k], set: (x) => { sheet[k] = x; }, enumerable: false }));
+    Object.defineProperty(v, 'allParts', { get: () => project.sheets.flatMap((x) => x.parts) });
+    Object.defineProperty(v, 'allWires', { get: () => project.sheets.flatMap((x) => x.wires) });
+    Object.defineProperty(v, 'sheetNo', { get: () => project.sheets.indexOf(sheet) + 1 });
+    return v;
+  }
+  function views(project) { return project.sheets.map((s) => view(project, s)); }
 
   function partDef(doc, type) {
     if (lib[type]) return lib[type];
@@ -694,11 +717,11 @@
   function nextLabel(doc, prefix) {
     if (!prefix) return '';
     let max = 0; const re = new RegExp('^' + prefix.replace(/[^A-Za-z0-9]/g, '') + '(\\d+)$');
-    doc.parts.forEach((p) => { const m = re.exec(p.label || ''); if (m) max = Math.max(max, +m[1]); });
+    (doc.allParts || doc.parts).forEach((p) => { const m = re.exec(p.label || ''); if (m) max = Math.max(max, +m[1]); });
     return prefix + (max + 1);
   }
   function nextWireName(doc) {
-    let max = 0; doc.wires.forEach((w) => { const m = /^W(\d+)$/.exec(w.name || ''); if (m) max = Math.max(max, +m[1]); });
+    let max = 0; (doc.allWires || doc.wires).forEach((w) => { const m = /^W(\d+)$/.exec(w.name || ''); if (m) max = Math.max(max, +m[1]); });
     return 'W' + (max + 1);
   }
   const uid = (p) => p + Math.random().toString(36).slice(2, 9);
@@ -723,7 +746,7 @@
     return { part: p.id, pin: pn.id };
   }
   function addWire(doc, from, to, opts = {}) {
-    const w = { id: uid('w'), name: opts.name || nextWireName(doc), from: parseEnd(doc, from), to: parseEnd(doc, to), colour: opts.colour || 'red', tracer: opts.tracer || '', gauge: String(opts.gauge || '1.0'), length: opts.length || '', current: opts.current || '', circuit: opts.circuit || '', notes: opts.notes || '' };
+    const w = { id: uid('w'), name: opts.name || nextWireName(doc), from: parseEnd(doc, from), to: parseEnd(doc, to), colour: opts.colour || 'red', tracer: opts.tracer || '', gauge: String(opts.gauge || '1.0'), length: opts.length || '', current: opts.current || '', circuit: opts.circuit || '', harness: opts.harness || '', notes: opts.notes || '' };
     if (opts.tracer2) w.tracer2 = opts.tracer2;
     doc.wires.push(w);
     return w;
@@ -732,12 +755,25 @@
 
   function normalise(doc) {
     const base = newDoc();
-    if (!doc || typeof doc !== 'object' || !Array.isArray(doc.parts) || !Array.isArray(doc.wires)) throw new Error('This file is not a Loomwright diagram.');
-    const out = { ...base, ...doc, meta: { ...base.meta, ...(doc.meta || {}) }, settings: { ...base.settings, ...(doc.settings || {}) } };
+    if (!doc || typeof doc !== 'object') throw new Error('This file is not a LoomWright project.');
+    let sheets = doc.sheets;
+    if (!Array.isArray(sheets)) {
+      // version 1 files had a single drawing at the top level
+      if (!Array.isArray(doc.parts) || !Array.isArray(doc.wires)) throw new Error('This file is not a LoomWright project.');
+      sheets = [{ id: uid('s'), name: doc.title || 'Sheet 1', parts: doc.parts, wires: doc.wires }];
+    }
+    const out = { ...base, ...doc, version: 2, meta: { ...base.meta, ...(doc.meta || {}) }, settings: { ...base.settings, ...(doc.settings || {}) } };
+    delete out.parts; delete out.wires; delete out.meta.sheet;
     out.customColours = (out.customColours || []).map((c) => ({ ...c, custom: true }));
     out.customParts = out.customParts || [];
-    out.parts = out.parts.filter((p) => p && p.type).map((p) => ({ rot: 0, props: {}, ...p }));
-    out.wires = out.wires.filter((w) => w && w.from && w.to);
+    out.harnesses = out.harnesses || [];
+    out.settings.stock = out.settings.stock || [];
+    out.sheets = sheets.map((sh, i) => ({
+      id: sh.id || uid('s'), name: sh.name || `Sheet ${i + 1}`, ...(sh.notes ? { notes: sh.notes } : {}),
+      parts: (sh.parts || []).filter((p) => p && p.type).map((p) => ({ rot: 0, props: {}, ...p })),
+      wires: (sh.wires || []).filter((w) => w && w.from && w.to),
+    }));
+    if (!out.sheets.length) out.sheets = [newSheet('Sheet 1')];
     return out;
   }
 
@@ -809,16 +845,26 @@
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
 
-  function usedColourCombos(doc) {
+  /* Where each colour combination is used. Colours can be reused for different
+     jobs in different harnesses or sheets; this shows every use side by side. */
+  function colourUsage(d) {
     const m = new Map();
-    doc.wires.forEach((w) => { const k = wireCode(doc, w); if (!m.has(k)) m.set(k, w); });
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    eachView(d).forEach((doc) => doc.wires.forEach((w) => {
+      const code = wireCode(doc, w);
+      if (!m.has(code)) m.set(code, { code, colour: wireColourName(doc, w), sample: w, wires: 0, uses: new Map() });
+      const e = m.get(code); e.wires++;
+      const use = [w.circuit || 'No circuit', w.harness].filter(Boolean).join(' · ');
+      if (!e.uses.has(use)) e.uses.set(use, { circuit: w.circuit || '', harness: w.harness || '', sheets: new Set(), wires: [] });
+      const u = e.uses.get(use); u.sheets.add(doc.sheet ? doc.sheet.name : ''); u.wires.push(w.name);
+    }));
+    return [...m.values()].sort((a, b) => a.code.localeCompare(b.code)).map((e) => ({ ...e, uses: [...e.uses.values()].map((u) => ({ ...u, sheets: [...u.sheets].filter(Boolean) })) }));
   }
+  function usedColourCombos(doc) { return colourUsage(doc).map((e) => [e.code, e.sample, e.uses]); }
 
   function exportSVG(doc, o = {}) {
     const b = bounds(doc), pad = 40, s = doc.settings || {};
     const combos = s.colourKey !== false ? usedColourCombos(doc) : [];
-    const keyW = combos.length ? 230 : 0;
+    const keyW = combos.length ? 330 : 0;
     const tbH = s.titleBlock !== false ? 96 : 0;
     const W = Math.max(b.w + pad * 2 + keyW, 520), H = Math.max(b.h + pad * 2 + tbH, combos.length * 18 + 80 + tbH);
     const X = b.x - pad, Y = b.y - pad;
@@ -829,19 +875,22 @@
     if (combos.length) {
       const kx = X + W - keyW + 4, ky = Y + 30;
       out += `<text x="${kx}" y="${ky}" font-size="11" font-weight="700" fill="${INK}">WIRE COLOUR KEY</text>`;
-      combos.forEach(([code, w], i) => {
+      combos.forEach(([code, w, uses], i) => {
         const yy = ky + 18 + i * 18, main = colourById(doc, w.colour) || { hex: '#888' };
         out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="#262b28" stroke-width="6.5"/><line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${main.hex}" stroke-width="5"/>`;
         [w.tracer, w.tracer2].filter(Boolean).forEach((id, j) => { const t = colourById(doc, id); if (t) out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${t.hex}" stroke-width="3" stroke-dasharray="${w.tracer2 ? '4 8' : '6 6'}" stroke-dashoffset="${j * 6}"/>`; });
-        out += `<text x="${kx + 48}" y="${yy}" font-size="9" fill="${INK}"><tspan font-weight="700">${esc(code)}</tspan> ${esc(wireColourName(doc, w))}</text>`;
+        const what = uses.map((u) => u.circuit).filter(Boolean);
+        out += `<text x="${kx + 48}" y="${yy}" font-size="9" fill="${INK}"><tspan font-weight="700">${esc(code)}</tspan> ${esc(wireColourName(doc, w))}${what.length ? `<tspan fill="#5b625e"> · ${esc(what.join(', ').slice(0, 60))}</tspan>` : ''}</text>`;
       });
     }
     if (tbH) {
       const m = doc.meta || {}, tw = 420, tx = X + W - tw - 8, ty = Y + H - tbH - 8;
-      const cell = (x, y, w, h, label, val, big) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" stroke="${INK}" stroke-width="1"/><text x="${x + 5}" y="${y + 10}" font-size="6.5" fill="#5b625e">${esc(label)}</text><text x="${x + 5}" y="${y + h - 7}" font-size="${big ? 13 : 9}" font-weight="${big ? 700 : 500}" fill="${INK}">${esc(val)}</text>`;
-      out += cell(tx, ty, tw, 36, 'TITLE', doc.title, true);
-      out += cell(tx, ty + 36, 210, 30, 'PROJECT / VEHICLE', m.project) + cell(tx + 210, ty + 36, 210, 30, 'DRAWN BY', m.drawnBy);
-      out += cell(tx, ty + 66, 140, 30, 'DATE', m.date) + cell(tx + 140, ty + 66, 70, 30, 'REV', m.revision) + cell(tx + 210, ty + 66, 80, 30, 'SHEET', m.sheet) + cell(tx + 290, ty + 66, 130, 30, 'DRAWN WITH', 'Loomwright');
+      const fit = (v, w, size) => { const t = String(v == null ? '' : v), n = Math.floor((w - 10) / (size * 0.62)); return t.length > n ? t.slice(0, Math.max(1, n - 1)) + '…' : t; };
+      const cell = (x, y, w, h, label, val, big) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" stroke="${INK}" stroke-width="1"/><text x="${x + 5}" y="${y + 10}" font-size="6.5" fill="#5b625e">${esc(label)}</text><text x="${x + 5}" y="${y + h - 7}" font-size="${big ? 13 : 9}" font-weight="${big ? 700 : 500}" fill="${INK}">${esc(fit(val, w, big ? 13 : 9))}</text>`;
+      const sheetName = doc.sheet ? doc.sheet.name : doc.title, sheetNo = doc.sheet ? `${doc.sheetNo} of ${doc.sheets.length}` : '1 of 1';
+      out += cell(tx, ty, tw, 36, 'SHEET TITLE', sheetName, true);
+      out += cell(tx, ty + 36, 210, 30, 'PROJECT', doc.title) + cell(tx + 210, ty + 36, 210, 30, 'VEHICLE / CLIENT', m.project);
+      out += cell(tx, ty + 66, 110, 30, 'DRAWN BY', m.drawnBy) + cell(tx + 110, ty + 66, 90, 30, 'DATE', m.date) + cell(tx + 200, ty + 66, 50, 30, 'REV', m.revision) + cell(tx + 250, ty + 66, 70, 30, 'SHEET', sheetNo) + cell(tx + 320, ty + 66, 100, 30, 'DRAWN WITH', 'LoomWright');
     }
     return out + '</svg>';
   }
@@ -849,35 +898,44 @@
   /* ------------------------------------------------------------------ */
   /* Reports and checks                                                  */
   /* ------------------------------------------------------------------ */
-  function wireList(doc) {
+  // Reports accept a sheet view or a whole project.
+  function eachView(d) { return d && d.sheet ? [d] : d && Array.isArray(d.sheets) ? views(d) : [d]; }
+  function wireList(d) { return eachView(d).flatMap(wireListSheet); }
+  function wireListSheet(doc) {
     return doc.wires.map((w) => {
       const g = gaugeInfo(w.gauge), vd = voltageDrop(w);
-      return { id: w.id, name: w.name, from: pinName(doc, w.from), to: pinName(doc, w.to), code: wireCode(doc, w), colour: wireColourName(doc, w), gauge: w.gauge, awg: g ? g.awg : '', length: w.length, current: w.current, drop: vd == null ? '' : vd.toFixed(2), circuit: w.circuit || '', notes: w.notes || '' };
+      return { id: w.id, sheet: doc.sheet ? doc.sheet.name : '', sheetId: doc.sheet ? doc.sheet.id : '', name: w.name, from: pinName(doc, w.from), to: pinName(doc, w.to), code: wireCode(doc, w), colour: wireColourName(doc, w), gauge: w.gauge, awg: g ? g.awg : '', length: w.length, current: w.current, drop: vd == null ? '' : vd.toFixed(2), circuit: w.circuit || '', harness: w.harness || '', notes: w.notes || '' };
     });
   }
-  function bom(doc) {
-    const m = new Map();
-    doc.parts.forEach((p) => {
+  function bom(d) {
+    const m = new Map(), seen = new Set();
+    eachView(d).forEach((doc) => doc.parts.forEach((p) => {
+      if (p.label && seen.has(p.type + '|' + p.label)) return; // the same part drawn on several sheets
+      if (p.label) seen.add(p.type + '|' + p.label);
       const d = partDef(doc, p.type); if (!d || d.cat === 'Annotation' || p.type === 'splice' || p.type === 'net_label' || p.type === 'offpage') return;
       const r = resolved(doc, p), spec = d.sub ? tmpl(d.sub, r.props).trim() : '';
       const k = d.name + '|' + spec;
       if (!m.has(k)) m.set(k, { name: d.name, spec, qty: 0, refs: [] });
       const e = m.get(k); e.qty++; if (p.label) e.refs.push(p.label);
-    });
+    }));
     return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
-  function cableTotals(doc) {
+  function cableTotals(d) {
     const m = new Map();
-    doc.wires.forEach((w) => {
+    eachView(d).forEach((doc) => doc.wires.forEach((w) => {
       const k = w.gauge + '|' + wireCode(doc, w);
       if (!m.has(k)) m.set(k, { gauge: w.gauge, code: wireCode(doc, w), colour: wireColourName(doc, w), metres: 0, wires: 0, unknown: 0 });
       const e = m.get(k); e.wires++; const l = parseFloat(w.length); if (l > 0) e.metres += l; else e.unknown++;
-    });
+    }));
     return [...m.values()].sort((a, b) => parseFloat(a.gauge) - parseFloat(b.gauge) || a.code.localeCompare(b.code));
   }
   function parseAmps(s) { const m = /([\d.]+)\s*A?/i.exec(String(s || '')); return m ? parseFloat(m[1]) : null; }
 
-  function validate(doc) {
+  function validate(d) {
+    const vs = eachView(d), many = vs.length > 1;
+    return vs.flatMap((doc) => validateSheet(doc).map((c) => ({ ...c, sheetId: doc.sheet ? doc.sheet.id : '', text: many && doc.sheet ? `${doc.sheet.name}: ${c.text}` : c.text })));
+  }
+  function validateSheet(doc) {
     const out = [], sys = parseFloat(((doc.settings || {}).volts) || 12) || 12;
     const conn = new Map();
     doc.wires.forEach((w) => [w.from, w.to].forEach((e) => { const k = e.part + '|' + e.pin; conn.set(k, (conn.get(k) || 0) + 1); }));
@@ -954,7 +1012,7 @@
   return {
     VERSION, FORMAT, GRID, INK, CATEGORIES, LIBRARY: lib, COLOURS, STANDARDS, GAUGES,
     shapes: { L, R: R2, C, P, T }, shapeSVG, symbolSVG, esc, tmpl, uid, snap,
-    newDoc, normalise, partDef, defaultProps, resolved, partBox, findPart, pinPos, pinName, wirePoints, rotPt,
+    newDoc, newSheet, view, views, normalise, colourUsage, partDef, defaultProps, resolved, partBox, findPart, pinPos, pinName, wirePoints, rotPt,
     addPart, addWire, parseEnd, pruneWires, nextLabel, nextWireName,
     allColours, colourById, colourCode, wireCode, wireColourName, gaugeInfo, gaugeWidth, voltageDrop,
     renderDiagram, exportSVG, bounds, wireList, bom, cableTotals, validate, autoLayout, libraryList,

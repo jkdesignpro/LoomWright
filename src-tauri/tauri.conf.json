@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Loomwright",
-  "version": "0.1.0",
+  "productName": "LoomWright",
+  "version": "0.2.0",
   "identifier": "org.loomwright.app",
   "build": {
     "frontendDist": "../app"
@@ -10,7 +10,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Loomwright",
+        "title": "LoomWright",
         "width": 1440,
         "height": 900,
         "minWidth": 900,
@@ -28,7 +28,7 @@
     "category": "Productivity",
     "shortDescription": "Wiring diagram editor",
     "longDescription": "Free, open-source wiring diagram editor for vehicle and electronics projects.",
-    "copyright": "Copyright (C) 2026 Loomwright contributors. GPL-3.0-or-later.",
+    "copyright": "Copyright (C) 2026 LoomWright contributors. GPL-3.0-or-later.",
     "license": "GPL-3.0-or-later",
     "icon": [
       "icons/32x32.png",
@@ -40,8 +40,8 @@
     "fileAssociations": [
       {
         "ext": ["loom"],
-        "name": "Loomwright diagram",
-        "description": "Loomwright wiring diagram",
+        "name": "LoomWright diagram",
+        "description": "LoomWright wiring diagram",
         "role": "Editor",
         "mimeType": "application/json"
       }

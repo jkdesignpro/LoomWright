@@ -3,7 +3,7 @@
  * browser, or embedded in a sandboxed preview. This file hides the differences
  * for opening, saving and exporting files.
  *
- * Copyright (C) 2026 Loomwright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
  */
 (function () {
   'use strict';
@@ -53,7 +53,7 @@
       return pickFile('.loom,.json,application/json');
     },
     async openText(accept) {
-      if (invoke) return invoke('open_text', { filterName: 'Loomwright library', extensions: ['json'] });
+      if (invoke) return invoke('open_text', { filterName: 'LoomWright library', extensions: ['json'] });
       return pickFile(accept || '.json,application/json');
     },
     async initialFile() { if (!invoke) return null; try { return await invoke('initial_file'); } catch (e) { return null; } },

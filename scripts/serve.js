@@ -13,4 +13,4 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
     res.end(data);
   });
-}).listen(port, () => console.log(`Loomwright running at http://localhost:${port}`));
+}).listen(port, () => console.log(`LoomWright running at http://localhost:${port}`));
