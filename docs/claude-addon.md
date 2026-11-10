@@ -97,7 +97,7 @@ one). You can fine-tune it afterwards in the app's component builder.
 | `trace_circuit` | Follow a wire or pin through every sheet, off-page link and mated connector |
 | `test_circuit` | Live test: switch parts on or off, blow a fuse, and see what runs (connections only, not voltages) |
 | `load_budget` | Fuse and relay schedule, load on each fuse, relay and supply |
-| `report` | Build lists as CSV: wires, parts and costs, cable to buy, colour usage, fuses, connector tables, cut list, labels, locations, nets |
+| `report` | Build lists as CSV: wires, parts and costs, cable to buy, colour usage, fuses, connector tables, cut list, labels, locations, nets, power rails |
 | `harness_formboard` | A harness's branches, lengths and bundle sizes; copy routed lengths to the wires |
 | `project_settings` | Title block, voltage, colour standard, paper size per project or sheet, black and white, revision clouds, currency |
 | `export`, `import` | DXF, WireViz, a read-only web page, the build pack and formboard DXF; import CSV wire lists, WireViz, KiCad netlists and measured lengths |

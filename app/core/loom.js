@@ -16,4 +16,5 @@ require('./loom-plan.js');
 require('./loom-templates.js');
 require('./loom-route.js');
 require('./loom-pdf.js');
+require('./loom-electronics.js');
 module.exports = require('./loom-core.js');

@@ -145,7 +145,14 @@ function sheetSummary(doc) {
 function wireOpts(doc, a) {
   const c = parseColours(doc, a.colour, a.tracer, a.tracer2);
   if (a.harness) addHarness(doc, a.harness);
-  return { ...c, gauge: gauge(a.gauge), length: a.length != null ? String(a.length) : '', current: a.current != null ? String(a.current) : '', circuit: a.circuit || '', harness: a.harness || '', notes: a.notes || '', name: a.name };
+  return { ...c, gauge: gauge(a.gauge), length: a.length != null ? String(a.length) : '', current: a.current != null ? String(a.current) : '', circuit: a.circuit || '', harness: a.harness || '', notes: a.notes || '', name: a.name, signal: signalId(a.signal) };
+}
+/* A signal id from its id or name ("I2C SDA" → i2c_sda); empty when not set. */
+function signalId(s) {
+  if (!s) return '';
+  const t = String(s).trim().toLowerCase(), hit = (L.SIGNALS || []).find((x) => x.id === t || x.name.toLowerCase() === t);
+  if (!hit) throw new Error(`Unknown signal "${s}". Use one of: ${(L.SIGNALS || []).filter((x) => x.id).map((x) => x.id).join(', ')}`);
+  return hit.id;
 }
 function addHarness(doc, h) { h = String(h || '').trim(); if (h && !doc.harnesses.includes(h)) doc.harnesses.push(h); }
 /* A component from the user's library is copied into the project when used. */
@@ -238,6 +245,7 @@ const wireShape = z.object({
   gauge: z.union([z.string(), z.number()]).optional().describe('mm², e.g. 1.5, or "14 awg"'),
   length: z.number().optional().describe('metres'), current: z.number().optional().describe('amps'),
   circuit: z.string().optional().describe('What the wire is for, e.g. "Spot lamps"'),
+  signal: z.string().optional().describe('What it carries, for electronics: power, ground, digital, analogue, pwm, i2c_sda, i2c_scl, spi_mosi, spi_miso, spi_sck, spi_cs, uart_tx, uart_rx, can_h, can_l, rs485_a, rs485_b, usb_dp, usb_dm, onewire, shield'),
   harness: z.string().optional().describe('The loom it runs in, e.g. "Engine bay". Added to the project\'s harness list.'),
   notes: z.string().optional(), name: z.string().optional().describe('Wire number; auto W1, W2... when omitted'),
 });
@@ -390,7 +398,7 @@ server.registerTool('update_wire', {
   title: 'Update wire',
   description: 'Change a wire\'s colour, tracer, size, length, current, circuit, harness, notes or number, and its build details: insulation, the multicore cable it runs in, and how each end is finished (terminal, crimp or solder, strip length, heat-shrink, seal). Identify it by wire number (W3) or by its two ends. Wire numbers are searched on every sheet.',
   inputSchema: {
-    path: z.string(), sheet: sheetArg, wire: z.string().describe('Wire number like W3, or "F1:2 -> K1:30"'), colour: z.string().optional(), tracer: z.string().optional(), tracer2: z.string().optional(), gauge: z.union([z.string(), z.number()]).optional(), length: z.number().optional(), current: z.number().optional(), circuit: z.string().optional(), harness: z.string().optional(), notes: z.string().optional(), name: z.string().optional(),
+    path: z.string(), sheet: sheetArg, wire: z.string().describe('Wire number like W3, or "F1:2 -> K1:30"'), signal: z.string().optional().describe('What it carries (see add_wire); "" clears it'), colour: z.string().optional(), tracer: z.string().optional(), tracer2: z.string().optional(), gauge: z.union([z.string(), z.number()]).optional(), length: z.number().optional(), current: z.number().optional(), circuit: z.string().optional(), harness: z.string().optional(), notes: z.string().optional(), name: z.string().optional(),
     insulation: z.string().optional().describe('Insulation id or name from list_connector_series, e.g. flry_b'), cable: z.string().optional().describe('Name of a cable from define_cable; "" for a single core'),
     end_a: endShape.optional().describe('The "from" end'), end_b: endShape.optional().describe('The "to" end'),
   },
@@ -403,6 +411,7 @@ server.registerTool('update_wire', {
   ['circuit', 'notes', 'name', 'harness'].forEach((k) => { if (a[k] != null) w[k] = a[k]; });
   if (a.harness) addHarness(project, a.harness);
   if (a.insulation != null) w.insulation = pick(L.INSULATION, a.insulation, 'insulation');
+  if (a.signal != null) { const sg = signalId(a.signal); if (sg) w.signal = sg; else delete w.signal; }
   if (a.cable != null) {
     if (!a.cable) w.cable = '';
     else { const c = (project.cables || []).find((x) => x.id === a.cable || x.name.toLowerCase() === a.cable.toLowerCase()); if (!c) throw new Error(`No cable ${a.cable}. Add it with define_cable.`); w.cable = c.id; }
@@ -753,8 +762,8 @@ server.registerTool('load_budget', {
 /* ---------------- build lists ---------------- */
 server.registerTool('report', {
   title: 'Build lists and reports',
-  description: 'Get a build list for the whole project as CSV text, or save it as a .csv file: wires, bom (parts with prices and totals), cable (metres to buy by colour and size), usage (colour reuse), fuses (fuse schedule and load budget), connectors (connector cavity tables), cut (cut list by harness with terminals, strip lengths and seals), labels (a label for each wire end), locations (where each part is fitted), nets (every electrical net).',
-  inputSchema: { path: z.string(), kind: z.enum(['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cut', 'labels', 'locations', 'nets']), out: z.string().optional().describe('Save as this .csv file (relative to the project) instead of returning the text'), single: z.boolean().optional().describe('labels: one label per wire instead of one per end') },
+  description: 'Get a build list for the whole project as CSV text, or save it as a .csv file: wires, bom (parts with prices and totals), cable (metres to buy by colour and size), usage (colour reuse), fuses (fuse schedule and load budget), connectors (connector cavity tables), cut (cut list by harness with terminals, strip lengths and seals), labels (a label for each wire end), locations (where each part is fitted), nets (every electrical net), power (each supply rail with what it feeds in mA against its rating).',
+  inputSchema: { path: z.string(), kind: z.enum(['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cut', 'labels', 'locations', 'nets', 'power']), out: z.string().optional().describe('Save as this .csv file (relative to the project) instead of returning the text'), single: z.boolean().optional().describe('labels: one label per wire instead of one per end') },
 }, wrap(async (a) => {
   const { full, project } = load(a.path);
   const text = L.toCSV(L.reportRows(project, a.kind, { single: a.single }));
