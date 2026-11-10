@@ -422,6 +422,11 @@
     return clone({ parts, wires, custom });
   }
   /* Paste parts and wires (from the clipboard or a saved block). at: where the block's top-left goes. */
+  /* A saved block, or a starter circuit (ids starting tpl:). */
+  function blockById(id) {
+    if (String(id).startsWith('tpl:') && L.templateBlock) { try { return L.templateBlock(id.slice(4), project); } catch (e) { toast(e.message); return null; } }
+    return (userLib.blocks || []).find((x) => x.id === id) || null;
+  }
   function insertBlock(cb, offset = 40, at = null) {
     if (!cb || !cb.parts.length || test) return;
     pushHistory();
@@ -442,8 +447,20 @@
       if (q.points) q.points = q.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
       doc.wires.push(q); return q;
     });
+    // starter circuits are laid out neatly around their parts where they land
+    if (String(cb.id || '').startsWith('tpl:') && L.tidyWires) { try { L.tidyWires(doc, newWires.map((w) => w.id)); } catch (e) { console.warn(e); } }
     select(newParts.map((p) => p.id), newWires.map((w) => w.id));
     commit();
+  }
+  /* Lay the selected wires (or every wire on the sheet) out with square corners around the parts. */
+  function tidyCmd() {
+    if (!L.tidyWires || test) return;
+    const ids = [...sel.wires];
+    if (!ids.length && sel.parts.size) doc.wires.forEach((w) => { if (sel.parts.has(w.from.part) || sel.parts.has(w.to.part)) ids.push(w.id); });
+    pushHistory();
+    const n = L.tidyWires(doc, ids);
+    commit();
+    toast(`${t('Tidied')} ${plural(n, t('wire'))}`, { label: t('Undo'), run: undo });
   }
   function paste(offset = 40) {
     let cb = clipboard;
@@ -748,7 +765,7 @@
     const type = e.dataTransfer.getData('text/x-loom-part'), block = e.dataTransfer.getData('text/x-loom-block');
     if (!type && !block) return;
     e.preventDefault();
-    if (block) { const b = (userLib.blocks || []).find((x) => x.id === block); if (b) insertBlock(b, 0, world(e)); return; }
+    if (block) { const b = blockById(block); if (b) insertBlock(b, 0, world(e)); return; }
     addPartAt(type, world(e));
   });
 
@@ -787,6 +804,7 @@
     else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(); }
     else if (k === 'r' && !mod) rotateSelection(e.shiftKey ? -1 : 1);
     else if (k === 'f' && !mod) flipSelection();
+    else if (k === 't' && !mod && e.shiftKey) runCommand('tidy');
     else if (k === 't' && !mod) runCommand('trace');
     else if (e.key === 'Escape') { if (draft) { draft = null; svg.classList.remove('wiring'); render(); setHint(); } else if (trace) clearTrace(); else clearSel(); }
     else if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -817,11 +835,22 @@
     const q = $('#lib-search').value.trim().toLowerCase();
     const items = libraryItems();
     const match = (d) => !q || (d.name + ' ' + d.cat + ' ' + (d.prefix || '') + ' ' + (d.tags || '')).toLowerCase().includes(q);
-    const cats = ['My blocks', 'My components', ...L.CATEGORIES];
+    const cats = ['Starter circuits', 'My blocks', 'My components', ...L.CATEGORIES];
     const openState = {};
     $$('#lib-list details').forEach((d) => { openState[d.dataset.cat] = d.open; });
     let html = '';
     cats.forEach((cat) => {
+      if (cat === 'Starter circuits') {
+        if (!L.templateList) return;
+        const kind = project.settings.projectType || 'vehicle';
+        const tl = L.templateList().filter((x) => (q ? (x.name + ' ' + x.description).toLowerCase().includes(q) : x.kind === kind || kind === 'mixed'));
+        if (!tl.length) return;
+        const open = q ? true : openState[cat] !== undefined ? openState[cat] : false;
+        html += `<details class="lib-cat" data-cat="${esc(cat)}"${open ? ' open' : ''}><summary>${esc(t(cat))} <span>${tl.length}</span></summary><div class="lib-grid">`;
+        html += tl.map((x) => { let icon = ''; try { icon = blockIcon(L.templateBlock(x.id, project)); } catch (e) { icon = ''; } return `<button class="lib-item" draggable="true" data-block="tpl:${esc(x.id)}" title="${esc(t(x.name) + '. ' + t(x.description))}">${icon}<span>${esc(t(x.name))}</span></button>`; }).join('');
+        html += '</div></details>';
+        return;
+      }
       if (cat === 'My blocks') {
         const bl = (userLib.blocks || []).filter((b) => !q || b.name.toLowerCase().includes(q));
         if (!bl.length && q) return;
@@ -849,7 +878,7 @@
     const ed = e.target.closest('[data-edit]');
     if (ed) { e.stopPropagation(); window.LoomBuilder.open(defOf(ed.dataset.edit)); return; }
     const bl = e.target.closest('[data-block]');
-    if (bl) { const b = userLib.blocks.find((x) => x.id === bl.dataset.block); if (b) insertBlock(b, 0, centreWorld()); return; }
+    if (bl) { const b = blockById(bl.dataset.block); if (b) insertBlock(b, 0, centreWorld()); return; }
     const it = e.target.closest('.lib-item');
     if (it) addPartAt(it.dataset.type);
   });
@@ -2321,6 +2350,7 @@
     }, on: () => !!trace },
     test: { label: 'Live circuit test', run: () => (test ? endTest() : startTest()), on: () => !!test },
     fault: { label: 'Fault finding…', run: () => faultModal(only('part') ? only('part').id : null) },
+    tidy: { label: 'Tidy wires', key: 'Shift+T', run: tidyCmd },
     stock: { label: 'My stock…', run: stockModal },
     'stock-take': { label: 'Take this project from stock…', run: takeStockModal },
     'export-shop': { label: 'Export shopping list (CSV)', run: exportShopping },
@@ -2355,7 +2385,7 @@
     ['File', ['new', 'open', 'sample', 'close-tab', '-', 'save', 'saveas', '-', 'print', 'print-pack', 'print-labels', '-', 'import-csv', 'import-wireviz', 'import-kicad', 'import-lengths', '-', 'export-svg', 'export-png', 'export-dxf', 'export-wireviz', 'export-share']],
     ['Edit', ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'dup', 'delete', '-', 'select-all', 'find', 'replace', 'renumber', '-', 'block-save']],
     ['View', ['pane-parts', 'pane-project', 'pane-history', 'pane-props', 'tables', '-', 'zoom-in', 'zoom-out', 'fit', '-', 'junctions', 'xrefs', 'bw', '-', 'theme', 'language']],
-    ['Arrange', ['rotate', 'flip', '-', 'align-left', 'align-centre', 'align-right', 'align-top', 'align-middle', 'align-bottom', '-', 'dist-h', 'dist-v']],
+    ['Arrange', ['rotate', 'flip', '-', 'align-left', 'align-centre', 'align-right', 'align-top', 'align-middle', 'align-bottom', '-', 'dist-h', 'dist-v', '-', 'tidy']],
     ['Sheet', ['sheet-new', 'sheet-dup', 'sheet-rename', 'sheet-del', '-', 'sheet-left', 'sheet-right', '-', 'sheet-prev', 'sheet-next']],
     ['Tools', ['trace', 'test', 'fault', '-', 'formboard', 'locations', '-', 'builder', 'colours', 'cables', '-', 'stock', 'build-share', 'build-import', '-', 'lib-import', 'lib-export', '-', 'check']],
     ['Reports', ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cutlist', 'build', 'shop', 'nets', '-', 'print-pack', 'print-labels', '-', 'export-wires', 'export-bom', 'export-cable', 'export-cut', 'export-connectors', 'export-fuses', 'export-voltages', 'export-shop', 'export-labels', 'export-usage']],
