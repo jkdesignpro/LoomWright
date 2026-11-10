@@ -1,6 +1,6 @@
 # The .loom file format
 
-A LoomWright project is one `.loom` file. It is plain JSON, written with two-space indents, so it diffs well in Git and can be read or written by other programs. This page describes version 3 of the format, which LoomWright 0.3 reads and writes.
+A LoomWright project is one `.loom` file. It is plain JSON, written with two-space indents, so it diffs well in Git and can be read or written by other programs. This page describes version 3 of the format, which LoomWright 0.3 and 0.4 read and write. 0.4 added some optional keys (project type, mains settings, mains details on wires, build progress and compressed air systems); older versions keep them when they open and save a file.
 
 The model lives in `app/core/loom-core.js` (`newDoc`, `newSheet`, `normalise`, `view`). The reports in `app/core/loom-reports.js` and the checks in `app/core/loom-nets.js` read the same structure.
 
@@ -38,8 +38,9 @@ If you write `.loom` files from another program, write version 3 and let `normal
   "revisions": [],
   "harnessLayouts": {},
   "vehicle": null,
+  "air": [],
   "sheets": [],
-  "app": "LoomWright 0.3.0"
+  "app": "LoomWright 0.4.0"
 }
 ```
 
@@ -58,6 +59,7 @@ If you write `.loom` files from another program, write version 3 and let `normal
 | `revisions` | Issued revisions, oldest first; see below. |
 | `harnessLayouts` | Formboard layouts, keyed by harness name; see below. |
 | `vehicle` | The vehicle locations view, or `null`; see below. |
+| `air` | Optional. Compressed air systems planned in this project; see below. |
 | `sheets` | The sheets, in order. A project always has at least one. |
 | `app` | The program and version that saved the file. Ignored when reading. |
 
@@ -68,7 +70,7 @@ These are the defaults that `newDoc()` writes.
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `standard` | `"lr"` | Colour code standard: `lr` (Land Rover / British), `din` (DIN 72551 / IEC 60757), `sae` (SAE / US) or `custom` (your own colours only). |
-| `volts` | `12` | System voltage, used to turn watts into amps and for the voltage drop check. 12, 24 or 48. |
+| `volts` | `12` | System voltage, used to turn watts into amps and for the voltage drop check: 12, 24 or 48, or 110, 230 or 400 for mains. |
 | `labels` | `"full"` | Wire labels on the drawing: `full` (number, colour code, size), `code` (colour code only) or `none`. |
 | `titleBlock` | `true` | Draw the title block and revision table. |
 | `colourKey` | `true` | Draw the colour key. |
@@ -83,6 +85,10 @@ These are the defaults that `newDoc()` writes.
 | `cutAllowance` | `0.15` | Metres added to each wire in the cut lists. |
 | `currency` | `"£"` | Currency symbol for costs. |
 | `cableCosts` | `{}` | Cable price per metre, keyed by size in mm² (for example `{ "2.5": 0.32 }`). |
+| `projectType` | `"vehicle"` | `vehicle`, `household`, `factory`, `electronics` or `mixed`. Picks the parts, tabs and checks shown first. Choosing household, factory or mixed also sets `mains`, `standard: "din"`, and 230 V for household. |
+| `mains` | not set | Household and factory projects: `{ "building", "country", "ambient", "method" }`. `building` is `dwelling`, `hmo`, `hrrb`, `student`, `care` or `commercial`; `country` is `england`, `wales`, `scotland` or `ni`; `ambient` is the usual air temperature in °C (30); `method` is the usual installation method (`C`). |
+| `autoColour` | not set | `true` picks colours for new wires with the colour helper. |
+| `harnessTemps` | not set | Air temperature around each harness in °C, keyed by harness name, for derating. |
 
 ## Sheets
 
@@ -158,6 +164,8 @@ These are the defaults that `newDoc()` writes.
 | `points` | Optional bend points, in drawing units. |
 | `dx` | Optional sideways offset of the middle run of a square-cornered wire with no bend points. |
 | `lab` | Optional offset of the wire label from where it would sit. |
+| `method`, `insul`, `grouped`, `groupKind`, `cpc`, `ambient` | Optional, mains cables only: installation method (`C`, `B`, `A`, `100` to `103`), thermal insulation, how many circuits are grouped with it and how (bunched or clipped side by side), the earth (cpc) size in mm², and the air temperature in °C. Missing values use the project's `mains` settings. |
+| `build` | Optional build progress: `cut`, `ends` and `fitted` (`true` when done), `test` (`pass` or `fail`) and `note`. Restoring a revision keeps it. |
 | `ends` | Optional. How each end is finished: `term` (a terminal id from `loom-data.js`), `method` (`crimp`, `crimp_solder`, `solder`, `screw` or `ferrule`), `strip` (mm), `seal` (`seal`, `plug` or `gel`) and `shrink` (free text). |
 
 ## Cables
@@ -182,7 +190,7 @@ These are the defaults that `newDoc()` writes.
 { "id": "r8x2k1m0", "rev": "B", "date": "2026-11-10", "by": "", "description": "Fridge feed moved to 6 mm²", "snapshot": { } }
 ```
 
-`snapshot` is a full copy of the project at the time of issue: `title`, `meta`, `settings`, `harnesses`, `cables`, `customColours`, `customParts`, `harnessLayouts` and `sheets`. It does not hold the revision list itself or the vehicle view. Comparing revisions, going back to one and drawing clouds all work from these snapshots. Save points are not stored in the file; they stay on the computer.
+`snapshot` is a full copy of the project at the time of issue: `title`, `meta`, `settings`, `harnesses`, `cables`, `customColours`, `customParts`, `harnessLayouts`, `sheets` and `air`. It does not hold the revision list itself or the vehicle view. Comparing revisions, going back to one and drawing clouds all work from these snapshots. Save points are not stored in the file; they stay on the computer.
 
 ## Harness layouts (formboards)
 
@@ -209,6 +217,27 @@ A node is either a `point` (a breakout or junction on the board) or an `end` (a 
 ```
 
 `image` is a picture of the vehicle as a data URL, or empty for the built-in outline. `marks` places parts on a 1000 by 500 view, keyed by `<type>|<reference>`, or by the part id for a part with no reference.
+
+## Compressed air systems
+
+```json
+"air": [
+  {
+    "id": "airk2j9x1", "name": "Workshop air",
+    "settings": { "use": "work", "quality": "dry", "tariff": 0.25, "hours": 2000, "ambient": 20, "altitude": 0, "rh": 70, "leakPct": 10, "growthPct": 15, "simultaneity": 70 },
+    "compressors": [{ "id": "c1", "name": "Screw compressor", "kind": "screw", "fad": 1600, "basis": "fad", "kw": 11, "cutIn": 7, "cutOut": 7.5 }],
+    "receivers": [{ "id": "r1", "name": "Main receiver", "litres": 500, "ps": 11, "safetyValve": true, "drain": true }],
+    "treatment": [{ "id": "t1", "kind": "dryer-ref", "name": "", "rated": 2000, "dp": 0.2, "before": false }],
+    "pipes": [{ "id": "p1", "parent": null, "name": "Ring main", "material": "aluminium", "size": "32", "length": 60, "role": "main", "ring": true, "fittings": { "elbow": 6, "bend": 0, "teeRun": 4, "teeBranch": 0, "valve": 1, "coupling": 0 } }],
+    "drops": [{ "id": "d1", "pipe": "p1", "name": "Bench 1", "takeoff": "top", "drainLeg": true, "outlets": 1,
+      "frl": { "rated": 1500, "dp": 0.2, "set": null, "lubricator": false },
+      "hose": { "size": "3/8\"", "length": 5, "coupling": "1/4\"", "couplings": 1, "safety": false },
+      "tools": [{ "id": "k1", "kind": "impact-12", "name": "Impact wrench 1/2\"", "lpm": 850, "util": 25, "bar": 6.3, "cont": false, "paint": false }] }]
+  }
+]
+```
+
+Flows are free air in l/min, pressures bar gauge, lengths metres and volumes litres. `use` is `work` or `home`, which changes the pressure systems advice. A pipe's `parent` is the pipe it branches from, or `null` for one that starts at the receiver; a drop's `pipe` is the pipe it is taken off. The lists of compressor kinds, treatment kinds, pipe materials and sizes, hoses, couplings and tools are in `app/core/loom-air.js` (`Loom.air`). Revisions keep a copy of the air systems.
 
 ## Component library file
 
