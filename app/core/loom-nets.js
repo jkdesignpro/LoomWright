@@ -42,6 +42,7 @@
       r.pins.forEach((pn) => uf.find(k(pn.id)));
       b.links.forEach(([a, c]) => join(k(a), k(c), { kind: 'link', ...at }));
       if (b.kind === 'earth') r.pins.forEach((pn) => join(k(pn.id), EARTH, { kind: 'earth', ...at }));
+      if (b.earthPins) b.earthPins.forEach((pn) => join(k(pn), EARTH, { kind: 'earth', ...at }));
       if (p.type === 'net_label' && p.props.text) join(k('L'), 'NET:' + String(p.props.text).trim().toUpperCase(), { kind: 'net', ...at });
       if (p.type === 'offpage' && p.props.link) join(k('L'), 'NET:' + String(p.props.link).trim().toUpperCase(), { kind: 'net', ...at });
       if (b.kind === 'protect' && opts.protect !== false) {
@@ -51,7 +52,9 @@
         b.outputs.forEach((o) => { if (opts.relays === 'closed' || (opts.pdm instanceof Set && opts.pdm.has(partKey(p) + '#' + o.pin))) join(k(b.input), k(o.pin), { kind: 'pdm', ...at }); });
       }
       if (b.kind === 'switch') {
-        const pairs = opts.switches === 'closed' ? (b.states || ['', '']).flatMap((_, i) => (b.switched ? b.switched(i) : [])) : opts.switches === 'open' ? [] : (b.switched ? b.switched(state(it)) : []);
+        // a contact drawn apart from its coil (b.follows) takes the coil's state
+        const st = b.follows && opts.relays instanceof Set ? (opts.relays.has(b.follows) ? 1 : 0) : state(it);
+        const pairs = opts.switches === 'closed' ? (b.states || ['', '']).flatMap((_, i) => (b.switched ? b.switched(i) : [])) : opts.switches === 'open' ? [] : (b.switched ? b.switched(st) : []);
         pairs.forEach(([a, c]) => join(k(a), k(c), { kind: 'switch', ...at }));
         if (b.earthWhen && (opts.switches === 'closed' || (opts.switches !== 'open' && b.earthWhen(state(it))))) join(k('1'), EARTH, { kind: 'switch', ...at });
       }
@@ -60,7 +63,8 @@
         const pairs = on == null ? [...b.contacts(true), ...b.contacts(false)] : b.contacts(on);
         pairs.forEach(([a, c]) => join(k(a), k(c), { kind: 'relay', ...at }));
       }
-      if (p.label && !(Loom.partDef(it.v, p.type) || {}).noLabel) {
+      const pd = Loom.partDef(it.v, p.type) || {};
+      if (p.label && !pd.noLabel && !(pd.xrefGroup && !pd.coil)) {
         const lk = p.type + '|' + p.label;
         if (byLabel.has(lk)) { const o = byLabel.get(lk); r.pins.forEach((pn) => join(k(pn.id), key(o.sheet, o.p.id, pn.id), { kind: 'same', ...at, other: o })); } else byLabel.set(lk, it);
       }
@@ -168,7 +172,7 @@
   function partStates(d, p) {
     const v = d.sheet ? d : Loom.view(projectOf(d), 0);
     const b = Loom.behaviour(v, p);
-    return b.states ? { states: b.states, def: b.def || 0, key: partKey(p) } : null;
+    return b.states ? { states: b.states, def: b.def || 0, key: partKey(p), ...(b.follows ? { follows: b.follows } : {}) } : null;
   }
 
   /* ---------------- Fuse and relay schedule, load budget ---------------- */
@@ -247,7 +251,7 @@
     const seen = new Map();
     views.forEach((v) => v.parts.forEach((p) => {
       const def = Loom.partDef(v, p.type) || {};
-      if (!p.label || def.noLabel || def.cat === 'Annotation') return;
+      if (!p.label || def.noLabel || def.cat === 'Annotation' || (def.xrefGroup && !def.coil)) return;
       const k = p.label.toUpperCase();
       if (!seen.has(k)) seen.set(k, []);
       seen.get(k).push({ v, p });

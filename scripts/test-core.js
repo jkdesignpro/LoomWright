@@ -217,4 +217,62 @@ assert.strictEqual(L.wireCode({ settings: { standard: 'sae' } }, { colour: 'brow
   assert.ok(L.disclaimerFor(p).mains && L.exportSVG(L.view(p, 0)).includes('BS 7671'), 'household drawings carry the disclaimer');
 }
 
+// 0.4: household and factory wiring (guidance checks, not certification)
+{
+  const tplProject = (id, type) => { const b = L.templateBlock(id), p = L.newDoc(id); L.applyProjectType(p, type); p.sheets[0].parts = b.parts; p.sheets[0].wires = b.wires; return p; };
+  const rules = (list) => list.map((c) => c.rule).filter(Boolean);
+  // a sensible consumer unit raises no errors or warnings
+  const h = tplProject('cu-rcbo', 'household'), hv = L.view(h, 0);
+  const hc = L.householdChecks(h);
+  assert.strictEqual(hc.circuits.length, 4, 'four circuits found');
+  const ring = hc.circuits.find((c) => c.kind === 'ring');
+  assert.ok(ring && ring.ring, 'the ring is a closed loop');
+  assert.ok(!hc.out.some((c) => c.level !== 'info'), 'the starter consumer unit has no errors: ' + hc.out.filter((c) => c.level !== 'info').map((c) => c.text).join('; '));
+  assert.ok(L.validate(h).every((c) => !/has no earth return|guide figure/.test(c.text)), 'vehicle cable rules are not applied to household projects');
+  assert.strictEqual(L.reportRows(h, 'circuits').length, 5, 'circuit schedule has a row per circuit');
+  // breaking the ring is an error
+  const close = hv.wires.find((w) => w.to.part === ring.dev.p.id && w.to.pin === 'out');
+  hv.wires.splice(hv.wires.indexOf(close), 1);
+  assert.ok(rules(L.householdChecks(h).out).includes('A1-RING-CLOSED'), 'an open ring is found');
+  hv.wires.push(close);
+  // a socket circuit without a 30 mA RCD, a long thin radial, and a TT supply without RCDs
+  const cb = hv.parts.find((p) => p.type === 'rcbo' && p.props.circuit === 'ring');
+  cb.type = 'mcb';
+  assert.ok(rules(L.householdChecks(h).out).includes('A2-RCD-SOCKETS'), 'sockets without RCD protection are found');
+  const lights = hv.parts.find((p) => p.type === 'rcbo' && p.props.circuit === 'lighting');
+  hv.wires.filter((w) => w.circuit === 'Lights').forEach((w) => { w.length = '60'; });
+  lights.props.rating = '32'; lights.props.circuit = '';
+  assert.ok(rules(L.householdChecks(h).out).includes('A3-ZS'), 'a long circuit on a big breaker fails the earth loop check');
+  hv.parts.find((p) => p.type === 'supply_cutout').props.earthing = 'TT';
+  assert.ok(rules(L.householdChecks(h).out).includes('A3-TT-RCD'), 'TT circuits need RCDs');
+  assert.ok(L.disclaimerFor(h).mains && L.exportSVG(hv).includes('BS 7671'), 'household drawings carry the disclaimer');
+  // loads library
+  assert.ok(L.APPLIANCES.length > 10 && L.MACHINES.length > 5, 'loads library');
+  assert.ok(Math.abs(L.motorFLC(2.2, 3) - 5) < 0.2, 'three-phase full-load current estimate');
+  assert.strictEqual(L.rateCable({ gauge: '2.5', method: 'C' }).iz, 27, 'cable rating from the table');
+  assert.ok(L.rateCable({ gauge: '2.5', method: 'C', insul: 'surrounded', length: '2' }).iz < 14, 'insulation halves the rating');
+
+  // factory: the starter works in the live test, and a wrong setting is found
+  const f = tplProject('dol-starter', 'factory'), fv = L.view(f, 0);
+  assert.deepStrictEqual(L.factoryChecks(f).filter((c) => c.level !== 'info').map((c) => c.text), [], 'the starter has no errors');
+  const start = fv.parts.find((p) => p.type === 'pb_start'), k = fv.parts.find((p) => p.type === 'contactor');
+  assert.ok(L.simulate(f, { [L.partKey(start)]: 1 }).relays.has(L.partKey(k)), 'pressing start pulls in the contactor');
+  assert.ok(!L.simulate(f, {}).relays.has(L.partKey(k)), 'the contactor is off at rest');
+  const aux = fv.parts.find((p) => p.type === 'aux_contact');
+  const on = L.buildNet(f, { relays: new Set([L.partKey(k)]), switches: 'state', state: {} });
+  assert.strictEqual(on.uf.find(on.k(fv.sheet, aux.id, '1')), on.uf.find(on.k(fv.sheet, aux.id, '2')), 'the hold-in contact follows its coil');
+  fv.parts.find((p) => p.type === 'mpcb').props.setting = '9';
+  start.props.colour = 'red';
+  fv.wires.find((w) => w.tracer === 'yellow').tracer = '';
+  const fr = rules(L.factoryChecks(f));
+  ['B2-OVERLOAD', 'B1-PB', 'B1-COLOURS'].forEach((r) => assert.ok(fr.includes(r), `factory check ${r}`));
+  assert.ok(L.reportRows(f, 'motors').length === 2 && L.reportRows(f, 'plcio').length === 1, 'motor and PLC lists');
+  // wire numbers by potential: the three wires either side of the hold-in contact share two numbers
+  L.numberByPotential(f);
+  const names = new Set(fv.wires.filter((w) => [w.from.part, w.to.part].includes(aux.id)).map((w) => w.name));
+  assert.strictEqual(names.size, 2, 'wires on one potential share a number');
+  const fpdf = Buffer.from(L.projectPDF(f, { tables: ['motors', 'terminals', 'plcio'] })).toString('latin1');
+  assert.ok(fpdf.includes('/Outlines'), 'factory PDF builds');
+}
+
 console.log(`ok: ${n} components, example project with ${s.sheets.length} sheets and ${L.wireList(s).length} wires`);

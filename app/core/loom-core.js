@@ -839,7 +839,9 @@
       v.parts.forEach((p) => {
         const pr = p.props || {};
         let k = null;
-        if (p.type === 'offpage' && pr.link) k = 'N:' + String(pr.link).trim().toUpperCase();
+        const grp = (partDef(v, p.type) || {}).xrefGroup;
+        if (grp && p.label) k = 'G:' + grp + '|' + p.label;
+        else if (p.type === 'offpage' && pr.link) k = 'N:' + String(pr.link).trim().toUpperCase();
         else if (p.type === 'net_label' && pr.text) k = 'N:' + String(pr.text).trim().toUpperCase();
         else if (p.label && !(partDef(v, p.type) || {}).noLabel) k = 'P:' + p.type + '|' + p.label;
         if (!k) return;
@@ -919,7 +921,7 @@
     const xr = o.xref && o.xref.get(p.id);
     if (xr) {
       const link = p.type === 'offpage' || p.type === 'net_label';
-      const lead = link ? '→ ' : 'also on ', targets = o.links ? xr.map((x) => `<tspan data-link="part|${esc(x.sheetId)}|${esc(x.part)}">${esc(x.text)}</tspan>`).join(', ') : esc(xr.map((x) => x.text).join(', '));
+      const lead = link ? '→ ' : d.xrefGroup ? (d.coil ? 'contacts on ' : 'coil on ') : 'also on ', targets = o.links ? xr.map((x) => `<tspan data-link="part|${esc(x.sheetId)}|${esc(x.part)}">${esc(x.text)}</tspan>`).join(', ') : esc(xr.map((x) => x.text).join(', '));
       s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8" text-anchor="middle" fill="${o.bw ? INK : '#2b5fb8'}" font-family="${MONO}"${edit ? ` data-xref="${p.id}" class="xref"` : ''}>${esc(lead)}${targets}${edit ? '<title>Click to go there</title>' : ''}</text>`;
       ty += 10;
     }
