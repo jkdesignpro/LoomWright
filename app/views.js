@@ -1,7 +1,7 @@
 /*
  * LoomWright views: the harness formboard and the vehicle location view.
  * Both open full-window over the editor and edit the open project through window.LoomEditor.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function () {
   'use strict';

@@ -1,5 +1,5 @@
 // LoomWright desktop shell: native file dialogs and file access for the editor.
-// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
 
 use base64::Engine;
 use serde::Serialize;

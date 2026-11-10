@@ -3,7 +3,7 @@
  * browser, or embedded in a sandboxed preview. This file hides the differences
  * for opening, saving and exporting files.
  *
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function () {
   'use strict';

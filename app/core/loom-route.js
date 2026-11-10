@@ -5,7 +5,7 @@
  * so a routed wire can still be dragged and edited by hand afterwards.
  *
  * Extends window.Loom; needs loom-core.js first.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./loom-core.js'));

@@ -6,7 +6,7 @@
  * app's checks, build lists, revision history and live circuit test.
  * Entirely optional; the LoomWright app works without it.
  *
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 'use strict';
 const fs = require('fs');

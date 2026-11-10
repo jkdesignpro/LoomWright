@@ -30,7 +30,7 @@ Vehicle wiring has its own risks: fire from overloaded or unprotected cables, an
 
 ## No warranty
 
-LoomWright is free software, released under the GNU General Public License, version 3 or later. It comes with no warranty, as far as the law allows. You use it at your own risk.
+LoomWright is free software, released under the GNU Affero General Public License, version 3 or later. It comes with no warranty, as far as the law allows. You use it at your own risk.
 
 The authors and contributors accept no responsibility for any loss, damage, injury or death arising from the use of LoomWright or of anything drawn with it.
 

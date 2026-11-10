@@ -3,7 +3,7 @@
  * fuse and relay schedule with load budget, and project-level design checks.
  * Extends window.Loom; needs loom-core.js and loom-data.js first.
  *
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) { require('./loom-data.js'); module.exports = factory(require('./loom-core.js')); }

@@ -5,7 +5,7 @@
  * Part numbers are given where they are well established. Always check them
  * against the maker's current catalogue before ordering.
  *
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./loom-core.js'));

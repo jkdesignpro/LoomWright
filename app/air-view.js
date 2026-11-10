@@ -4,7 +4,7 @@
  * in the middle, and the results and checks from Loom.air on the right.
  * Opens full-window over the editor (Tools, Compressed air planner) and keeps its plans
  * in project.air through window.LoomEditor, so undo, autosave and saving work as usual.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function () {
   'use strict';

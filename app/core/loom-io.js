@@ -3,7 +3,7 @@
  * WireViz YAML, KiCad netlists, DXF for CAD, and a read-only HTML page.
  * Extends window.Loom; needs the other core modules first. WireViz needs js-yaml.
  *
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -530,7 +530,7 @@ footer{padding:8px 16px 24px;color:var(--muted);font-size:12px}
 <div id="list" hidden><table><thead><tr><th>Sheet</th><th>Wire</th><th>From</th><th>To</th><th>Code</th><th>mm²</th><th>m</th><th>Circuit</th><th>Harness</th></tr></thead><tbody>${wl.map((r) => `<tr><td>${esc(r.sheet)}</td><td class="mono">${esc(r.name)}</td><td class="mono">${esc(r.from)}</td><td class="mono">${esc(r.to)}</td><td class="mono">${esc(r.code)}</td><td class="mono">${esc(r.gauge)}</td><td class="mono">${esc(r.length)}</td><td>${esc(r.circuit)}</td><td>${esc(r.harness)}</td></tr>`).join('')}</tbody></table></div></div>
 ${build ? `<div id="build" hidden><div class="bt"><span class="prog"><i id="bp"></i></span><span id="bpt"></span><button class="bbtn" id="bexp">Export progress</button><button class="bbtn" id="bclr">Clear ticks on this device</button></div><p class="r" style="color:var(--muted)">Tick each wire as you go. Ticks are kept on this device; Export progress and import the file in LoomWright (Lists, Build) to bring them back.</p><div id="bl"></div></div>` : ''}
 <aside id="info"><h2>Trace a circuit</h2><p>Click any wire to see everything it connects to, on every sheet.</p></aside></main>
-<footer>Read-only copy made with LoomWright ${esc(Loom.VERSION)}, free and open-source wiring software (GPL-3.0).</footer>
+<footer>Read-only copy made with LoomWright ${esc(Loom.VERSION)}, free and open-source wiring software (AGPL-3.0-or-later).</footer>
 <script>
 const D=${data};
 const tabs=document.querySelectorAll('nav button');

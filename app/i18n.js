@@ -2,7 +2,7 @@
  * LoomWright interface languages.
  * Each entry is the English text, then German | French | Spanish | Dutch.
  * Anything not listed stays in English. Corrections and new languages are welcome.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function () {
   'use strict';
@@ -447,6 +447,8 @@
     'Compressed air system': 'Druckluftanlage|Réseau d’air comprimé|Sistema de aire comprimido|Persluchtsysteem',
     'Delete this system?': 'Diese Anlage löschen?|Supprimer ce réseau ?|¿Eliminar este sistema?|Dit systeem verwijderen?',
     // 0.4: electronics, power rails and part sources (first pass)
+    'Licensed under the GNU Affero General Public License v3.0 or later.': 'Lizenziert unter der GNU Affero General Public License v3.0 oder später.|Sous licence GNU Affero General Public License v3.0 ou ultérieure.|Con licencia GNU Affero General Public License v3.0 o posterior.|Gelicentieerd onder de GNU Affero General Public License v3.0 of later.',
+    'Source code': 'Quellcode|Code source|Código fuente|Broncode',
     'Signal': 'Signal|Signal|Señal|Signaal',
     'Power rails': 'Versorgungsschienen|Rails d’alimentation|Líneas de alimentación|Voedingsrails',
     'Export power rails (CSV)': 'Versorgungsschienen exportieren (CSV)|Exporter les rails d’alimentation (CSV)|Exportar las líneas de alimentación (CSV)|Voedingsrails exporteren (CSV)',

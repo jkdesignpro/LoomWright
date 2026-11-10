@@ -198,14 +198,18 @@ LoomWright is a basic tool for planning and drawing wiring.
 - It does **not replace a qualified electrician or engineer**.
 - Work on **mains electricity or compressed air** systems must be designed, installed, inspected and
   tested by a competent person.
-- LoomWright is free software under the GPL and comes with **no warranty**, as far as the law allows.
+- LoomWright is free software under the GNU AGPL and comes with **no warranty**, as far as the law allows.
   The authors and contributors accept no responsibility for any loss, damage, injury or death arising
   from its use.
 
 ## Licence
 
 LoomWright is free software: you can redistribute it and/or modify it under the terms of the
-GNU General Public License version 3, or (at your option) any later version. See [LICENSE](LICENSE).
+GNU Affero General Public License as published by the Free Software Foundation, version 3, or
+(at your option) any later version. See [LICENSE](LICENSE). Copyright (C) 2026 LoomWright contributors.
+
+If you change LoomWright and let people use your changed version over a network, the licence asks
+you to offer them its source code too.
 
 The bundled IBM Plex fonts are under the SIL Open Font License (`app/fonts/OFL.txt`).
 The bundled js-yaml (`app/vendor/js-yaml.min.js`, used for WireViz files) is under the MIT License (`app/vendor/js-yaml.LICENSE`).

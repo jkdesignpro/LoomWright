@@ -3,7 +3,7 @@ name = "loomwright"
 version = "0.4.0"
 description = "Free, open-source wiring diagram editor for vehicles and electronics"
 authors = ["LoomWright contributors"]
-license = "GPL-3.0-or-later"
+license = "AGPL-3.0-or-later"
 edition = "2021"
 rust-version = "1.77"
 

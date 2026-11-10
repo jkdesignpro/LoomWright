@@ -1,6 +1,6 @@
 // Compressed air planner checks: the formulas against the worked examples in the
 // research notes, and the checks on a home garage and a workshop system.
-// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
 'use strict';
 const assert = require('assert');
 const L = require('../app/core/loom.js');

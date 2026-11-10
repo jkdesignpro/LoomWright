@@ -10,7 +10,7 @@
  *   LoomManualViewer.search('fuse')              open with a search
  *   LoomManualViewer.close()
  *
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function () {
   'use strict';

@@ -1,6 +1,6 @@
 // Copies the LoomWright core library (and the YAML reader it uses for WireViz files)
 // into this package before it is packed, so the add-on runs on its own.
-// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
 'use strict';
 const fs = require('fs'), path = require('path');
 const here = path.join(__dirname, '..'), app = path.join(here, '..', 'app');

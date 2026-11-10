@@ -1,7 +1,7 @@
 /*
  * LoomWright editor: projects made of sheets, each sheet a drawing.
  * Several projects can be open at once, each in its own tab.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function () {
   'use strict';
@@ -2369,9 +2369,11 @@
       <p><b>LoomWright ${esc(L.VERSION)}</b>, ${esc(t('running in'))} ${esc(where)}.</p>
       <p class="muted">${esc(t('Free, open-source wiring diagram editor, mainly for vehicles, and also for household, workshop, factory and electronics wiring. Projects are saved as .loom files (plain JSON) that the optional Claude add-on can also read and write.'))}</p>
       <p class="callout warn">${esc(t('A basic planning tool: its checks are guidance only and do not replace a qualified electrician or engineer.'))} <a href="#" id="h-disc">${esc(t('Read the disclaimer'))}</a></p>
-      <p class="muted">Copyright © 2026 LoomWright contributors. ${esc(t('Licensed under the GNU General Public License v3.0 or later.'))} IBM Plex Mono: SIL Open Font License. js-yaml: MIT License.</p>
+      <p class="muted">Copyright © 2026 LoomWright contributors. ${esc(t('Licensed under the GNU Affero General Public License v3.0 or later.'))} IBM Plex Mono: SIL Open Font License. js-yaml: MIT License.</p>
+      <p class="muted">${esc(t('Source code'))}: <span class="mono src-url">https://github.com/jkdesignpro/LoomWright</span> <button class="linkbtn" data-src-copy>${esc(t('Copy link'))}</button></p>
       <div class="row-btns"><button class="btn" id="h-sample">${esc(t('Open the example project'))}</button><button class="btn primary" data-close>${esc(t('Close'))}</button></div>`);
     $('#h-sample').onclick = () => { closeModal(); openSample(); };
+    $('[data-src-copy]').onclick = () => { if (navigator.clipboard) navigator.clipboard.writeText('https://github.com/jkdesignpro/LoomWright').then(() => toast(t('Link copied')), () => {}); };
     $('#h-disc').onclick = (e) => { e.preventDefault(); disclaimerModal(); };
     if (PF.appInfo) PF.appInfo().then((info) => {
       const at = $('#modal-body .muted'); if (!info || !at) return;

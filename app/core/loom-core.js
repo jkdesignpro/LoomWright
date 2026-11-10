@@ -6,7 +6,7 @@
  * Claude MCP add-on (Node, via require). No dependencies.
  *
  * Copyright (C) 2026 LoomWright contributors
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -1066,7 +1066,7 @@
       'Every check, warning, hint, calculation and suggestion it gives (cable sizes, voltage drop, fault loop impedance, protective devices, derating, compressed air sizing and the rest) is guidance only. It uses simplified models and the data you enter, and it can be wrong or incomplete. A clean report does not mean a design is safe, or that it meets BS 7671, BS EN 60204-1, the Building Regulations (including Part P), the Electricity at Work Regulations 1989, the Pressure Systems Safety Regulations 2000 or any other standard, regulation or code.',
       'Mains wiring in homes and workplaces, machine control panels and compressed air systems can kill or injure people and start fires. That work must be designed, installed, inspected, tested and certified by a competent, qualified person, such as a registered electrician, working to the current edition of the relevant standards and the makers\' instructions. Some household electrical work must be notified to building control.',
       'Vehicle wiring has its own risks: fire from overloaded or unprotected cables, and faults that affect lights, brakes or safety systems. Check your work against the vehicle and component makers\' data.',
-      'LoomWright is free software under the GNU General Public License, version 3 or later. It is provided "as is", without any warranty, not even the implied warranty of merchantability or fitness for a particular purpose. As far as the law allows, its authors and contributors accept no responsibility or liability for any loss, damage, injury or death arising from its use, or from relying on anything it shows or produces.',
+      'LoomWright is free software under the GNU Affero General Public License, version 3 or later. It is provided "as is", without any warranty, not even the implied warranty of merchantability or fitness for a particular purpose. As far as the law allows, its authors and contributors accept no responsibility or liability for any loss, damage, injury or death arising from its use, or from relying on anything it shows or produces.',
     ],
   };
   const MAINS_TYPES = ['household', 'factory', 'mixed'];

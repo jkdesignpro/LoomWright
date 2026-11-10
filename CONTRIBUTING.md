@@ -2,7 +2,7 @@
 
 Thank you for helping. Bug reports, corrections to the manual or the translations, new component symbols and code are all welcome.
 
-LoomWright is free software under the GNU General Public License, version 3 or later. By sending a change you agree that it is released under the same licence.
+LoomWright is free software under the GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later). By sending a change you agree that it is released under the same licence.
 
 ## Reporting a problem
 
@@ -25,7 +25,7 @@ For anything larger than a fix, open an issue first and describe what you want t
 - **Offline.** The app loads nothing from the internet. The desktop app's content security policy only allows files from the app itself, so do not add inline `<script>` blocks or external links to scripts, styles or fonts.
 - **The core has no browser code.** Files in `app/core/` must also run in Node, because the tests and the Claude add-on use them. Keep anything that touches the page in `app/editor.js`, `app/views.js` or `app/builder.js`.
 - **Style.** Two-space indents, single quotes, semicolons, `'use strict'`. Follow the code around your change.
-- **Licence header.** Start each new file with a short description and `SPDX-License-Identifier: GPL-3.0-or-later`, as the existing files do.
+- **Licence header.** Start each new file with a short description and `SPDX-License-Identifier: AGPL-3.0-or-later`, as the existing files do.
 - **Interface text** goes through `t()` from `app/i18n.js`, so it can be translated. Write it in plain UK English, in full sentences, and say what will happen ("Delete 3 wires") rather than how clever it is.
 - **Colours and themes.** Use the CSS custom properties defined at the top of `app/styles.css` (`--bg`, `--panel`, `--ink`, `--line`, `--accent` and so on) so the change works in both the light and dark themes.
 - **Keyboard.** New controls should work from the keyboard, and buttons need a visible label or an `aria-label`.

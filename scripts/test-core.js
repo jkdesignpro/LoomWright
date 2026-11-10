@@ -1,6 +1,6 @@
 // Core library checks: every symbol sits on the grid, projects with sheets work,
 // and the example project is valid.
-// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
 'use strict';
 const assert = require('assert');
 const L = require('../app/core/loom.js');

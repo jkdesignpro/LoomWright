@@ -1,4 +1,4 @@
-/* LoomWright user manual viewer (manual-viewer.js). GPL-3.0-or-later.
+/* LoomWright user manual viewer (manual-viewer.js). AGPL-3.0-or-later.
    Uses the colour tokens from styles.css, so it follows the light and dark themes. */
 
 .lm { position: fixed; inset: 0; z-index: 70; background: var(--bg); display: flex; flex-direction: column; color: var(--ink); }

@@ -2,7 +2,7 @@
  * Example project shown on first launch: dual battery charging on sheet 1,
  * auxiliary lighting and accessories on sheet 2, a rear work lamp through a
  * sealed connector pair on sheet 3.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./core/loom-core.js'));

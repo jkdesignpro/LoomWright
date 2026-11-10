@@ -28,8 +28,8 @@
     "category": "Productivity",
     "shortDescription": "Wiring diagram editor",
     "longDescription": "Free, open-source wiring diagram editor for vehicle and electronics projects.",
-    "copyright": "Copyright (C) 2026 LoomWright contributors. GPL-3.0-or-later.",
-    "license": "GPL-3.0-or-later",
+    "copyright": "Copyright (C) 2026 LoomWright contributors. AGPL-3.0-or-later.",
+    "license": "AGPL-3.0-or-later",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

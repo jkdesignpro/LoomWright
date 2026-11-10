@@ -2,6 +2,10 @@
 
 ## 0.4.0
 
+**Licence.** From this release LoomWright is under the GNU Affero General Public License, version 3
+or later (AGPL-3.0-or-later). It stays free to use, change and share. The difference from the GPL is
+that a changed version offered to people over a network must offer them its source code too.
+
 LoomWright is still mainly for vehicle looms, and now also covers household wiring, factory control
 panels, electronics projects and compressed air. Every mains and compressed air check is planning
 guidance only: see the disclaimer.

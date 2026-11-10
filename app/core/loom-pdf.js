@@ -6,7 +6,7 @@
  * same in the app and in the Claude add-on with nothing extra to install.
  *
  * Extends window.Loom; needs loom-core.js and loom-reports.js first.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 /* global CompressionStream, Response */
 (function (root, factory) {

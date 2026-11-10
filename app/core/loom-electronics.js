@@ -8,7 +8,7 @@
  * each board. Check it against the revision of the board you have.
  *
  * Extends window.Loom; needs loom-core.js, loom-data.js, loom-nets.js, loom-reports.js and loom-templates.js first.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) { require('./loom-data.js'); require('./loom-nets.js'); require('./loom-reports.js'); require('./loom-templates.js'); module.exports = factory(require('./loom-core.js')); }

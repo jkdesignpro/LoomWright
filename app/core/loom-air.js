@@ -20,7 +20,7 @@
  * Flows are free air (FAD) in l/min, pressures bar gauge, lengths m, volumes litres.
  *
  * Extends window.Loom; needs loom-core.js first. No DOM, so it also runs in Node.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./loom-core.js'));
