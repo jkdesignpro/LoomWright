@@ -866,7 +866,7 @@
       a.wire(c1, 'out', so[0], 'in', { ...T, gauge: '2.5', length: 8, circuit: 'Sockets' });
       so.slice(1).forEach((x, i) => a.wire(so[i], 'out', x, 'in', { ...T, gauge: '2.5', length: 6, circuit: 'Sockets' }));
       a.wire(so[3], 'out', c1, 'out', { ...T, gauge: '2.5', length: 10, circuit: 'Sockets' });
-      const sw = a.part('switch_light', 440, 140), l1 = a.part('light', 520, 140, { props: { watts: '10', count: '4' } }), l2 = a.part('light', 600, 140, { props: { watts: '10', count: '3' } }), sa = a.part('smoke_alarm', 680, 140);
+      const sw = a.part('switch_light', 440, 140), l1 = a.part('light', 520, 140, { props: { watts: '10', count: '4' } }), l2 = a.part('light', 600, 140, { props: { watts: '10', count: '3' } }), sa = a.part('smoke_alarm', 720, 200);
       a.wire(c2, 'out', sw, 'in', { ...T, gauge: '1.5', length: 10, circuit: 'Lights' });
       a.wire(sw, 'out', l1, 'in', { ...T, gauge: '1.5', length: 4, circuit: 'Lights' });
       a.wire(l1, 'out', l2, 'in', { ...T, gauge: '1.5', length: 5, circuit: 'Lights' });
