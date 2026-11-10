@@ -1693,6 +1693,28 @@
       toast(`${t('Opened')} ${r.name}`);
     } catch (e) { showMessage(t('Could not open that file'), `<p>${esc(e.message || e)}</p><p class="muted">${esc(t('LoomWright opens .loom and .json files saved by LoomWright or the Claude add-on. To bring in other formats, use File, Import.'))}</p>`); }
   }
+  /* A file handed to us from outside: double-clicked, passed on the command line, or dropped on the window. */
+  function openIncoming(o, say) {
+    try {
+      const at = o.path ? tabs.findIndex((tb, i) => (i === active ? file.path : tb.file.path) === o.path) : -1;
+      if (at >= 0) { if (at !== active) activate(at); return; }
+      loadDoc(JSON.parse(o.text), o, null, !pristine()); markClean();
+      if (say) toast(`${t('Opened')} ${o.name}`);
+    } catch (e) { toast(t('Could not open') + ' ' + o.name); }
+  }
+  // Dropping a .loom file anywhere on the window opens it. Without this the
+  // browser would leave the page to show the file.
+  window.addEventListener('dragover', (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+  window.addEventListener('drop', (e) => {
+    if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+    e.preventDefault();
+    [...e.dataTransfer.files].forEach((f) => {
+      if (!/\.(loom|json)$/i.test(f.name)) { toast(t('Only .loom files open by dropping. To bring in other formats, use File, Import.')); return; }
+      const rd = new FileReader();
+      rd.onload = () => { openIncoming({ name: f.name, path: null, text: String(rd.result) }, true); autosave(); };
+      rd.readAsText(f);
+    });
+  });
   async function save() { return saveTo(file.path); }
   async function saveAs() { return saveTo(null); }
   async function saveTo(path) {
@@ -2698,14 +2720,8 @@
       try { if (v1 && v1.doc) { loadDoc(v1.doc, v1.file, v1.sheetId); if (v1.file && v1.file.name) markClean(); else markDirty(); ok = true; } } catch (e) { tabs = []; project = null; ok = false; }
     }
     if (!ok) { loadDoc(window.LoomSample(), null); markClean(); }
-    const initial = await PF.initialFile();
-    if (initial) {
-      try {
-        const at = initial.path ? tabs.findIndex((tb, i) => (i === active ? file.path : tb.file.path) === initial.path) : -1;
-        if (at >= 0) { if (at !== active) activate(at); }
-        else { loadDoc(JSON.parse(initial.text), initial, null, !pristine()); markClean(); }
-      } catch (e) { toast(t('Could not open') + ' ' + initial.name); }
-    }
+    (await PF.openedFiles()).forEach((o) => openIncoming(o, false));
+    PF.onFilesWaiting(async () => { (await PF.openedFiles()).forEach((o) => openIncoming(o, true)); autosave(); });
     applyView(); setHint(); autosave();
   })();
 })();

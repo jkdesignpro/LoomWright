@@ -74,7 +74,10 @@
         document.body.appendChild(inp); inp.click();
       });
     },
-    async initialFile() { if (!invoke) return null; try { return await invoke('initial_file'); } catch (e) { return null; } },
+    /* Files the system asked us to open (double-clicked, or passed on the command line). */
+    async openedFiles() { if (!invoke) return []; try { return (await invoke('opened_files')) || []; } catch (e) { return []; } },
+    /* Calls fn when more such files are waiting (macOS sends them while the app runs). */
+    onFilesWaiting(fn) { try { if (T && T.event && T.event.listen) T.event.listen('files-waiting', () => fn()); } catch (e) { /* not in the desktop app */ } },
     async readFile(path) { return invoke('read_text', { path }); },
     async mtime(path) { return invoke('file_mtime', { path }); },
 
