@@ -47,7 +47,7 @@ In order of how far back they go:
 3. **Issued revisions** in the History pane hold every revision you issued, in the project file.
 4. Your own backups, or version control such as Git.
 
-See [Revision history and save points](21-revisions-and-save-points.md).
+See [Revision history and save points](22-revisions-and-save-points.md).
 
 ### Changes made by Claude do not appear
 
@@ -135,7 +135,7 @@ Choosing a household, factory or mixed project type changes **Land Rover / Briti
 
 ### Imported lengths are a thousand times too big or too small
 
-LoomWright guessed the unit. Undo the import, add a header row such as `Wire,Length mm` or `Wire,Length m`, and import again. See [Measured wire lengths](22-import-and-export.md#measured-wire-lengths).
+LoomWright guessed the unit. Undo the import, add a header row such as `Wire,Length mm` or `Wire,Length m`, and import again. See [Measured wire lengths](23-import-and-export.md#measured-wire-lengths).
 
 ## Printing
 

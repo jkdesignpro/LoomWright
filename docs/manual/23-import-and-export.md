@@ -101,4 +101,4 @@ Every list can be saved as a CSV file from the **Reports** menu. See [Exporting 
 - The harness formboard exports DXF at 1:1 and SVG. See [Exporting the formboard](16-harness-formboard.md#exporting-the-formboard).
 - The vehicle view exports SVG and PNG. See [Using the locations](17-vehicle-locations.md#using-the-locations).
 - Your components and blocks export as a library file. See [Sharing components and blocks](09-component-builder.md#sharing-components-and-blocks).
-- The revision comparison exports CSV. See [Comparing revisions](21-revisions-and-save-points.md#comparing-revisions).
+- The revision comparison exports CSV. See [Comparing revisions](22-revisions-and-save-points.md#comparing-revisions).

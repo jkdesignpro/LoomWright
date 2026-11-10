@@ -2,7 +2,7 @@
 
 As you draw, LoomWright checks the project for common mistakes: a fuse too big for the wire it protects, a wire carrying more than its size suits, a load with no earth, a supply wired straight to earth. The checks run all the time and cover every sheet.
 
-> The checks are rules of thumb. They catch slips, but they cannot prove a design is safe. Wire sizes and fuse ratings in particular depend on the cable, how it is bundled and routed, how hot it gets and how long the run is. Always check your cable maker's and fuse maker's data, and fuse every circuit to protect its wire. See the [Disclaimer](27-disclaimer.md).
+> The checks are rules of thumb. They catch slips, but they cannot prove a design is safe. Wire sizes and fuse ratings in particular depend on the cable, how it is bundled and routed, how hot it gets and how long the run is. Always check your cable maker's and fuse maker's data, and fuse every circuit to protect its wire. See the [Disclaimer](28-disclaimer.md).
 
 ## Where to see them
 

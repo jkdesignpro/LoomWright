@@ -80,6 +80,8 @@ function link(text, href, title, ctx) {
     ctx.links.push({ id, anchor, from: ctx.chapterId });
     return `<a href="#lm-${esc(id)}${anchor ? '--' + esc(anchor) : ''}" data-chapter="${esc(id)}" data-anchor="${esc(anchor)}"${tt}>${label}</a>`;
   }
+  // a link that looks like a chapter but names no chapter file: most likely a renumbered chapter
+  if (m && /^\d+[-_]/.test(m[1])) ctx.warn(`link to ${m[1]}, which is not a chapter`);
   // a file in the repository but outside the manual: the app has no copy, so name it instead
   const repoPath = path.posix.normalize(path.posix.join('docs/manual', href.split('#')[0]));
   return `<span class="lm-path" title="${esc('In the LoomWright source: ' + repoPath)}">${label} <code>${esc(repoPath)}</code></span>`;

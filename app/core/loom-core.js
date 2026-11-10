@@ -748,13 +748,16 @@
     const p = findPart(doc, str.slice(0, i));
     if (!p) throw new Error(`No part called "${str.slice(0, i)}"`);
     const pinId = str.slice(i + 1), pins = resolved(doc, p).pins;
-    const pn = pins.find((q) => q.id === pinId) || pins.find((q) => q.id.toLowerCase() === pinId.toLowerCase()) || pins.find((q) => (q.n || '').toLowerCase() === pinId.toLowerCase());
+    const lc = pinId.toLowerCase();
+    // a pin can also carry other names it is known by (pin.a), such as GPIO17 for pin 11 of a Raspberry Pi header
+    const pn = pins.find((q) => q.id === pinId) || pins.find((q) => q.id.toLowerCase() === lc) || pins.find((q) => (q.n || '').toLowerCase() === lc) || pins.find((q) => (q.a || []).some((x) => String(x).toLowerCase() === lc));
     if (!pn) throw new Error(`${p.label} has no pin "${pinId}". Pins: ${pins.map((q) => q.id).join(', ')}`);
     return { part: p.id, pin: pn.id };
   }
   function addWire(doc, from, to, opts = {}) {
     const w = { id: uid('w'), name: opts.name || nextWireName(doc), from: parseEnd(doc, from), to: parseEnd(doc, to), colour: opts.colour || 'red', tracer: opts.tracer || '', gauge: String(opts.gauge || '1.0'), length: opts.length || '', current: opts.current || '', circuit: opts.circuit || '', harness: opts.harness || '', notes: opts.notes || '' };
     if (opts.tracer2) w.tracer2 = opts.tracer2;
+    if (opts.signal) w.signal = opts.signal;
     doc.wires.push(w);
     return w;
   }
@@ -1227,7 +1230,7 @@
   }
   function revisionById(project, id) { return (project.revisions || []).find((r) => r.id === id || r.rev === id) || null; }
   const PART_FIELDS = ['type', 'label', 'props', 'mpn', 'supplier', 'cost', 'location', 'rot', 'flip'];
-  const WIRE_FIELDS = ['name', 'from', 'to', 'colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'notes', 'ends', 'insulation', 'cable', 'route'];
+  const WIRE_FIELDS = ['name', 'from', 'to', 'colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'notes', 'ends', 'insulation', 'cable', 'route', 'signal'];
   const same = (a, b) => JSON.stringify(a == null || a === '' ? null : a) === JSON.stringify(b == null || b === '' ? null : b);
   /* What changed between two project states (older a, newer b). */
   function diffStates(a, b) {
@@ -1308,7 +1311,7 @@
       s.parts.changed.forEach((p) => lines.push(at + `${p.label}: ` + [...p.fields.map((f) => f === 'props' ? Object.keys({ ...p.from.props, ...p.to.props }).filter((k) => !same((p.from.props || {})[k], (p.to.props || {})[k])).map((k) => `${k} ${(p.from.props || {})[k] ?? ''} → ${(p.to.props || {})[k] ?? ''}`).join(', ') : f === 'label' ? `renamed from ${p.from.label}` : ['mpn', 'supplier', 'cost', 'location'].includes(f) ? `${f === 'mpn' ? 'part no.' : f} ${p.from[f] ?? '—'} → ${p.to[f] ?? '—'}` : `${f} changed`), p.moved ? 'moved' : ''].filter(Boolean).join('; ')));
       s.wires.added.forEach((w) => lines.push(at + `added wire ${w.label}`));
       s.wires.removed.forEach((w) => lines.push(at + `removed wire ${w.label}`));
-      s.wires.changed.forEach((w) => lines.push(at + `wire ${w.label}: ` + [...w.fields.map((f) => (['from', 'to'].includes(f) ? `${f} end moved` : ['colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'name', 'insulation'].includes(f) ? `${f} ${w.from[f] || '—'} → ${w.to[f] || '—'}` : `${f} changed`)), w.rerouted ? 'rerouted' : ''].filter(Boolean).join('; ')));
+      s.wires.changed.forEach((w) => lines.push(at + `wire ${w.label}: ` + [...w.fields.map((f) => (['from', 'to'].includes(f) ? `${f} end moved` : ['colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'name', 'insulation', 'signal'].includes(f) ? `${f} ${w.from[f] || '—'} → ${w.to[f] || '—'}` : `${f} changed`)), w.rerouted ? 'rerouted' : ''].filter(Boolean).join('; ')));
     });
     return lines;
   }
@@ -1336,7 +1339,7 @@
     return doc.wires.map((w) => {
       const g = gaugeInfo(w.gauge), vd = voltageDrop(w);
       const ends = w.ends || {}, ef = ends.from || {}, et = ends.to || {};
-      return { id: w.id, sheet: doc.sheet ? doc.sheet.name : '', sheetId: doc.sheet ? doc.sheet.id : '', name: w.name, from: pinName(doc, w.from), to: pinName(doc, w.to), code: wireCode(doc, w), colour: wireColourName(doc, w), gauge: w.gauge, awg: g ? g.awg : '', length: w.length, current: w.current, drop: vd == null ? '' : vd.toFixed(2), circuit: w.circuit || '', harness: w.harness || '', notes: w.notes || '', insulation: w.insulation || '', cable: w.cable || '', termFrom: ef.term || '', termTo: et.term || '' };
+      return { id: w.id, sheet: doc.sheet ? doc.sheet.name : '', sheetId: doc.sheet ? doc.sheet.id : '', name: w.name, from: pinName(doc, w.from), to: pinName(doc, w.to), code: wireCode(doc, w), colour: wireColourName(doc, w), gauge: w.gauge, awg: g ? g.awg : '', length: w.length, current: w.current, drop: vd == null ? '' : vd.toFixed(2), circuit: w.circuit || '', harness: w.harness || '', notes: w.notes || '', insulation: w.insulation || '', cable: w.cable || '', termFrom: ef.term || '', termTo: et.term || '', signal: w.signal || '' };
     });
   }
   function bom(d) {
@@ -1389,9 +1392,10 @@
       if (!d) { out.push({ level: 'error', part: p.id, text: `${p.label || p.type}: component type "${p.type}" is missing from the library.` }); return; }
       if (d.cat === 'Annotation') return;
       // optionalPins: spare contacts and the like, often left unwired on purpose
+      // parts with many pins, such as boards, are rarely fully wired: d.partial skips this note
       const allFree = r.pins.filter((pn) => !conn.get(p.id + '|' + pn.id)), free = allFree.filter((pn) => !(d.optionalPins || []).includes(pn.id));
       if (allFree.length && allFree.length === r.pins.length && r.pins.length) out.push({ level: 'info', part: p.id, text: `${p.label || d.name} has no wires connected.` });
-      else if (free.length && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas', 'pdm'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
+      else if (free.length && !d.partial && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas', 'pdm'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
       // Fuse rating against the wire it protects
       if (['fuse', 'fuse_maxi', 'breaker', 'fusible_link'].includes(p.type) || p.type === 'fuse_box') {
         const ratings = p.type === 'fuse_box' ? String(r.props.ratings || '').split(',').map(parseAmps) : null;

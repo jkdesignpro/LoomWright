@@ -22,7 +22,7 @@ Open the **Project** pane (the **Project** button on the tool rail). At the top 
 | Revision | REV |
 | Date | DATE |
 
-The title is also the name on the project tab. When you issue a revision, LoomWright sets the revision letter and date for you; see [Revision history and save points](21-revisions-and-save-points.md).
+The title is also the name on the project tab. When you issue a revision, LoomWright sets the revision letter and date for you; see [Revision history and save points](22-revisions-and-save-points.md).
 
 The **Totals** section at the bottom of the pane counts sheets, parts and wires, and the total length of cable, over the whole project.
 
@@ -54,7 +54,7 @@ Choosing **Household**, **Factory** or **Mixed** also does three things to the p
 
 Changing the type back does not undo these. Set the colour codes and system voltage yourself if you need to.
 
-The first time a household, factory or mixed project opens on this computer, LoomWright shows the [Disclaimer](27-disclaimer.md) and asks you to read it. Click **I understand** to carry on. It does not ask again on this computer.
+The first time a household, factory or mixed project opens on this computer, LoomWright shows the [Disclaimer](28-disclaimer.md) and asks you to read it. Click **I understand** to carry on. It does not ask again on this computer.
 
 ## Sheets
 
@@ -95,7 +95,7 @@ Under **Drawing**, for every sheet in the project:
 | Black and white | Draws wires in dark grey for printing on a mono printer. See [Black and white drawings](#black-and-white-drawings). |
 | Only offer colours I stock | Limits the wire colour pickers to the colours you stock. |
 
-In household, factory and mixed projects, a note under **Project type** says that the checks are a planning aid only, with a link to the [Disclaimer](27-disclaimer.md). Below the orientation is a **Mains installation** section:
+In household, factory and mixed projects, a note under **Project type** says that the checks are a planning aid only, with a link to the [Disclaimer](28-disclaimer.md). Below the orientation is a **Mains installation** section:
 
 | Setting | What it does |
 | --- | --- |

@@ -291,4 +291,86 @@ assert.strictEqual(L.wireCode({ settings: { standard: 'sae' } }, { colour: 'brow
   assert.ok(fpdf.includes('/Outlines'), 'factory PDF builds');
 }
 
+// ---------------------------------------------------------------------------
+// Electronics: boards, checks between boards, power budget, signals, templates
+// ---------------------------------------------------------------------------
+{
+  const pins = (type) => L.resolved({}, { type, props: {} }).pins;
+  // every header pin is drawn, in the maker's count
+  [['arduino_uno_r3', 32], ['arduino_nano', 30], ['rpi_header', 40], ['esp32_devkitc', 38], ['esp32_s3_devkitc1', 44]].forEach(([t, count]) => {
+    assert.strictEqual(pins(t).length, count, `${t}: ${count} header pins`);
+    assert.ok(/^Pinout from .+ documentation; check against your board's revision\.$/.test(L.LIBRARY[t].note), `${t}: part note`);
+    assert.ok(/^https:\/\//.test(L.LIBRARY[t].src), `${t}: source link`);
+  });
+  // Raspberry Pi: physical pin numbers, odd pins on the left, and GPIO names find the right pin
+  const pi = pins('rpi_header');
+  assert.deepStrictEqual(pi.filter((x) => x.k === 'gnd').map((x) => +x.id).sort((a, c) => a - c), [6, 9, 14, 20, 25, 30, 34, 39], 'Pi ground pins');
+  assert.ok(pi.filter((x) => +x.id % 2).every((x) => x.x === 0), 'Pi odd pins on the left');
+  const e = L.newDoc('elec');
+  L.applyProjectType(e, 'electronics');
+  const v = L.view(e, 0);
+  const uno = L.addPart(v, 'arduino_uno_r3', { x: 0, y: 0, props: { mA: '50' } });
+  const esp = L.addPart(v, 'esp32_devkitc', { x: 400, y: 0 });
+  const rpi = L.addPart(v, 'rpi_header', { x: 800, y: 0 });
+  assert.strictEqual(L.addWire(v, `${rpi.label}:GPIO17`, `${uno.label}:D7`).from.pin, '11', 'GPIO17 is Pi pin 11');
+  v.wires.length = 0;
+  // GND is the board's earth return; 5V and VIN are its supply pins
+  const b = L.behaviour(v, uno);
+  assert.ok(b.kind === 'load' && b.earth.includes('GND') && b.power.includes('VIN') && !b.power.includes('3V3'), 'a board is a load returned on GND');
+  // TX to TX is a crossover mistake; TX to RX is right
+  L.addWire(v, `${uno.label}:TX`, `${esp.label}:TX`, { signal: 'uart_tx' });
+  const tx = L.validate(e).filter((c) => /both TX/.test(c.text));
+  assert.strictEqual(tx.length, 1, 'TX wired to TX is flagged');
+  assert.strictEqual(tx[0].level, 'warn', 'TX to TX is a warning');
+  v.wires[0].to.pin = 'RX';
+  assert.ok(!L.validate(e).some((c) => /both (TX|RX)/.test(c.text)), 'TX to RX is not flagged');
+  assert.ok(L.validate(e).some((c) => /grounds are not joined/.test(c.text)), 'a signal with no ground between the boards is flagged');
+  // 5 V into a 3.3 V board
+  const ps = L.addPart(v, 'dc_supply', { x: -200, y: 0, props: { volts: '5V', amps: '1A' } });
+  L.addWire(v, `${ps.label}:+`, `${rpi.label}:GPIO4`);
+  assert.ok(L.validate(e).some((c) => c.level === 'error' && /3\.3 V pin/.test(c.text) && c.part === rpi.id), '5 V on a Pi GPIO pin is an error');
+  // the checks only run in electronics and mixed projects
+  e.settings.projectType = 'vehicle';
+  assert.ok(!L.validate(e).some((c) => /both TX|3\.3 V pin/.test(c.text)), 'vehicle projects skip the electronics checks');
+  e.settings.projectType = 'electronics';
+  // power budget: a 5 V supply feeds the UNO, whose 3V3 output feeds a sensor
+  v.wires.length = 0;
+  const s1 = L.addPart(v, 'module_i2c', { x: 200, y: 400, props: { mA: '2' } });
+  const s2 = L.addPart(v, 'module_i2c', { x: 200, y: 600, props: { mA: '10' } });
+  [[ps, '+', uno, '5V'], [ps, '-', uno, 'GND'], [uno, '5V', s1, 'VCC'], [uno, 'GND', s1, 'GND'], [uno, '3V3', s2, 'VCC'], [uno, 'GND.2', s2, 'GND'], [uno, 'A4', s1, 'SDA'], [uno, 'A5', s1, 'SCL']]
+    .forEach(([a, ap, c, cp]) => L.addWire(v, `${a.label}:${ap}`, `${c.label}:${cp}`));
+  const pw = L.electronicsPower(e);
+  const main = pw.find((x) => x.supply === ps.label), r3 = pw.find((x) => x.supply === uno.label && x.pin === '3V3');
+  assert.strictEqual(main.load, 62, 'the 5 V rail carries the UNO (50 mA + 10 mA from its 3V3) and the sensor (2 mA)');
+  assert.strictEqual(main.rating, 1000, 'the supply rating is its 1A');
+  assert.strictEqual(r3.rating, 50, 'the UNO 3V3 rating is 50 mA');
+  assert.strictEqual(r3.load, 10, 'the 3V3 rail feeds the second sensor');
+  assert.ok(L.REPORTS.includes('power'), 'power is a report');
+  const rows = L.reportRows(e, 'power');
+  assert.strictEqual(rows[0][1], 'Supply', 'power report header');
+  assert.strictEqual(rows.length, 1 + pw.length, 'one row per rail');
+  assert.ok(!L.validate(e).some((c) => c.level !== 'info' && c.part === ps.id), 'a DC supply needs no fuse and its − counts as ground');
+  // the wire list carries the signal in electronics projects only
+  v.wires[6].signal = 'i2c_sda';
+  const wr = L.reportRows(e, 'wires');
+  assert.strictEqual(wr[0][wr[0].indexOf('Circuit') + 1], 'Signal', 'Signal column after Circuit');
+  assert.ok(wr.some((r) => r.includes('I2C SDA')), 'signal name in the wire list');
+  assert.ok(!L.reportRows(sample(), 'wires')[0].includes('Signal'), 'vehicle wire lists have no Signal column');
+  assert.ok(L.SIGNALS.some((x) => x.id === 'can_h') && L.SIGNALS.some((x) => x.id === 'rs485_a'), 'signal list');
+  // connector series for electronics, with their own cavity names where they have them
+  ['jst_xh', 'jst_ph', 'jst_sh', 'kk254', 'microfit3', 'minifit_jr', 'xt60', 'barrel_5521', 'usbc_power', 'm8', 'm12a', 'screw_50'].forEach((id) => assert.ok(L.SERIES.some((x) => x.id === id), `series ${id}`));
+  const m8 = L.addPart(v, 'conn', { x: 0, y: 900, props: { series: 'm8', ways: 3 } });
+  assert.deepStrictEqual(L.resolved(v, m8).pins.map((x) => x.id), ['1', '3', '4'], 'M8 3-pin uses cavities 1, 3 and 4');
+  // the starter circuits come out clean
+  L.templateList('electronics').forEach((tp) => {
+    const q = L.newDoc('t');
+    L.applyProjectType(q, 'electronics');
+    const blk = L.templateBlock(tp.id, q), tv = L.view(q, 0);
+    blk.parts.forEach((x) => { assert.ok(x.x % 10 === 0 && x.y % 10 === 0, `${tp.id}: ${x.label || x.type} on the grid`); tv.parts.push(x); });
+    blk.wires.forEach((x) => tv.wires.push(x));
+    assert.deepStrictEqual(L.validate(q).filter((c) => c.level !== 'info').map((c) => c.text), [], `${tp.id}: no warnings`);
+  });
+  assert.ok(L.templateList('electronics').length >= 2, 'electronics starter circuits');
+}
+
 console.log(`ok: ${n} components, example project with ${s.sheets.length} sheets and ${L.wireList(s).length} wires`);

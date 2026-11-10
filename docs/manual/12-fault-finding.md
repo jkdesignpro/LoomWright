@@ -2,7 +2,7 @@
 
 Fault finding writes a step-by-step test for a load that does not work as it should. LoomWright follows the load's feed, switches, fuses and earth through every sheet, and gives the reading a meter should show at each point. Take the sheet to the vehicle, work down the steps, and it narrows the fault to one wire, joint or part.
 
-> The expected readings are worked out from the drawing and assume healthy parts. If the loom is not wired as drawn, the readings will differ. A fault sheet is a guide to testing, not a guarantee of what is wrong. See the [Disclaimer](27-disclaimer.md).
+> The expected readings are worked out from the drawing and assume healthy parts. If the loom is not wired as drawn, the readings will differ. A fault sheet is a guide to testing, not a guarantee of what is wrong. See the [Disclaimer](28-disclaimer.md).
 
 ## Opening fault finding
 

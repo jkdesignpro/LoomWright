@@ -52,7 +52,7 @@ The left pane has three tabs. Click the same tool rail button again to hide the 
 
 - **Parts** is the component library, with a search box at the top. Parts are grouped by category; click a heading to fold it away. **My blocks** and **My components** at the top hold the circuits and symbols you have saved yourself. See [Drawing](03-drawing.md#placing-parts).
 - **Project** holds the project details (title, vehicle, drawn by, revision, date), the list of sheets, the harnesses, the multicore cables and the totals for the whole project. See [Projects and sheets](05-projects-and-sheets.md).
-- **History** holds issued revisions and the save points kept on this computer. See [Revision history and save points](21-revisions-and-save-points.md).
+- **History** holds issued revisions and the save points kept on this computer. See [Revision history and save points](22-revisions-and-save-points.md).
 
 ## Project tabs and sheet tabs
 

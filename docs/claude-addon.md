@@ -107,7 +107,7 @@ one). You can fine-tune it afterwards in the app's component builder.
 | `compressed_air_report` | Work out a compressed air system: demand, pipe sizes and losses, pressure at each tool, receiver, running and leak cost, water, checks |
 | `set_compressed_air_system` | Add or change a compressed air system, from JSON or a worked example |
 | `list_compressed_air_parts` | Compressor kinds, air treatment, pipe sizes, hoses, couplings and typical tool air use |
-| `report` | Build lists as CSV: wires, parts and costs, cable to buy, colour usage, fuses, connector tables, cut list, labels, locations, nets, voltage at each load, household circuit schedule, motors, terminal plan, PLC I/O |
+| `report` | Build lists as CSV: wires, parts and costs, cable to buy, colour usage, fuses, connector tables, cut list, labels, locations, nets, voltage at each load, household circuit schedule, motors, terminal plan, PLC I/O, power rails |
 | `harness_formboard` | A harness's branches, lengths and bundle sizes; copy routed lengths to the wires |
 | `project_settings` | Project type (vehicle, household, factory, electronics, mixed), mains settings, title block, voltage, colour standard, paper size per project or sheet, black and white, revision clouds, currency |
 | `export`, `import` | PDF with bookmarks and links, DXF, WireViz, a read-only web page, the build pack and formboard DXF; import CSV wire lists, WireViz, KiCad netlists and measured lengths |

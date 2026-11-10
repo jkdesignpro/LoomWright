@@ -35,7 +35,7 @@ qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
 - **[User manual](docs/manual/01-getting-started.md)**: every feature, step by step. The same manual
   is built into the app.
 - **[Documentation index](docs/README.md)**: the manual's chapters and the guides below.
-- [Disclaimer](docs/manual/27-disclaimer.md): what LoomWright can and cannot tell you.
+- [Disclaimer](docs/manual/28-disclaimer.md): what LoomWright can and cannot tell you.
 - [The Claude add-on](docs/claude-addon.md): setting up the optional add-on.
 - [Building LoomWright](docs/building.md): running from the source, tests, the desktop app and releases.
 - [The .loom file format](docs/file-format.md) and [Components](docs/components.md): for reading

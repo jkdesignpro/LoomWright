@@ -160,6 +160,7 @@ These are the defaults that `newDoc()` writes.
 | `circuit`, `harness`, `notes` | Free text. `harness` should match a name in `harnesses`. |
 | `insulation` | Optional insulation type: `flry_b`, `fly`, `txl`, `gxl`, `sxl`, `tefzel`, `silicone` or `battery` (from `INSULATION` in `loom-data.js`). |
 | `cable` | Optional id of the multicore cable the wire is a core of. |
+| `signal` | Optional. What the wire carries, used in electronics projects: `power`, `ground`, `digital`, `analogue`, `pwm`, `i2c_sda`, `i2c_scl`, `spi_mosi`, `spi_miso`, `spi_sck`, `spi_cs`, `uart_tx`, `uart_rx`, `can_h`, `can_l`, `rs485_a`, `rs485_b`, `usb_dp`, `usb_dm`, `onewire` or `shield` (from `SIGNALS` in `loom-electronics.js`). |
 | `route` | Optional. `"straight"` draws straight lines through the bend points; otherwise the wire is drawn with square corners. |
 | `points` | Optional bend points, in drawing units. |
 | `dx` | Optional sideways offset of the middle run of a square-cornered wire with no bend points. |

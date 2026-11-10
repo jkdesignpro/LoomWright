@@ -2,7 +2,7 @@
 
 LoomWright can draw the circuits from a home's consumer unit as a single-line diagram. From the drawing it makes a circuit schedule, estimates the maximum demand, and checks the circuits against a selection of rules from BS 7671.
 
-> **A planning aid only.** The household checks and figures are guidance from selected rules of BS 7671:2018+A4:2026. They are not a design, not a test and not a certificate. Passing every check does not mean the work meets BS 7671 or the Building Regulations. Mains electricity can kill and start fires. A qualified electrician must design, install, test and certify the work, and some work must be notified to building control. Read the [Disclaimer](27-disclaimer.md) before you use this chapter.
+> **A planning aid only.** The household checks and figures are guidance from selected rules of BS 7671:2018+A4:2026. They are not a design, not a test and not a certificate. Passing every check does not mean the work meets BS 7671 or the Building Regulations. Mains electricity can kill and start fires. A qualified electrician must design, install, test and certify the work, and some work must be notified to building control. Read the [Disclaimer](28-disclaimer.md) before you use this chapter.
 
 ## Starting a household project
 
@@ -130,7 +130,7 @@ Three-phase circuits are not worked out. Zs is not checked on a TT supply, where
 
 The **Circuit schedule** tab in the Lists pane, or **Reports › Circuit schedule (household)**, lists every MCB and RCBO with its circuit.
 
-At the top, a note says that the schedule is a planning aid and not a design or certificate, with a link to the [Disclaimer](27-disclaimer.md). Below it are the supply (earthing, Ze, and the supply fuse) and the [estimated maximum demand](#maximum-demand).
+At the top, a note says that the schedule is a planning aid and not a design or certificate, with a link to the [Disclaimer](28-disclaimer.md). Below it are the supply (earthing, Ze, and the supply fuse) and the [estimated maximum demand](#maximum-demand).
 
 | Column | What it shows |
 | --- | --- |

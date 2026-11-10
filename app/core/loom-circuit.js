@@ -106,6 +106,8 @@
         else if (it.p.type === 'solar') {
           const w = parseFloat(pr.watts) || 100, voc = 1.75 * vn, vmp = 1.45 * vn, imp = w / vmp;
           els.push({ type: 'src', it, p, n, emf: voc, r: (voc - vmp) / imp, limit: imp * 1.1, mode: 'v', what: 'solar' });
+        } else if (b.vout > 0) { // a fixed-voltage supply (USB, adaptor, bench supply)
+          els.push({ type: 'src', it, p, n, emf: b.vout, r: 0.02, limit: parseFloat(pr.amps) || null, mode: 'v', what: 'supply' });
         } else {
           const nom = parseFloat(pr.volts) > 0 ? parseFloat(pr.volts) : vn;
           // opts.battery is the resting voltage the user typed for the system voltage
@@ -114,7 +116,7 @@
       } else if (b.kind === 'converter') {
         if (!first(it)) return;
         const en = b.enable && touched.has(P(b.enable)) && P(b.enable) !== P(b.input) ? P(b.enable) : null;
-        els.push({ type: 'conv', it, in: P(b.input), out: P(b.output), n: ret(b.ret), en, emf: 14.4 * k, r: 0.01, limit: parseFloat(pr.amps) || null, eff: 0.92, on: false, mode: 'v', iin: 0, what: 'charger' });
+        els.push({ type: 'conv', it, in: P(b.input), out: P(b.output), n: ret(b.ret), en, emf: b.vout > 0 ? b.vout : 14.4 * k, r: 0.01, limit: parseFloat(pr.amps) || null, eff: 0.92, on: false, mode: 'v', iin: 0, what: b.vout > 0 ? 'supply' : 'charger' });
       } else if (b.kind === 'diode') {
         if (!first(it)) return;
         els.push({ type: 'diode', it, a: P(b.anode), k: P(b.cathode), vf: 0.7, r: 0.05, on: false });
@@ -565,7 +567,7 @@
     }
 
     if (sym.id === 'dim') {
-      const bat = add({ id: 'bat', text: `Measure the supply at ${srcRef}: + to −, with the load off.`, expect: src.what === 'charger' ? `about ${fmt(src.emf, 1)} V` : `12.4 to 12.7 V engine off, 13.8 to 14.4 V running${N.vn !== 12 ? ` (for a ${N.vn} V system, scale accordingly)` : ''}` });
+      const bat = add({ id: 'bat', text: `Measure the supply at ${srcRef}: + to −, with the load off.`, expect: src.what === 'charger' || src.what === 'supply' ? `about ${fmt(src.emf, 1)} V` : `12.4 to 12.7 V engine off, 13.8 to 14.4 V running${N.vn !== 12 ? ` (for a ${N.vn} V system, scale accordingly)` : ''}` });
       bat.ifNot = { text: 'Charge and test the battery (and alternator) first. A low supply makes every load dim.' };
       const totalDrop = (tps[0] ? tps[0].v : 0) - loadPin.v;
       const tot = add({ id: 'total', text: `Switch ${tref} on. Measure the voltage drop from ${tps[0].label} to ${loadPin.label}, one probe on each (use a long lead).`, expect: `about ${fmt(totalDrop, 2)} V (under 0.5 V is good)` });

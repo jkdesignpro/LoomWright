@@ -143,11 +143,13 @@
     const h = n * 20 + 20, shapes = [], pins = [];
     // receptacle (pins) drawn square; plug (sockets) drawn with a rounded nose
     shapes.push(rec ? R(8, 4, 30, h - 8, { sw: 1.8 }) : P(`M8 4 H30 a8 8 0 0 1 8 8 V${h - 12} a8 8 0 0 1 -8 8 H8 Z`, { fill: 'paper', w: 1.8 }));
+    // a series can name its cavities (s.cavities(n) gives [{ id, name }]), e.g. M8 3-pin uses 1, 3 and 4
+    const cav = s.cavities ? s.cavities(n) : null;
     for (let i = 0; i < n; i++) {
-      const y = 20 + i * 20;
-      shapes.push(L(0, y, 8, y), T(14, y + 3, i + 1, { size: 7, anchor: 'start' }));
+      const y = 20 + i * 20, c = cav && cav[i];
+      shapes.push(L(0, y, 8, y), T(14, y + 3, c ? c.id : i + 1, { size: c && c.id.length > 3 ? 5 : 7, anchor: 'start' }));
       shapes.push(rec ? L(26, y, 34, y, { w: 2.4 }) : C(30, y, 3, { fill: 'none', w: 1.4 }));
-      pins.push(pin(i + 1, 0, y, `Cavity ${i + 1}`));
+      pins.push(c ? pin(c.id, 0, y, c.name) : pin(i + 1, 0, y, `Cavity ${i + 1}`));
     }
     return { w: 40, h, pins, shapes };
   }
@@ -167,6 +169,13 @@
       return { ways: n, seriesName: s.id === 'generic' ? '' : s.name.replace(/^(TE|Aptiv|Anderson) /, ''), mpnShown: p.mpn || (s.housing ? s.housing(n, p.gender) || '' : '') };
     },
   };
+  /* Add connector series from another module; they join the Series list of the connector part. */
+  function addSeries(list) {
+    (list || []).forEach((s) => { if (s && s.id && !SERIES.some((x) => x.id === s.id)) SERIES.push(s); });
+    const pr = lib.conn.props.find((x) => x.k === 'series');
+    pr.options = SERIES.map((s) => [s.id, s.name]);
+    return SERIES;
+  }
   lib.contura = {
     id: 'contura', name: 'Rocker switch, 8 pin (Contura style)', cat: 'Switches', prefix: 'S', w: 80, h: 100, tags: 'carling contura rocker',
     props: [{ k: 'legend', l: 'Legend', d: 'WORK LIGHTS' }, { k: 'action', l: 'Action', d: 'ON-OFF' }], sub: '{legend}',
@@ -299,7 +308,8 @@
     if (B.lamp) {/* handled by switch */}
     return B;
   }
-  function isEarthPin(id) { return /^(-|−|31|31b|E|GND|G|K|85)$/i.test(String(id)) && String(id) !== 'G1'; }
+  // GND.2, G.3 and so on are the second and third ground pins of a board
+  function isEarthPin(id) { return /^(-|−|31|31b|E|GND|G|K|85)(\.\d+)?$/i.test(String(id)) && String(id) !== 'G1'; }
   function isSupplyPin(r, id) { const pn = r.pins.find((x) => x.id === id); const s = (id + ' ' + ((pn && pn.n) || '')).toLowerCase(); return /\+|12v|24v|ign|supply|feed|batt|power|vcc|v\+|in\b|^1$|^l1/.test(s); }
   function parseAmps(s) { const m = /([\d.]+)\s*A?/i.exec(String(s || '')); return m ? parseFloat(m[1]) : null; }
   /* Current a part draws, from its fields (amps, or watts at the system voltage). */
@@ -316,6 +326,6 @@
     return 0;
   }
 
-  Object.assign(Loom, { TERMINALS, SERIES, INSULATION, SLEEVING, seriesById, nearestWays, wireOD, bundleDiameter, suggestSleeve, behaviour, partCurrent, parseAmps, isEarthPin, PROTECT });
+  Object.assign(Loom, { TERMINALS, SERIES, addSeries, INSULATION, SLEEVING, seriesById, nearestWays, wireOD, bundleDiameter, suggestSleeve, behaviour, partCurrent, parseAmps, isEarthPin, PROTECT });
   return Loom;
 });

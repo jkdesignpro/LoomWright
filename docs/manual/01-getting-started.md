@@ -6,7 +6,7 @@ LoomWright also draws household wiring, workshop and factory wiring, and control
 
 It works offline. Your projects are ordinary files on your computer, saved with the extension `.loom`.
 
-> LoomWright is a planning and drawing tool. Its checks and hints are guidance only, and it does not replace a qualified electrician or engineer. Read the [Disclaimer](27-disclaimer.md) before you build from your drawings.
+> LoomWright is a planning and drawing tool. Its checks and hints are guidance only, and it does not replace a qualified electrician or engineer. Read the [Disclaimer](28-disclaimer.md) before you build from your drawings.
 
 This chapter covers installing LoomWright, opening it for the first time, and drawing a first small circuit.
 
@@ -87,6 +87,6 @@ The rest of this manual explains each step in more detail. Good places to go nex
 - This manual is built in. Open it with **Help › User manual**, or press <kbd>F1</kbd>. <kbd>F1</kbd> opens the chapter for what you are doing, such as the live test, the formboard or the component builder. Otherwise it opens the chapter you last read. Use the search box at the top to find a word anywhere in it.
 - **Help › Disclaimer** shows what LoomWright can and cannot tell you.
 - Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to search every command, sheet, part and wire by name.
-- **Help › Keyboard and mouse** lists the main shortcuts. [Keyboard and mouse](24-keyboard-and-mouse.md) has the full list.
+- **Help › Keyboard and mouse** lists the main shortcuts. [Keyboard and mouse](25-keyboard-and-mouse.md) has the full list.
 - Hold the pointer over a button to see what it does.
 - The status bar at the bottom of the window shows a hint for what you are doing.

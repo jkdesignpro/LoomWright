@@ -43,6 +43,8 @@
       b.links.forEach(([a, c]) => join(k(a), k(c), { kind: 'link', ...at }));
       if (b.kind === 'earth') r.pins.forEach((pn) => join(k(pn.id), EARTH, { kind: 'earth', ...at }));
       if (b.earthPins) b.earthPins.forEach((pn) => join(k(pn), EARTH, { kind: 'earth', ...at }));
+      // b.zero: pins that are a supply's own 0 V reference, such as the − of a bench or USB supply
+      if (b.zero) b.zero.forEach((pin) => join(k(pin), EARTH, { kind: 'earth', ...at }));
       if (p.type === 'net_label' && p.props.text) join(k('L'), 'NET:' + String(p.props.text).trim().toUpperCase(), { kind: 'net', ...at });
       if (p.type === 'offpage' && p.props.link) join(k('L'), 'NET:' + String(p.props.link).trim().toUpperCase(), { kind: 'net', ...at });
       if (b.kind === 'protect' && opts.protect !== false) {
@@ -199,7 +201,9 @@
     inv.forEach((it) => {
       const b = it.b;
       const pins = b.kind === 'load' ? (b.either ? [...b.power, ...b.earth] : b.power) : b.kind === 'relay' ? [b.coil[0]] : b.kind === 'converter' ? [b.input] : b.lamp ? [b.lamp[0]] : [];
-      const amps = b.kind === 'converter' ? (parseFloat(Loom.resolved(it.v, it.p).props.amps) || 0) * 1.1 : b.kind === 'relay' ? 0.2 : Loom.partCurrent(it.v, it.p);
+      // a converter with a set output voltage (b.vout) draws its output power from the supply at about 85% efficiency
+      const conv = b.kind === 'converter' ? (parseFloat(Loom.resolved(it.v, it.p).props.amps) || 0) * (b.vout > 0 ? b.vout / (volts * 0.85) : 1.1) : 0;
+      const amps = b.kind === 'converter' ? +conv.toFixed(2) : b.kind === 'relay' ? 0.2 : Loom.partCurrent(it.v, it.p);
       const roots = new Set(pins.map((x) => R(it, x)));
       roots.forEach((r) => { if (!loadsIn.has(r)) loadsIn.set(r, []); loadsIn.get(r).push({ it, amps }); });
       if (b.kind === 'protect' || b.kind === 'pdm') outputs(it).forEach((o) => { const r = R(it, o.inPin); if (!protIn.has(r)) protIn.set(r, []); protIn.get(r).push(o); });
@@ -284,7 +288,8 @@
     st.inv.forEach((it) => { if (it.b.kind === 'source' && it.p.type !== 'alternator' && st.uf.find(key(it.sheet, it.p.id, it.b.source)) === earth) out.push({ level: 'error', part: it.p.id, sheetId: it.sheet.id, text: `${where(it.sheet)}${it.p.label} ${it.b.source} is connected straight to earth. That is a short circuit.` }); });
     // unfused feeds
     const uf = build(project, { switches: 'closed', relays: 'closed', protect: false });
-    uf.inv.filter((it) => it.b.kind === 'source').forEach((src) => {
+    // a current-limited supply (b.limited, such as a USB or bench supply) needs no fuse straight after it
+    uf.inv.filter((it) => it.b.kind === 'source' && !it.b.limited).forEach((src) => {
       const r = uf.uf.find(key(src.sheet, src.p.id, src.b.source));
       const hits = new Set();
       uf.inv.forEach((it) => {

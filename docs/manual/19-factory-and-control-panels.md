@@ -2,7 +2,7 @@
 
 LoomWright can draw machine control panels, motor starters and workshop supplies. It lists the motors, terminals and PLC inputs and outputs, numbers wires the way panel drawings do, and checks the drawing against a selection of recommendations from BS EN 60204-1.
 
-> **A planning aid only.** The factory checks are guidance from selected recommendations of BS EN 60204-1, and the workshop checks from selected rules of BS 7671. They are not a design, not a test and not a certificate. Passing every check does not mean a machine or panel meets the standards or the Electricity at Work Regulations 1989. A machine's safety functions come from its risk assessment, which LoomWright does not do. A qualified person must design, build, test and certify the work. Read the [Disclaimer](27-disclaimer.md) before you use this chapter.
+> **A planning aid only.** The factory checks are guidance from selected recommendations of BS EN 60204-1, and the workshop checks from selected rules of BS 7671. They are not a design, not a test and not a certificate. Passing every check does not mean a machine or panel meets the standards or the Electricity at Work Regulations 1989. A machine's safety functions come from its risk assessment, which LoomWright does not do. A qualified person must design, build, test and certify the work. Read the [Disclaimer](28-disclaimer.md) before you use this chapter.
 
 ## Starting a factory project
 

@@ -4,7 +4,7 @@ The compressed air planner helps you lay out a workshop or garage air system: th
 
 Open it with **Tools › Compressed air planner…**. The systems you plan are saved in the project file, and every change can be undone.
 
-> The planner is a basic tool. Its figures are planning estimates, made from published rules of thumb and the numbers you type in. They can be wrong. They do not show that a pressure system is safe, or that it meets any regulation, and no responsibility is accepted for their use. If the system is used at work, the Pressure Systems Safety Regulations 2000 apply: see [Pressure systems at work](#pressure-systems-at-work) and the [Disclaimer](27-disclaimer.md).
+> The planner is a basic tool. Its figures are planning estimates, made from published rules of thumb and the numbers you type in. They can be wrong. They do not show that a pressure system is safe, or that it meets any regulation, and no responsibility is accepted for their use. If the system is used at work, the Pressure Systems Safety Regulations 2000 apply: see [Pressure systems at work](#pressure-systems-at-work) and the [Disclaimer](28-disclaimer.md).
 
 ## Before you start
 
@@ -261,4 +261,4 @@ Whatever the setting, use only pipe, fittings, hoses and vessels rated for the p
 - Running costs assume steady use over the year at the hours you give.
 - The planner does not check wall thicknesses, supports, expansion, temperature ratings or the strength of any part.
 
-See also the [Disclaimer](27-disclaimer.md).
+See also the [Disclaimer](28-disclaimer.md).

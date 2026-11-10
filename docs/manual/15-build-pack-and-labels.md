@@ -6,7 +6,7 @@ When the drawing is done, LoomWright can put everything needed to build the loom
 
 **File › Print or save PDF (all sheets)** (<kbd>Ctrl</kbd>+<kbd>P</kbd>) prints every sheet, each on its own page at its paper size, followed by the wire list. To get a PDF, choose **Save as PDF** (or **Microsoft Print to PDF**) as the printer in the print window. For a sharper PDF with bookmarks and links, use [Export PDF](#export-pdf) instead.
 
-For a single sheet as a picture or for CAD, see [Import and export](22-import-and-export.md#exporting-drawings).
+For a single sheet as a picture or for CAD, see [Import and export](23-import-and-export.md#exporting-drawings).
 
 ## Export PDF
 
