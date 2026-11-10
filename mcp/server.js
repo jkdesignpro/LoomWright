@@ -11,6 +11,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const os = require('os');
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
@@ -37,7 +38,8 @@ function libraryPath() {
   return path.join(process.env.XDG_DATA_HOME || path.join(home, '.local', 'share'), APP_ID, 'library.json');
 }
 function loadLibrary() {
-  try { const d = JSON.parse(fs.readFileSync(libraryPath(), 'utf8')); return { parts: d.parts || [], colours: d.colours || [] }; }
+  // keep everything the app stores there (blocks, cable stock...), not only the parts
+  try { const d = JSON.parse(fs.readFileSync(libraryPath(), 'utf8')); return { ...d, parts: d.parts || [], colours: d.colours || [] }; }
   catch (e) { return { parts: [], colours: [] }; }
 }
 function saveLibrary(lib) {
@@ -169,7 +171,9 @@ function layoutNew(doc) {
 /* ---------------- server ---------------- */
 const server = new McpServer({ name: 'loomwright', version: L.VERSION }, {
   instructions: [
-    'LoomWright makes wiring diagrams for vehicles (12V/24V automotive) and electronics. A project is a .loom file holding one or more sheets; relative paths are saved in ' + HOME_DIR + '.',
+    'LoomWright makes wiring diagrams, mainly for vehicles (12V/24V automotive), and also for household (UK mains), workshop, factory control panels and electronics. A project is a .loom file holding one or more sheets; relative paths are saved in ' + HOME_DIR + '.',
+    'Set the project type with project_settings (vehicle, household, factory, electronics, mixed). Household and factory projects get their own parts (list_components category Household, Factory & panels, Loads library) and guidance checks from selected BS 7671 and BS EN 60204-1 rules. These checks are planning guidance only: never tell the user a design is compliant, safe, certified or meets the regulations, and always say mains work must be designed, installed, tested and certified by a qualified electrician. Draw household circuits single-line: one wire is one cable, from breaker out to each socket or light in turn (a ring returns to the breaker out).',
+    'Starter circuits (add_starter_circuit) drop in ready-drawn circuits such as spot lamps, split charge, a consumer unit or a motor starter; edit them to suit.',
     'For text-to-diagram, prefer one build_diagram call per sheet: list every part with a short ref (F1, K1, S1...) and a type from list_components, then every wire as "REF:PIN" ends. Pass sheet to put it on a named sheet (created if new). Carry circuits between sheets with offpage parts.',
     'Wires can carry a harness (the loom they run in, e.g. "Engine bay"). The user may stock only a few cable colours and reuse them for different circuits in different harnesses; respect the stocked colours from get_diagram and use colour_usage to show reuse.',
     'When the user shares a picture of a component (pinout, datasheet symbol, connector face), trace it with define_component using shapes and pin positions, and save_to_library: true so it appears in My components in the app.',
@@ -179,7 +183,7 @@ const server = new McpServer({ name: 'loomwright', version: L.VERSION }, {
     'Connectors: use part type "conn" with props series (see list_connector_series), ways, gender and mate (the reference of the other half). Mated connectors join cavity for cavity, so circuits trace through them.',
     'Build details: update_wire takes insulation, a multicore cable, and end_a/end_b with terminal, method, strip length, sleeve and seal. update_part takes part number, supplier, cost and fitted location. These feed the cut list, connector tables, costed parts list and build pack (report and export tools).',
     'Revision history: when the user signs off a change, call issue_revision with a short description. compare_revisions shows what changed since any revision, and project_settings clouds marks it on the drawing.',
-    'Use trace_circuit to follow a circuit across sheets and test_circuit to check what a switch or relay powers. The test checks connections only, never claim it proves voltages or currents.',
+    'Use trace_circuit to follow a circuit across sheets and test_circuit to check what a switch or relay powers. solve_circuit estimates volts and amps at each load from wire sizes and lengths; it is a guide to what a meter should read, not a measurement. fault_find writes a step-by-step test sheet for a load that misbehaves.',
     'Never invent pinouts or part numbers for a specific vehicle, ECU or module from memory. Ask for the documentation or a picture, and say part numbers must be checked against the maker.',
   ].join('\n'),
 });
@@ -393,10 +397,15 @@ server.registerTool('update_wire', {
     path: z.string(), sheet: sheetArg, wire: z.string().describe('Wire number like W3, or "F1:2 -> K1:30"'), colour: z.string().optional(), tracer: z.string().optional(), tracer2: z.string().optional(), gauge: z.union([z.string(), z.number()]).optional(), length: z.number().optional(), current: z.number().optional(), circuit: z.string().optional(), harness: z.string().optional(), notes: z.string().optional(), name: z.string().optional(),
     insulation: z.string().optional().describe('Insulation id or name from list_connector_series, e.g. flry_b'), cable: z.string().optional().describe('Name of a cable from define_cable; "" for a single core'),
     end_a: endShape.optional().describe('The "from" end'), end_b: endShape.optional().describe('The "to" end'),
+    method: z.string().optional().describe('Household cables: installation method C, B, A, 100, 101, 102 or 103 ("" for the project default)'), insul: z.enum(['', '50', '100', '200', '400', 'surrounded']).optional().describe('Household cables: thermal insulation around the cable'),
+    grouped: z.number().optional().describe('Household cables: number of circuits grouped together'), groupKind: z.enum(['', 'clipped']).optional().describe('"" bunched or enclosed, "clipped" side by side'), cpc: z.string().optional().describe('Earth conductor size in mm² if not standard twin and earth'), ambient: z.number().optional().describe('Ambient temperature °C where the cable runs'),
   },
 }, wrap(async (a) => {
   const { full, project } = load(a.path);
   const { doc, w } = findWireIn(project, a.sheet, a.wire);
+  ['method', 'insul', 'groupKind', 'cpc'].forEach((k) => { if (a[k] != null) { if (a[k] === '') delete w[k]; else w[k] = String(a[k]); } });
+  ['grouped', 'ambient'].forEach((k) => { if (a[k] != null) { if (!a[k]) delete w[k]; else w[k] = String(a[k]); } });
+  if (a.method && !L.INSTALL_METHODS.some(([m]) => m === String(a.method))) throw new Error(`Unknown method ${a.method}. Use one of ${L.INSTALL_METHODS.map(([m]) => m).join(', ')}.`);
   if (a.colour || a.tracer || a.tracer2) { const c = parseColours(doc, a.colour || w.colour, a.tracer, a.tracer2); w.colour = c.colour; if (c.tracer || a.tracer != null) w.tracer = c.tracer; if (c.tracer2) w.tracer2 = c.tracer2; }
   if (a.gauge != null) w.gauge = gauge(a.gauge);
   ['length', 'current'].forEach((k) => { if (a[k] != null) w[k] = String(a[k]); });
@@ -581,12 +590,14 @@ server.registerTool('auto_layout', {
 
 server.registerTool('check_diagram', {
   title: 'Check project',
-  description: 'Run design checks on every sheet (or one): unconnected pins, fuse rating against wire size, current against wire size, voltage drop over 3%.',
+  description: 'Run design checks on every sheet (or one): unconnected pins, fuse rating against wire size, current against wire size, voltage drop over 3%. Household and factory projects also get guidance checks from selected BS 7671 and BS EN 60204-1 rules (rule codes in brackets; sources in docs/standards-sources.md). Guidance only, not certification.',
   inputSchema: { path: z.string(), sheet: sheetArg.describe('Only this sheet'), includeInfo: z.boolean().optional() },
 }, wrap(async ({ path: p, sheet, includeInfo }) => {
   const { project } = load(p);
   const out = L.validate(sheet != null ? sheetView(project, sheet) : project).filter((c) => includeInfo || c.level !== 'info');
-  return ok(out.length ? out.map((c) => `[${c.level}] ${c.text}`).join('\n') : 'No problems found.');
+  const mains = L.disclaimerFor(project).mains;
+  const text = out.length ? out.map((c) => `[${c.level}]${c.rule ? ` (${c.rule})` : ''} ${c.text}`).join('\n') : 'No problems found.';
+  return ok(mains ? `${text}\n\n${L.DISCLAIMER.mains}` : text);
 }));
 
 server.registerTool('wire_list', {
@@ -753,8 +764,8 @@ server.registerTool('load_budget', {
 /* ---------------- build lists ---------------- */
 server.registerTool('report', {
   title: 'Build lists and reports',
-  description: 'Get a build list for the whole project as CSV text, or save it as a .csv file: wires, bom (parts with prices and totals), cable (metres to buy by colour and size), usage (colour reuse), fuses (fuse schedule and load budget), connectors (connector cavity tables), cut (cut list by harness with terminals, strip lengths and seals), labels (a label for each wire end), locations (where each part is fitted), nets (every electrical net).',
-  inputSchema: { path: z.string(), kind: z.enum(['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cut', 'labels', 'locations', 'nets']), out: z.string().optional().describe('Save as this .csv file (relative to the project) instead of returning the text'), single: z.boolean().optional().describe('labels: one label per wire instead of one per end') },
+  description: 'Get a build list for the whole project as CSV text, or save it as a .csv file: wires, bom (parts with prices and totals), cable (metres to buy by colour and size), usage (colour reuse), fuses (fuse schedule and load budget), connectors (connector cavity tables), cut (cut list by harness with terminals, strip lengths and seals), labels (a label for each wire end), locations (where each part is fitted), nets (every electrical net), voltages (estimated voltage at each load), circuits (household circuit schedule: cable, RCD, volt drop, Zs), motors (motor list with full-load and starting current), terminals (terminal plan), plcio (PLC inputs and outputs).',
+  inputSchema: { path: z.string(), kind: z.enum(L.REPORTS), out: z.string().optional().describe('Save as this .csv file (relative to the project) instead of returning the text'), single: z.boolean().optional().describe('labels: one label per wire instead of one per end') },
 }, wrap(async (a) => {
   const { full, project } = load(a.path);
   const text = L.toCSV(L.reportRows(project, a.kind, { single: a.single }));
@@ -870,9 +881,13 @@ server.registerTool('project_settings', {
     labels: z.enum(['full', 'code', 'none']).optional().describe('Wire labels: full (number, colour, size), code (colour code only) or none'), titleBlock: z.boolean().optional(), colourKey: z.boolean().optional(),
     clouds: z.string().optional().describe('Draw revision clouds round what changed since this revision letter; "" for none'),
     currency: z.string().optional(), cutAllowance: z.number().optional().describe('Metres added to each wire in the cut list'),
+    projectType: z.enum(L.PROJECT_TYPES.map((x) => x.id)).optional().describe('vehicle, household (UK mains), factory (workshop and control panels), electronics or mixed. Sets suitable defaults and which checks run.'),
+    mains: z.object({ building: z.enum(L.BUILDING_TYPES.map(([v]) => v)).optional(), country: z.enum(L.COUNTRIES.map(([v]) => v)).optional(), method: z.string().optional().describe('Usual cable installation method, e.g. C'), ambient: z.number().optional() }).optional().describe('Household and factory: building type, country (for Part P and its equivalents), usual installation method and ambient temperature'),
   },
 }, wrap(async (a) => {
   const { full, project } = load(a.path);
+  if (a.projectType) L.applyProjectType(project, a.projectType);
+  if (a.mains) project.settings.mains = { ...(project.settings.mains || {}), ...Object.fromEntries(Object.entries(a.mains).filter(([, v]) => v != null)) };
   const s = project.settings, m = project.meta;
   if (a.title != null) project.title = a.title;
   ['project', 'drawnBy', 'notes'].forEach((k) => { if (a[k] != null) m[k] = a[k]; });
@@ -885,7 +900,174 @@ server.registerTool('project_settings', {
   }
   save(full, project);
   const sheets = project.sheets.map((x, i) => `${i + 1} "${x.name}"${x.page || x.orientation ? ` (${[x.page, x.orientation].filter(Boolean).join(' ')})` : ''}`).join(', ');
-  return ok(`Settings for ${project.title}`, { meta: m, settings: { ...s, stock: undefined, cableCosts: undefined }, sheets });
+  const dc = L.disclaimerFor(project);
+  return ok(`Settings for ${project.title}${dc.mains ? `\n\n${dc.short}` : ''}`, { meta: m, settings: { ...s, stock: undefined, cableCosts: undefined }, sheets });
+}));
+
+/* ---------------- 0.4: volts and amps, fault finding, colours, stock, build, starter circuits ---------------- */
+function switchable(project) {
+  const sw = [];
+  L.views(project).forEach((v) => v.parts.forEach((p) => { const st = L.partStates(v, p); if (st && !st.follows && p.label && !sw.some((x) => x.key === st.key)) sw.push({ ...st, ref: p.label, sheet: v.sheet.name }); }));
+  return sw;
+}
+function parseState(project, set) {
+  const sw = switchable(project), list = sw.map((x) => `  ${x.ref}: ${x.states.map((s, i) => (i === x.def ? `[${s}]` : s)).join(' | ')}`).join('\n'), state = {};
+  Object.entries(set || {}).forEach(([ref, val]) => {
+    const x = sw.find((q) => q.ref.toLowerCase() === ref.toLowerCase());
+    if (!x) throw new Error(`${ref} cannot be switched. Switchable parts:\n${list}`);
+    const i = typeof val === 'number' ? val : x.states.findIndex((q) => String(q).toLowerCase() === String(val).toLowerCase());
+    if (i < 0 || i >= x.states.length) throw new Error(`${ref} has no state "${val}". States: ${x.states.join(', ')}`);
+    state[x.key] = i;
+  });
+  return { state, list };
+}
+server.registerTool('solve_circuit', {
+  title: 'Volts and amps',
+  description: 'Estimate the voltage at each running load, the current in each fuse and the load on each supply, with switches set as given (like test_circuit). Worked out from wire sizes, lengths and load ratings: a guide to what a meter should read, not a measurement. Without set, everything is in its default state.',
+  inputSchema: { path: z.string(), set: z.record(z.union([z.string(), z.number()])).optional().describe('Part reference to state, e.g. {"S1":"On"}'), battery: z.number().optional().describe('Battery voltage at rest, e.g. 12.6') },
+}, wrap(async (a) => {
+  const { project } = load(a.path);
+  const { state } = parseState(project, a.set);
+  const sol = L.solveCircuit(project, state, { battery: a.battery });
+  const on = sol.loads.filter((x) => x.running);
+  const lines = [`System ${sol.system} V, supply about ${sol.supply} V.`];
+  if (sol.shorts.length) lines.push(`SHORT TO EARTH from ${sol.shorts.join(', ')}: a fuse would blow.`);
+  lines.push('', 'Running loads (volts at the load, amps, drop from supply):');
+  on.forEach((x) => lines.push(x.volts == null || x.amps == null ? `  ${x.ref}: running, but it has no current or wattage, so its volts and amps are not worked out` : `  ${x.ref}: ${x.volts} V, ${x.amps} A, ${x.dropPct == null ? 'no rating' : x.dropPct + ' % drop'}${x.status && x.status !== 'ok' ? ` (${x.status})` : ''}`));
+  if (!on.length) lines.push('  nothing is running');
+  if (sol.fuses.length) { lines.push('', 'Fuses carrying current:'); sol.fuses.forEach((f) => lines.push(`  ${f.ref}: ${f.amps} A of ${f.rating || '?'} A${f.pct != null ? ` (${f.pct} %)` : ''}${f.status && f.status !== 'ok' ? ' ' + f.status.toUpperCase() : ''}`)); }
+  lines.push('', 'Supplies:'); sol.sources.forEach((x) => lines.push(`  ${x.ref}: ${x.volts} V, ${x.amps} A, ${x.state}`));
+  if (sol.notes.length) lines.push('', ...sol.notes);
+  lines.push('', 'Estimated from the drawing, not measured.');
+  return ok(lines.join('\n'));
+}));
+
+server.registerTool('fault_find', {
+  title: 'Fault finding',
+  description: 'A step-by-step test sheet for a load that misbehaves: where to put the meter, what it should read, and where to go next. Symptoms: dead (does not work), always (will not switch off), fuse (keeps blowing its fuse), dim (dim, slow or weak). Without part, lists the loads and relays you can pick. Save a printable page with out.',
+  inputSchema: { path: z.string(), part: z.string().optional().describe('Reference of the load or relay, e.g. H1'), symptom: z.enum(L.FAULT_SYMPTOMS.map((x) => x.id)).optional(), out: z.string().optional().describe('Also save the sheet as this .html file') },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  if (!a.part) return ok('Loads and relays:\n' + L.faultTargets(project).map((x) => `  ${x.ref} ${x.name} (sheet ${x.sheet})`).join('\n') + '\n\nSymptoms: ' + L.FAULT_SYMPTOMS.map((x) => `${x.id} (${x.name})`).join(', '));
+  const f = L.faultFind(project, a.part, a.symptom || 'dead');
+  if (f.error) throw new Error(f.error);
+  let saved = '';
+  if (a.out) {
+    const target = path.isAbsolute(a.out) ? a.out : path.join(path.dirname(full), a.out);
+    fs.writeFileSync(target, `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${L.esc(f.title)}</title><style>body{margin:16px}${L.FAULT_CSS}</style></head><body>${L.faultSheetHTML(f, { project: project.title })}</body></html>`);
+    saved = `\n\nSaved ${target}`;
+  }
+  return ok(L.faultSheetText(f) + saved);
+}));
+
+server.registerTool('suggest_colours', {
+  title: 'Suggest wire colours',
+  description: 'Ranked colour suggestions for a wire, using the colour standard\'s conventions, what the circuit already uses, the user\'s cable stock and colours already busy in the same harness. Give an existing wire, or from and to ends for a new one.',
+  inputSchema: { path: z.string(), sheet: sheetArg, wire: z.string().optional().describe('Existing wire number, e.g. W7'), from: z.string().optional().describe('New wire: from end, e.g. F3:2'), to: z.string().optional(), gauge: z.union([z.string(), z.number()]).optional(), harness: z.string().optional(), circuit: z.string().optional(), limit: z.number().optional() },
+}, wrap(async (a) => {
+  const { project } = load(a.path);
+  let doc, w;
+  if (a.wire) ({ doc, w } = findWireIn(project, a.sheet, a.wire));
+  else { doc = sheetView(project, a.sheet); if (!a.from || !a.to) throw new Error('Give wire, or from and to.'); w = { from: L.parseEnd(doc, a.from), to: L.parseEnd(doc, a.to), gauge: gauge(a.gauge), harness: a.harness || '', circuit: a.circuit || '' }; }
+  const r = L.suggestColours(project, doc.sheet.id, w, { inventory: loadLibrary().inventory, limit: a.limit || 6 });
+  return ok(r.suggestions.length ? r.suggestions.map((x, i) => `${i + 1}. ${x.code} (${x.name})${x.reasons.length ? ': ' + x.reasons.join('; ') : ''}`).join('\n') : 'No suggestions.');
+}));
+
+const stockCable = z.object({ gauge: z.union([z.string(), z.number()]), colour: z.string(), tracer: z.string().optional(), insulation: z.string().optional(), metres: z.number() });
+const stockItem = z.object({ name: z.string(), spec: z.string().optional(), mpn: z.string().optional(), qty: z.number() });
+server.registerTool('stock', {
+  title: 'My stock',
+  description: 'The user\'s stock of cable and parts, shared by all projects and the app (Tools, My stock). Without changes, lists it. cable and items replace those lists; add_cable and add_items add to them. take_for takes what a project uses out of stock.',
+  inputSchema: { cable: z.array(stockCable).optional(), items: z.array(stockItem).optional(), add_cable: z.array(stockCable).optional(), add_items: z.array(stockItem).optional(), take_for: z.string().optional().describe('Project path: take its cable and parts out of stock') },
+}, wrap(async (a) => {
+  const lib = loadLibrary(), inv = { cable: [], items: [], ...(lib.inventory || {}) };
+  const anyDoc = { customColours: [] };
+  const cab = (c) => { const k = parseColours(anyDoc, c.colour, c.tracer); return { gauge: gauge(c.gauge), colour: k.colour, tracer: k.tracer, insulation: c.insulation || '', metres: c.metres }; };
+  let changed = false, msg = '';
+  if (a.cable) { inv.cable = a.cable.map(cab); changed = true; }
+  if (a.items) { inv.items = a.items.map((x) => ({ ...x })); changed = true; }
+  if (a.add_cable) { inv.cable = inv.cable.concat(a.add_cable.map(cab)); changed = true; }
+  if (a.add_items) { inv.items = inv.items.concat(a.add_items.map((x) => ({ ...x }))); changed = true; }
+  if (a.take_for) { const r = L.takeFromStock(load(a.take_for).project, inv); Object.assign(inv, r.inventory); msg = r.changes.length ? 'Taken from stock:\n- ' + r.changes.join('\n- ') + '\n\n' : 'Nothing to take.\n\n'; changed = true; }
+  if (changed) { lib.inventory = inv; saveLibrary(lib); }
+  const name = (c) => L.wireColourName(anyDoc, c);
+  return ok(msg + `Cable:\n${inv.cable.map((c) => `  ${c.gauge} mm² ${name(c)}: ${c.metres} m`).join('\n') || '  none'}\nParts:\n${inv.items.map((x) => `  ${x.qty} × ${x.name}${x.spec ? ' ' + x.spec : ''}${x.mpn ? ' (' + x.mpn + ')' : ''}`).join('\n') || '  none'}`);
+}));
+
+server.registerTool('shopping_list', {
+  title: 'Shopping list',
+  description: 'What a project needs, what is already in stock and what to buy: cable by size and colour (with cut allowance and 10 % spare, rounded to a reel) and parts, with costs where known.',
+  inputSchema: { path: z.string() },
+}, wrap(async ({ path: p }) => {
+  const { project } = load(p);
+  const sl = L.shoppingList(project, loadLibrary().inventory), m = (v) => (v == null ? '' : ` ${sl.currency}${Number(v).toFixed(2)}`);
+  const lines = ['Cable (need / in stock / buy):'];
+  sl.cable.forEach((c) => lines.push(`  ${c.gauge} mm² ${c.code} ${c.name}: ${c.need}${c.unknown ? '+?' : ''} m / ${c.have} m / ${c.buy ? `${c.buy} m${c.reel ? ` (${c.reel} m reel)` : ''}` : 'none'}${m(c.cost)}`));
+  lines.push('', 'Parts (need / in stock / buy):');
+  sl.parts.forEach((r) => lines.push(`  ${r.name}${r.spec ? ' ' + r.spec : ''}${r.mpn ? ' (' + r.mpn + ')' : ''}: ${r.need} / ${r.have} / ${r.buy || 'none'}${m(r.cost)}`));
+  lines.push('', `${sl.toBuy} lines to buy${sl.total ? `, about${m(sl.total)}` : ''}.${sl.unknown ? ` ${sl.unknown} wires have no length.` : ''}`);
+  return ok(lines.join('\n'));
+}));
+
+server.registerTool('build_progress', {
+  title: 'Build progress',
+  description: 'Track the build: which wires are cut, have their ends done, are fitted and have passed or failed their test. Tick wires off with set; returns progress for each harness and any failed wires.',
+  inputSchema: { path: z.string(), set: z.array(z.object({ wire: z.string(), cut: z.boolean().optional(), ends: z.boolean().optional(), fitted: z.boolean().optional(), test: z.enum(['pass', 'fail', '']).optional(), note: z.string().optional() })).optional() },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  (a.set || []).forEach((x) => { const { w } = findWireIn(project, null, x.wire); L.setBuild(w, x); });
+  if (a.set && a.set.length) save(full, project);
+  const pr = L.buildProgress(project), line = (g) => `${g.harness}: ${g.pct} % (${g.cut}/${g.wires} cut, ${g.ends} ends, ${g.fitted} fitted, ${g.pass} passed${g.fail ? `, ${g.fail} FAILED` : ''})`;
+  const lines = [line(pr.total), ...pr.harnesses.map((g) => '  ' + line(g))];
+  if (pr.total.failing.length) lines.push('', 'Failed:', ...pr.total.failing.map((f) => `  ${f.name}${f.note ? ': ' + f.note : ''}`));
+  return ok(lines.join('\n'));
+}));
+
+server.registerTool('add_starter_circuit', {
+  title: 'Add a starter circuit',
+  description: 'Drop a ready-drawn circuit onto a sheet, with fresh references and tidy wires: e.g. spot lamps with relay, split charge, reversing camera, a consumer unit, a motor starter. Without template, lists them. Values are typical starting points to edit, not a design.',
+  inputSchema: { path: z.string(), sheet: sheetArg.describe('Sheet to add it to (created if new)'), template: z.string().optional().describe('Starter circuit id or name'), x: z.number().optional(), y: z.number().optional() },
+}, wrap(async (a) => {
+  if (!a.template) return ok(L.templateList().map((x) => `${x.id} (${x.kind}): ${x.name}. ${x.description}`).join('\n'));
+  const { full, project } = load(a.path);
+  const doc = sheetView(project, a.sheet, true), b = L.templateBlock(a.template, project);
+  const bb = doc.parts.length ? L.bounds(doc) : { x: 0, y: 0, w: 0, h: 0 }, tb = L.bounds({ ...doc, parts: b.parts, wires: [] });
+  const dx = a.x != null ? a.x - tb.x : 0, dy = a.y != null ? a.y - tb.y : doc.parts.length ? bb.y + bb.h + 80 - tb.y : 0;
+  const map = {}, relabel = {};
+  b.parts.forEach((p) => {
+    const q = JSON.parse(JSON.stringify(p)); q.id = L.uid('p'); map[p.id] = q.id; q.x = Math.round((q.x + dx) / 10) * 10; q.y = Math.round((q.y + dy) / 10) * 10;
+    const d = L.partDef(doc, q.type); if (d && d.prefix && q.label && !d.noLabel) { const nl = relabel[q.label] || L.nextLabel(doc, d.prefix); relabel[q.label] = nl; q.label = nl; }
+    doc.parts.push(q);
+  });
+  const ids = b.wires.map((w) => { const q = JSON.parse(JSON.stringify(w)); q.id = L.uid('w'); q.name = L.nextWireName(doc); q.from.part = map[w.from.part]; q.to.part = map[w.to.part]; doc.wires.push(q); return q.id; });
+  if (L.tidyWires) L.tidyWires(doc, ids);
+  if (b.kind && b.kind !== 'vehicle' && (project.settings.projectType || 'vehicle') === 'vehicle') L.applyProjectType(project, b.kind);
+  save(full, project);
+  return ok(`Added "${b.name}" to sheet ${doc.sheetNo}: ${b.parts.length} parts (${Object.values(relabel).join(', ')}), ${ids.length} wires.\n${b.description}`);
+}));
+
+server.registerTool('tidy_wires', {
+  title: 'Tidy wires',
+  description: 'Re-route wires with square corners around the parts. Give wire numbers, or leave out to tidy every wire on the sheet.',
+  inputSchema: { path: z.string(), sheet: sheetArg, wires: z.array(z.string()).optional() },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  const doc = sheetView(project, a.sheet);
+  const ids = (a.wires || []).map((n) => findWire(doc, n).id);
+  const n = L.tidyWires(doc, ids);
+  save(full, project);
+  return ok(`Tidied ${n} wire${n === 1 ? '' : 's'} on sheet ${doc.sheetNo}.`);
+}));
+
+server.registerTool('number_wires_by_potential', {
+  title: 'Number wires by potential',
+  description: 'Control panel style wire numbers: every wire joined without passing through a switch, contact, fuse or device gets the same number, starting with the sheet number (101, 102... on sheet 1). Renames every wire in the project.',
+  inputSchema: { path: z.string() },
+}, wrap(async ({ path: p }) => {
+  const { full, project } = load(p);
+  const n = L.numberByPotential(project);
+  save(full, project);
+  return ok(`Numbered ${n} wires by potential.`);
 }));
 
 /* ---------------- export and import ---------------- */
@@ -896,12 +1078,18 @@ const writeOut = (full, out, suffix, text) => {
 };
 server.registerTool('export', {
   title: 'Export',
-  description: 'Write the project in another format next to it (or to out): dxf (each sheet for CAD), wireviz (YAML for the WireViz harness tool, optionally one harness), html (a read-only page anyone can open in a browser, with clickable nets), pack (the build pack: drawings, revision history, wire, cut and connector lists, fuses, parts and costs, checks, ready to print), formboard_dxf (one harness formboard at 1:1 in mm). For CSV lists use report; for SVG use export_svg.',
-  inputSchema: { path: z.string(), format: z.enum(['dxf', 'wireviz', 'html', 'pack', 'formboard_dxf']), sheet: sheetArg.describe('dxf: only this sheet'), harness: z.string().optional().describe('wireviz: only this harness; formboard_dxf: required'), out: z.string().optional(), bw: z.boolean().optional().describe('pack: black-and-white drawings'), labels: z.boolean().optional().describe('pack: include wire labels') },
+  description: 'Write the project in another format next to it (or to out): pdf (every sheet as a vector drawing, then the tables you choose, with bookmarks and links that jump to parts), dxf (each sheet for CAD), wireviz (YAML for the WireViz harness tool, optionally one harness), html (a read-only page anyone can open in a browser, with clickable nets), pack (the build pack: drawings, revision history, wire, cut and connector lists, fuses, parts and costs, checks, ready to print), formboard_dxf (one harness formboard at 1:1 in mm). For CSV lists use report; for SVG use export_svg.',
+  inputSchema: { path: z.string(), format: z.enum(['pdf', 'dxf', 'wireviz', 'html', 'pack', 'formboard_dxf']), sheet: sheetArg.describe('dxf, pdf: only this sheet'), tables: z.array(z.enum(Object.keys(L.PDF_TABLES))).optional().describe('pdf: tables after the drawings (default wires, connectors, fuses, voltages, bom)'), harness: z.string().optional().describe('wireviz: only this harness; formboard_dxf: required'), out: z.string().optional(), bw: z.boolean().optional().describe('pack: black-and-white drawings'), labels: z.boolean().optional().describe('pack: include wire labels') },
 }, wrap(async (a) => {
   const { full, project } = load(a.path);
   let written;
-  if (a.format === 'dxf') {
+  if (a.format === 'pdf') {
+    const sheets = a.sheet != null ? [sheetView(project, a.sheet).sheet.id] : null;
+    const bytes = L.projectPDF(project, { tables: a.tables, sheets, bw: a.bw, date: new Date().toISOString().slice(0, 10), deflate: (b) => new Uint8Array(zlib.deflateSync(Buffer.from(b))) });
+    const target = a.out ? (path.isAbsolute(a.out) ? a.out : path.join(path.dirname(full), a.out)) : full.replace(/\.(loom|json)$/i, '') + '.pdf';
+    fs.writeFileSync(target, Buffer.from(bytes));
+    written = [target];
+  } else if (a.format === 'dxf') {
     const vs = a.sheet != null ? [sheetView(project, a.sheet)] : L.views(project);
     written = vs.map((v) => writeOut(full, vs.length === 1 ? a.out : null, project.sheets.length > 1 ? `-${v.sheetNo}.dxf` : '.dxf', L.exportDXF(v)));
   } else if (a.format === 'wireviz') {
