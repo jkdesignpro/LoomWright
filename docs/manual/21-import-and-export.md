@@ -73,7 +73,7 @@ These export the sheet you are looking at:
 
 A sheet with a fixed paper size exports at that size, with its frame. A **Fit to drawing** sheet exports with a border, the colour key and the title block round the drawing.
 
-To print or save every sheet as PDF, see [Printing the drawings](14-build-pack-and-labels.md#printing-the-drawings).
+To save every sheet as one PDF, with bookmarks, links and the lists you pick, use **File › Export PDF with bookmarks and links…**. See [Export PDF](15-build-pack-and-labels.md#export-pdf). To print the sheets, see [Printing the drawings](15-build-pack-and-labels.md#printing-the-drawings).
 
 ## Exporting for WireViz
 
@@ -85,18 +85,20 @@ To print or save every sheet as PDF, see [Printing the drawings](14-build-pack-a
 
 - each sheet, on its own tab,
 - the wire list,
-- tracing: click any wire to highlight its circuit and list every wire on it, on every sheet.
+- tracing: click any wire to highlight its circuit and list every wire on it, on every sheet,
+- a **Build checklist** tab, to tick wires off as you build. See [Ticking the build off on a phone](14-lists-and-reports.md#ticking-the-build-off-on-a-phone).
 
-It cannot be edited, which makes it a safe way to show a design to someone or keep a copy on a phone.
+The drawing cannot be edited, which makes it a safe way to show a design to someone or keep a copy on a phone. **Tools › Phone build checklist…** saves the same page, opening on the **Build checklist** tab.
 
 ## Lists as CSV
 
-Every list can be saved as a CSV file from the **Reports** menu. See [Exporting lists as CSV](13-lists-and-reports.md#exporting-lists-as-csv).
+Every list can be saved as a CSV file from the **Reports** menu. See [Exporting lists as CSV](14-lists-and-reports.md#exporting-lists-as-csv).
 
 ## Other exports
 
-- The build pack can be saved as a web page. See [The build pack](14-build-pack-and-labels.md#the-build-pack).
-- The harness formboard exports DXF at 1:1 and SVG. See [Exporting the formboard](15-harness-formboard.md#exporting-the-formboard).
-- The vehicle view exports SVG and PNG. See [Using the locations](16-vehicle-locations.md#using-the-locations).
+- The build pack can be saved as a web page. See [The build pack](15-build-pack-and-labels.md#the-build-pack).
+- A fault-finding sheet can be saved as a web page. See [Fault finding](12-fault-finding.md#showing-printing-and-saving).
+- The harness formboard exports DXF at 1:1 and SVG. See [Exporting the formboard](16-harness-formboard.md#exporting-the-formboard).
+- The vehicle view exports SVG and PNG. See [Using the locations](17-vehicle-locations.md#using-the-locations).
 - Your components and blocks export as a library file. See [Sharing components and blocks](09-component-builder.md#sharing-components-and-blocks).
-- The revision comparison exports CSV. See [Comparing revisions](17-revisions-and-save-points.md#comparing-revisions).
+- The revision comparison exports CSV. See [Comparing revisions](20-revisions-and-save-points.md#comparing-revisions).

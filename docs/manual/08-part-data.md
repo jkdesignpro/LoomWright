@@ -49,7 +49,7 @@ Prices are plain numbers; LoomWright does not convert currencies. The **Currency
 
 ## Locations
 
-The **Location** field says where a part lives on the vehicle. It appears in the parts list and the build pack, and you can type it in the vehicle view as well, where you can also mark each part on a picture of the vehicle. See [Vehicle locations view](16-vehicle-locations.md).
+The **Location** field says where a part lives on the vehicle. It appears in the parts list and the build pack, and you can type it in the vehicle view as well, where you can also mark each part on a picture of the vehicle. See [Vehicle locations view](17-vehicle-locations.md).
 
 Using the same wording for the same place, such as always `Under seat box`, keeps the parts list tidy.
 

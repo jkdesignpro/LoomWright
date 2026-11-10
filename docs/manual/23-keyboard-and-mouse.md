@@ -15,7 +15,7 @@ Single-letter shortcuts such as <kbd>R</kbd> and <kbd>T</kbd> do nothing while y
 | <kbd>Ctrl</kbd>+<kbd>O</kbd> | Open a project |
 | <kbd>Ctrl</kbd>+<kbd>P</kbd> | Print or save PDF (all sheets) |
 | <kbd>Ctrl</kbd>+<kbd>K</kbd> | Search commands, sheets, parts and wires |
-| <kbd>F1</kbd> | Open this manual |
+| <kbd>F1</kbd> | Open this manual at the chapter for what you are doing, such as the live test, the formboard or the component builder; otherwise at the chapter you last read |
 
 ## Editing
 
@@ -32,6 +32,7 @@ Single-letter shortcuts such as <kbd>R</kbd> and <kbd>T</kbd> do nothing while y
 | <kbd>R</kbd> | Rotate the selection a quarter turn clockwise |
 | <kbd>Shift</kbd>+<kbd>R</kbd> | Rotate the other way |
 | <kbd>F</kbd> | Flip the selection |
+| <kbd>Shift</kbd>+<kbd>T</kbd> | Tidy wires: the selected wires, the wires on the selected parts, or every wire on the sheet |
 | Arrow keys | Move the selection 10 units |
 | <kbd>Shift</kbd>+arrow keys | Move the selection 50 units |
 | <kbd>Ctrl</kbd>+<kbd>F</kbd> | Find |

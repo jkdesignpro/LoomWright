@@ -6,7 +6,9 @@ LoomWright draws on a grid of 10 drawing units. Parts and bend points snap to it
 
 ## Placing parts
 
-The **Parts** pane on the left holds the component library: batteries, fuses, fuse boxes, switches, relays, lamps, motors, gauges, connectors and electronic parts, grouped by category.
+The **Parts** pane on the left holds the component library: batteries, fuses, fuse boxes, switches, relays, lamps, motors, gauges, connectors and electronic parts, grouped by category. Household and factory parts have their own categories.
+
+The order of the categories, and which ones start open, follow the **Project type**. In a household project, **Household**, **Loads library** and **Wiring & connectors** come first and the vehicle categories are folded away. In a vehicle project, the mains categories are folded away. A **Mixed** project opens everything. See [Projects and sheets](05-projects-and-sheets.md#project-type).
 
 To place a part:
 
@@ -78,6 +80,20 @@ For more control, add bend points:
 
 Under **Cable** in the wire's Properties, **Routing** chooses **Square corners** or **Straight lines**. Straight lines run directly from point to point, which suits a block diagram or a quick sketch.
 
+## Tidying wires
+
+**Arrange › Tidy wires** (<kbd>Shift</kbd>+<kbd>T</kbd>) lays wires out again with square corners. Each tidied wire goes around the parts, with as few bends as it can, and keeps clear of running along other wires.
+
+What it tidies:
+
+- the selected wires, or
+- if no wires are selected, every wire on the selected parts, or
+- if nothing is selected, every wire on the sheet.
+
+It works on the sheet you are looking at. Wires set to **Straight lines** are left alone. So is a wire with no clear way through; the message after tidying says how many wires it changed. The new route is ordinary bend points, so you can drag them afterwards.
+
+Tidying cannot be done during the live test. To put the wires back, press <kbd>Ctrl</kbd>+<kbd>Z</kbd>, or click **Undo** in the message.
+
 ## Wire labels
 
 Each wire carries a label. What it shows is set for the whole drawing under **Wire labels** (with nothing selected): **Number, colour, size**, **Colour code only**, or **None**.
@@ -108,6 +124,23 @@ To line up several parts at once, select them and use the **Arrange** menu, or t
 - **Align tops**, **Align middles**, **Align bottoms** line them up on a horizontal line.
 - **Distribute across** and **Distribute down** space three or more parts evenly between the outermost two. In the Properties pane these are called **Space evenly across** and **Space evenly down**.
 
+## Starter circuits
+
+**Starter circuits** at the top of the Parts pane are ready-made circuits to place and change. The ones shown follow the project type:
+
+| Project type | Starter circuits |
+| --- | --- |
+| Vehicle | Spot lamps with relay, Split charge with VSR, Split charge with DC-DC charger, Winch with isolator, Air compressor with pressure switch, Reversing camera and monitor. |
+| Household | Consumer unit with RCBOs. See [Household wiring](18-household-wiring.md#the-starter-consumer-unit). |
+| Factory, workshop and control panels | Motor starter, direct on line. See [Factory, workshop and control panels](19-factory-and-control-panels.md#the-direct-on-line-starter). |
+| Mixed | All of them. |
+
+The section starts folded. Click its heading to open it. Hold the pointer over a starter circuit to read what it holds. Typing in **Search parts** finds starter circuits of every type.
+
+To place one, drag it onto the sheet, or click it to drop it in the middle of the view. Its parts get fresh references and its wires get fresh numbers. A coil and its contacts that share a reference in the starter circuit still share one new reference. The wires are tidied around the parts where they land.
+
+The sizes, ratings and lengths in a starter circuit are typical starting points, not a design. Change them to suit your own parts and runs.
+
 ## Blocks: reusable circuits
 
 A block is a piece of circuit you use again and again, such as a relay-switched lamp with its fuse and switch.
@@ -133,5 +166,7 @@ After a lot of editing, wire numbers and references end up out of order. **Edit 
 - **All sheets**, or only the sheet you are on.
 
 A part drawn on several sheets keeps one reference, and connectors keep pointing at the connector they mate with. Renumbering can be undone.
+
+Control panel drawings often number wires by potential instead. See [Numbering wires by potential](19-factory-and-control-panels.md#numbering-wires-by-potential).
 
 > Renumbering changes the numbers on any labels you have already printed. Do it before you print labels, not after.

@@ -15,22 +15,26 @@ The **user manual** covers everything in the app, from installing it to printing
 9. [Component builder and My components](manual/09-component-builder.md)
 10. [Design checks](manual/10-design-checks.md)
 11. [Circuit trace and live test](manual/11-trace-and-live-test.md)
-12. [Fuses and loads](manual/12-fuses-and-loads.md)
-13. [Lists and reports](manual/13-lists-and-reports.md)
-14. [Build pack and wire labels](manual/14-build-pack-and-labels.md)
-15. [Harness formboard](manual/15-harness-formboard.md)
-16. [Vehicle locations view](manual/16-vehicle-locations.md)
-17. [Revision history and save points](manual/17-revisions-and-save-points.md)
-18. [Import and export](manual/18-import-and-export.md)
-19. [Language and theme](manual/19-language-and-theme.md)
-20. [Keyboard and mouse](manual/20-keyboard-and-mouse.md)
-21. [The Claude add-on](manual/21-claude-add-on.md)
-22. [Troubleshooting and questions](manual/22-troubleshooting.md)
-23. [Disclaimer](manual/23-disclaimer.md)
+12. [Fault finding](manual/12-fault-finding.md)
+13. [Fuses and loads](manual/13-fuses-and-loads.md)
+14. [Lists and reports](manual/14-lists-and-reports.md)
+15. [Build pack and wire labels](manual/15-build-pack-and-labels.md)
+16. [Harness formboard](manual/16-harness-formboard.md)
+17. [Vehicle locations view](manual/17-vehicle-locations.md)
+18. [Household wiring](manual/18-household-wiring.md)
+19. [Factory, workshop and control panels](manual/19-factory-and-control-panels.md)
+20. [Revision history and save points](manual/20-revisions-and-save-points.md)
+21. [Import and export](manual/21-import-and-export.md)
+22. [Language and theme](manual/22-language-and-theme.md)
+23. [Keyboard and mouse](manual/23-keyboard-and-mouse.md)
+24. [The Claude add-on](manual/24-claude-add-on.md)
+25. [Troubleshooting and questions](manual/25-troubleshooting.md)
+26. [Disclaimer](manual/26-disclaimer.md)
 
-Please read the [Disclaimer](manual/23-disclaimer.md) before you build from your drawings.
+Please read the [Disclaimer](manual/26-disclaimer.md) before you build from your drawings.
 
 - [The Claude add-on](claude-addon.md): setting up the optional add-on that lets Claude read and edit your projects, and the list of what it can do.
+- [Where the mains checks come from](standards-sources.md): the rules behind the household and factory checks, and the sources for each one.
 
 ## For people working on LoomWright
 

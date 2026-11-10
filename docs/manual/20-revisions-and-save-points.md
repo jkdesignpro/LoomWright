@@ -33,7 +33,7 @@ Under **Issued revisions** each revision is listed, newest first, with its date,
 
 - **Compare with now** shows what has changed since that revision.
 - **Open copy** opens the project as it was at that revision in a new tab, to look at or print. It is a separate copy; close its tab when you are done.
-- **Restore** puts the drawings back to how they were at that revision. The list of revisions is kept, so you can go forward again by restoring a later one, and **Restore** can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>.
+- **Restore** puts the drawings back to how they were at that revision. The list of revisions is kept, so you can go forward again by restoring a later one, and **Restore** can be undone with <kbd>Ctrl</kbd>+<kbd>Z</kbd>. Build and test progress belongs to the loom on the bench, not the drawing, so restoring keeps it for every wire that is still there. See [Build](14-lists-and-reports.md#build).
 
 ## Comparing revisions
 

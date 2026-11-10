@@ -47,7 +47,7 @@ In order of how far back they go:
 3. **Issued revisions** in the History pane hold every revision you issued, in the project file.
 4. Your own backups, or version control such as Git.
 
-See [Revision history and save points](17-revisions-and-save-points.md).
+See [Revision history and save points](20-revisions-and-save-points.md).
 
 ### Changes made by Claude do not appear
 
@@ -101,13 +101,37 @@ Relays operate themselves when their coil has a feed and an earth. Operate the s
 
 It needs a path from a battery through closed switches and good fuses to its feed pin, and a path from its earth pin to earth. Trace both sides to find the gap. A battery isolator starts **On**; an alternator or solar panel only supplies power when set to **Engine running** or **Sun**.
 
+### A motor starter drops out when I release the start button
+
+The live test does not remember that a contactor was pulled in, so a hold-in contact does not latch. Leave the start button on **Pressed** to see the circuit running. See [Operating parts](11-trace-and-live-test.md#operating-parts).
+
+### Nothing comes on in the live test of a household project
+
+The household **Supply** part is not a supply in the live test, so household circuits do not run. Use the [circuit schedule](18-household-wiring.md#the-circuit-schedule) and the checks for household circuits.
+
+### The live test figures look too high or too low
+
+Check the **System voltage** in the drawing settings, and that every wire has a size and a length and every load a current or wattage. The notes in the live test panel list wires and loads with missing figures. See [Volts and amps](11-trace-and-live-test.md#volts-and-amps).
+
+### Fault finding says to give loads a reference
+
+Fault finding only offers loads and relays with a reference, such as `H1` or `K1`. Household and three-phase parts are not offered at all. See [Fault finding](12-fault-finding.md).
+
 ### The fuse schedule shows 0 A loads
 
-LoomWright only knows a load's current if the part has a current or wattage. Fill in lamps' wattage and loads' current. See [How LoomWright works out a load](12-fuses-and-loads.md#how-loomwright-works-out-a-load).
+LoomWright only knows a load's current if the part has a current or wattage. Fill in lamps' wattage and loads' current. See [How LoomWright works out a load](13-fuses-and-loads.md#how-loomwright-works-out-a-load).
+
+### The Circuit schedule, Motors or PLC I/O tab is missing
+
+These tabs only appear in projects that need them. Set the **Project type** to **Household**, **Factory, workshop and control panels** or **Mixed**. See [Project type](05-projects-and-sheets.md#project-type).
+
+### My wire colours changed to DIN codes
+
+Choosing a household, factory or mixed project type changes **Land Rover / British** colour codes to **DIN**. Set **Colour codes** back in the drawing settings if you want them.
 
 ### Imported lengths are a thousand times too big or too small
 
-LoomWright guessed the unit. Undo the import, add a header row such as `Wire,Length mm` or `Wire,Length m`, and import again. See [Measured wire lengths](18-import-and-export.md#measured-wire-lengths).
+LoomWright guessed the unit. Undo the import, add a header row such as `Wire,Length mm` or `Wire,Length m`, and import again. See [Measured wire lengths](21-import-and-export.md#measured-wire-lengths).
 
 ## Printing
 

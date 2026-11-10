@@ -30,5 +30,5 @@ Markers belong to a part's reference and type, so a part drawn on several sheets
 ## Using the locations
 
 - **Export SVG** and **Export PNG** save the picture with its markers.
-- The build pack's **Component locations** section prints the picture with its markers and a table of every part's location. See [Build pack and wire labels](14-build-pack-and-labels.md).
+- The build pack's **Component locations** section prints the picture with its markers and a table of every part's location. See [Build pack and wire labels](15-build-pack-and-labels.md).
 - The parts list shows each line's locations, which helps when ordering for one area of the vehicle at a time.

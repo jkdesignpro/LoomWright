@@ -11,7 +11,9 @@ Click a wire to select it. The Properties pane shows the wire number and code at
 - **Identity**: wire number, circuit and harness.
 - **Colour**: main colour, tracer and second tracer.
 - **Cable**: size, insulation, multicore cable, length, current, routing and notes.
+- **Installation (mains guide)**: only in household, factory and mixed projects. How a mains cable is run. See [Cables and how they are run](18-household-wiring.md#cables-and-how-they-are-run).
 - **End A** and **End B**: terminal, fitting, strip length, seal and heat shrink for each end.
+- **Build and test**: whether the wire is cut, its ends are done, it is fitted and it has passed its test. See [Build progress](14-lists-and-reports.md#build).
 
 At the bottom are **Trace circuit**, **Swap ends** (which turns the wire round, so End A becomes End B), **Clear bends** and **Delete**.
 
@@ -26,6 +28,36 @@ At the bottom are **Trace circuit**, **Swap ends** (which turns the wire round, 
 A wire has a **main colour** and up to two **tracers** (the thin stripe along the insulation). The wire is drawn in its colours on the sheet, and its colour code is written on its label, for example `NR` for brown with a red tracer.
 
 If the colour you pick is already used by other wires, a note under the colour says what for, such as "R is also used for Charging in Rear body". If the same colour is already used for a different circuit in the same harness, the note is shown as a warning, because two identical wires in one loom are easy to mix up.
+
+## Suggested colours
+
+Under the colour fields, **Suggested** shows up to five colours that would suit the selected wire. Hold the pointer over one to see why it is suggested. Click one to give the wire that colour. The next wire you draw takes it too.
+
+LoomWright picks the suggestions from the cable you have:
+
+- If **My stock** holds cable of the wire's size, it suggests from those. See [Shopping](14-lists-and-reports.md#shopping).
+- Otherwise, if you have ticked colours under [Colours I stock](#colours-i-stock), it suggests from those.
+- Otherwise it suggests from every colour.
+- Unless **Only offer colours I stock** is ticked, it also offers the colours already used in the same circuit.
+
+It then ranks them. A colour scores higher when:
+
+- other wires on the same circuit already use it,
+- it is the usual colour for the job in your colour code. With **Land Rover / British** codes, that is black for an earth, brown for a permanent battery feed and white for an ignition feed. With **DIN**, brown for an earth and red for a permanent feed. With **SAE**, black for an earth and red for a battery feed,
+- you have enough of it in **My stock**.
+
+A colour scores lower when:
+
+- it is plain earth colour and the wire is not an earth,
+- another circuit already uses it in the same harness,
+- another circuit already uses it in a connector at either end of this wire,
+- you have less of it in stock than the wire needs.
+
+LoomWright treats a wire as an ignition feed when it joins a net label or off-sheet link with `ign`, `15` or `ignition` in its name, or when its circuit name has `ign` or `ignition` in it.
+
+Tick **Pick colours for new wires automatically** to give each new wire the top suggestion as you draw it. This is a project setting.
+
+Household projects do not show suggestions, because mains cable is usually grey or white sheathed twin and earth.
 
 ## Colour codes
 
@@ -109,14 +141,27 @@ Reusing a colour is fine when the circuits run in different harnesses, or when e
 
 The guide figures are for a single PVC automotive cable in free air. A wire bundled tightly in a loom, running hot in an engine bay, or a long run, can need a size larger. Use them to catch mistakes, then check your cable maker's ratings, and always fuse to protect the wire.
 
+## Heat and bundling
+
+For each wire with a **Current** set, LoomWright reduces the guide current for two things:
+
+- **The air around the harness.** An engine bay harness is taken as 80 °C, and other harnesses as 30 °C. A harness counts as an engine bay harness when its name has `engine`, `bay`, `exhaust` or `motor` in it. To set your own figure, open the harness on the [formboard](16-harness-formboard.md#heat) and fill in **Air around this harness (°C)**.
+- **Loaded wires in one bundle.** Once a harness is laid out on the formboard, LoomWright counts how many wires carrying current share the busiest branch the wire runs through. Two or three loaded wires take the rating down to 80%, four to six to 70%, seven to nine to 60%, and ten or more to 50%. A harness with no formboard layout is not reduced for bundling.
+
+The reduction for heat uses the temperature rating of the wire's **Insulation**. If the insulation is not set, LoomWright assumes 105 °C.
+
+When a wire carries more than the reduced figure, the design checks say so and suggest the size to use, for example "W5 carries 20 A but 1.5 mm² in Engine bay (80 °C, 3 loaded wires in the bundle) is good for about 9.4 A. Use 2.5 mm²." When the air is as hot as the insulation's rating, the check says the insulation is not rated for this temperature.
+
 On the drawing, heavier wires are drawn thicker.
 
 ## Length, current and voltage drop
 
-- **Length (m)** is the length of the wire as fitted, in metres. Lengths add up into the cable totals, the cut lists and the parts cost. If you lay the harness out on a formboard, LoomWright can fill the lengths in for you: see [Harness formboard](15-harness-formboard.md#wire-lengths). **File › Import wire lengths** brings them in from a list.
+- **Length (m)** is the length of the wire as fitted, in metres. Lengths add up into the cable totals, the cut lists and the parts cost. If you lay the harness out on a formboard, LoomWright can fill the lengths in for you: see [Harness formboard](16-harness-formboard.md#wire-lengths). **File › Import wire lengths** brings them in from a list.
 - **Current (A)** is the current the wire carries when its load is on.
 
-With both filled in, LoomWright works out the **voltage drop** along the wire and shows it under the current, for example "Voltage drop 0.02 V (0.2% of 12 V) one way at 25 A". It uses the resistance of copper at 20 °C for the one conductor, so it does not include the earth return or the connections. A drop of more than 3% of the system voltage is shown as a warning and appears in the design checks. Set the system voltage (12, 24 or 48 V) in the drawing settings.
+With both filled in, LoomWright works out the **voltage drop** along the wire and shows it under the current, for example "Voltage drop 0.02 V (0.2% of 12 V) one way at 25 A". It uses the resistance of copper at 20 °C for the one conductor, so it does not include the earth return or the connections. A drop of more than 3% of the system voltage is shown as a warning and appears in the design checks. Set the system voltage (12, 24, 48, 110, 230 or 400 V) in the drawing settings.
+
+Household and factory projects leave this 3% check out of the design checks. Their cables are checked with the mains rules instead. See [Household wiring](18-household-wiring.md#the-household-checks).
 
 ## Insulation
 
@@ -133,7 +178,7 @@ With both filled in, LoomWright works out the **voltage drop** along the wire an
 | Silicone | 180 °C |
 | Battery / welding cable | 90 °C |
 
-It appears in the cut list and the cable totals, so you buy the right cable. LoomWright does not change the guide currents for different insulation.
+It appears in the cut list and the cable totals, so you buy the right cable. Its temperature rating is used to reduce the guide current in hot places. See [Heat and bundling](#heat-and-bundling).
 
 ## Multicore cable, routing and notes
 

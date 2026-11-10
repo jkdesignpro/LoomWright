@@ -88,4 +88,4 @@ Open the component in the builder and click **Delete from library**, then click 
 
 ## Components from a picture, with Claude
 
-With the optional Claude add-on, Claude can make a component for you from a photo or a datasheet picture of a part's pinout. It appears under **My components** the next time you switch back to LoomWright. Check the pins against the part before you rely on it. See [The Claude add-on](21-claude-add-on.md).
+With the optional Claude add-on, Claude can make a component for you from a photo or a datasheet picture of a part's pinout. It appears under **My components** the next time you switch back to LoomWright. Check the pins against the part before you rely on it. See [The Claude add-on](24-claude-add-on.md).

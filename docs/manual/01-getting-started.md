@@ -2,9 +2,11 @@
 
 LoomWright is a free program for drawing wiring diagrams, written first for vehicle looms. You draw the circuit with real components, give each wire its colour, size, length and circuit, and LoomWright turns that into the lists you need at the bench: a wire list, cut lists, connector tables, a fuse schedule, labels and a printable build pack.
 
+LoomWright also draws household wiring, workshop and factory wiring, and control panels. Each project has a **Project type** that shows the parts, lists and checks for that kind of work. See [Projects and sheets](05-projects-and-sheets.md#project-type).
+
 It works offline. Your projects are ordinary files on your computer, saved with the extension `.loom`.
 
-> LoomWright is a planning and drawing tool. Its checks and hints are guidance only, and it does not replace a qualified electrician or engineer. Read the [Disclaimer](23-disclaimer.md) before you build from your drawings.
+> LoomWright is a planning and drawing tool. Its checks and hints are guidance only, and it does not replace a qualified electrician or engineer. Read the [Disclaimer](26-disclaimer.md) before you build from your drawings.
 
 This chapter covers installing LoomWright, opening it for the first time, and drawing a first small circuit.
 
@@ -78,11 +80,13 @@ The rest of this manual explains each step in more detail. Good places to go nex
 - [The window](02-the-window.md) names the parts of the screen.
 - [Drawing](03-drawing.md) covers placing, wiring and arranging.
 - [Wires and colours](04-wires-and-colours.md) covers wire colours, sizes and the colour codes.
+- [Drawing](03-drawing.md#starter-circuits) also has ready-made starter circuits, such as spot lamps with a relay or a split charge, to place and change.
 
 ## Getting help inside LoomWright
 
-- This manual is built in: open it from the **Help** menu, or press <kbd>F1</kbd>. Use the search box at the top to find a word anywhere in it.
+- This manual is built in. Open it with **Help › User manual**, or press <kbd>F1</kbd>. <kbd>F1</kbd> opens the chapter for what you are doing, such as the live test, the formboard or the component builder. Otherwise it opens the chapter you last read. Use the search box at the top to find a word anywhere in it.
+- **Help › Disclaimer** shows what LoomWright can and cannot tell you.
 - Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to search every command, sheet, part and wire by name.
-- **Help › Keyboard and mouse** lists the main shortcuts. [Keyboard and mouse](20-keyboard-and-mouse.md) has the full list.
+- **Help › Keyboard and mouse** lists the main shortcuts. [Keyboard and mouse](23-keyboard-and-mouse.md) has the full list.
 - Hold the pointer over a button to see what it does.
 - The status bar at the bottom of the window shows a hint for what you are doing.

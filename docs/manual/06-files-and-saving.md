@@ -47,7 +47,7 @@ Besides your project files, LoomWright keeps a few things of its own on this com
 | What | Where it is kept |
 | --- | --- |
 | The projects you had open, including unsaved changes | The app's own storage. They reopen next time you start LoomWright. |
-| Save points (copies of each project at points in time) | The app's own storage. See [Save points](17-revisions-and-save-points.md#save-points). |
+| Save points (copies of each project at points in time) | The app's own storage. See [Save points](20-revisions-and-save-points.md#save-points). |
 | My components, My blocks and your saved palette of colours | A file called `library.json` in the desktop app's data folder, or the browser's storage when running in a browser. |
 | Language, theme and similar settings | The app's own storage. |
 
@@ -77,5 +77,5 @@ Export your components and blocks now and then with **Tools › Export my compon
 ## Sharing a project with someone
 
 - Send the `.loom` file. Custom components used in the project travel inside it, so the other person sees the same symbols. Their colour palette and blocks are their own.
-- For someone without LoomWright, use **File › Save read-only web page**. It writes a single web page with the drawings and the wire list, which anyone can open in a browser. See [Import and export](18-import-and-export.md#a-read-only-web-page).
-- For the workshop, print a build pack. See [Build pack and wire labels](14-build-pack-and-labels.md).
+- For someone without LoomWright, use **File › Save read-only web page**. It writes a single web page with the drawings and the wire list, which anyone can open in a browser. See [Import and export](21-import-and-export.md#a-read-only-web-page).
+- For the workshop, print a build pack. See [Build pack and wire labels](15-build-pack-and-labels.md).
