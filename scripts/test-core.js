@@ -45,6 +45,17 @@ assert.strictEqual(L.view(s, 1).sheet, s.sheets[1], 'numeric index is 0-based');
 assert.strictEqual(L.view(s, '2').sheet, s.sheets[1], 'string number is 1-based');
 assert.strictEqual(L.view(s, s.sheets[1].name).sheet, s.sheets[1], 'lookup by name');
 
+// voltage drop checks follow the system voltage
+{
+  const t = L.newDoc('drop'); const v = L.view(t, 0);
+  L.addPart(v, 'battery', { label: 'B1' }); L.addPart(v, 'lamp', { label: 'H1' });
+  L.addWire(v, 'B1:+', 'H1:1', { colour: 'red', gauge: '1.0', length: 6, current: 5 });
+  const warns = () => L.validate(t).filter((c) => /voltage drop/.test(c.text)).length;
+  assert.strictEqual(warns(), 1, '1.0mm² at 5A over 6m is over 3% of 12V');
+  t.settings.volts = '24';
+  assert.strictEqual(warns(), 0, 'the same wire is under 3% of 24V');
+}
+
 // colour codes
 assert.strictEqual(L.wireCode({ settings: { standard: 'lr' } }, { colour: 'brown', tracer: 'red' }), 'NR');
 assert.strictEqual(L.wireCode({ settings: { standard: 'din' } }, { colour: 'brown', tracer: 'red' }), 'BN/RD');

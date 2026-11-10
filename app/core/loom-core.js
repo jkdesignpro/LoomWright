@@ -625,7 +625,7 @@
     return {
       format: FORMAT, version: 2, title: title || 'Untitled project',
       meta: { project: '', drawnBy: '', revision: 'A', date: new Date().toISOString().slice(0, 10), notes: '' },
-      settings: { standard: 'lr', labels: 'full', titleBlock: true, colourKey: true, stock: [], stockOnly: false },
+      settings: { standard: 'lr', volts: 12, labels: 'full', titleBlock: true, colourKey: true, stock: [], stockOnly: false },
       harnesses: [], customColours: [], customParts: [], sheets: [newSheet('Sheet 1')],
     };
   }

@@ -122,7 +122,7 @@ function gauge(g) {
 }
 function summary(project) {
   const s = project.settings;
-  const lines = [`Project: ${project.title}`, `Colour standard: ${L.STANDARDS[s.standard].name}`, `Harnesses: ${project.harnesses.join(', ') || 'none'}`];
+  const lines = [`Project: ${project.title}`, `System voltage: ${s.volts || 12} V`, `Colour standard: ${L.STANDARDS[s.standard].name}`, `Harnesses: ${project.harnesses.join(', ') || 'none'}`];
   if (s.stock && s.stock.length) lines.push(`Colours in stock${s.stockOnly ? ' (only these are offered)' : ''}: ${s.stock.join(', ')}`);
   L.views(project).forEach((v, i) => { lines.push('', `=== Sheet ${i + 1}: ${v.sheet.name} ===`); lines.push(sheetSummary(v)); });
   return lines.join('\n');
@@ -240,14 +240,16 @@ server.registerTool('create_diagram', {
   inputSchema: {
     path: z.string().describe('File name or path, e.g. "defender-aux.loom"'), title: z.string(), project: z.string().optional().describe('Vehicle or client name for the title block'),
     standard: z.enum(['lr', 'din', 'sae', 'custom']).optional().describe('Wire colour code standard; lr = Land Rover/British'),
+    volts: z.number().optional().describe('System voltage for voltage-drop checks: 12 (default), 24 or 48'),
     sheet: z.string().optional().describe('Name of the first sheet'), harnesses: z.array(z.string()).optional(), overwrite: z.boolean().optional(),
   },
-}, wrap(async ({ path: p, title, project, standard, sheet, harnesses, overwrite }) => {
+}, wrap(async ({ path: p, title, project, standard, volts, sheet, harnesses, overwrite }) => {
   const full = resolvePath(p);
   if (fs.existsSync(full) && !overwrite) throw new Error(`${full} already exists. Pass overwrite: true to replace it, or edit it with the other tools.`);
   const doc = L.newDoc(title);
   if (project) doc.meta.project = project;
   if (standard) doc.settings.standard = standard;
+  if (volts) doc.settings.volts = volts;
   if (sheet) doc.sheets[0].name = sheet;
   (harnesses || []).forEach((h) => addHarness(doc, h));
   save(full, doc);
@@ -259,6 +261,7 @@ server.registerTool('build_diagram', {
   description: 'Text-to-diagram in one call: add many parts and wires to one sheet, lay them out automatically, and save. Creates the project if it does not exist, and the sheet if the name is new. Parts without x/y are placed automatically.',
   inputSchema: {
     path: z.string(), title: z.string().optional(), project: z.string().optional(), standard: z.enum(['lr', 'din', 'sae', 'custom']).optional(),
+    volts: z.number().optional().describe('System voltage: 12, 24 or 48'),
     sheet: z.union([z.string(), z.number()]).optional().describe('Sheet number or name. A new name adds a sheet.'),
     parts: z.array(partShape).default([]), wires: z.array(wireShape).default([]),
     replace: z.boolean().optional().describe('Clear this sheet first (or, with no sheet given, start a new project)'),
@@ -271,6 +274,7 @@ server.registerTool('build_diagram', {
   if (a.title) project.title = a.title;
   if (a.project) project.meta.project = a.project;
   if (a.standard) project.settings.standard = a.standard;
+  if (a.volts) project.settings.volts = a.volts;
   const doc = sheetView(project, a.sheet, true);
   if (a.replace && a.sheet != null) { doc.parts = []; doc.wires = []; }
   const errors = [];

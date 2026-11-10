@@ -19,6 +19,7 @@
 - **Claude add-on.** All tools work on sheets (`sheet` argument). New `add_sheet`, `colour_usage` and
   `set_colour_stock` tools. `define_component` can draw a full symbol with pins anywhere on the outline,
   so Claude can make a component from a picture, and saves it to the app's *My components* library.
+- System voltage setting (12, 24 or 48 V) for voltage-drop checks; it was fixed at 12 V.
 - Name is now written LoomWright everywhere.
 
 ## 0.1.0

@@ -705,7 +705,7 @@
     return h;
   }
   function wirePanel(w) {
-    const vd = L.voltageDrop(w), sys = 12;
+    const vd = L.voltageDrop(w), sys = parseFloat(project.settings.volts) || 12;
     // other jobs this colour combination already does in the project
     const code = L.wireCode(doc, w);
     const others = L.colourUsage(project).find((e) => e.code === code);
@@ -717,7 +717,7 @@
     if (otherUses.length) h += `<div class="callout ${clash.length ? 'warn' : ''}" style="${clash.length ? '' : 'background:var(--raise);border-color:var(--line)'}"><b>${esc(code)}</b> is also used for ${otherUses.map((u) => esc([u.circuit || 'no circuit', u.harness].filter(Boolean).join(' in '))).join('; ')}.${clash.length ? ' Same harness, different circuit: make sure they can be told apart, for example with wire numbers or sleeves.' : ''}</div>`;
     h += `</div><div class="sec"><h3>Cable</h3><label class="fld"><span>Size</span><select id="f-gauge" data-field="gauge">${gaugeOptions(w.gauge)}</select></label>`;
     h += `${fld('Length (m)', 'length', w.length, 'number', 'min="0" step="0.1"')}${fld('Current (A)', 'current', w.current, 'number', 'min="0" step="0.5"')}`;
-    if (vd != null) h += `<div class="callout ${vd > sys * 0.03 ? 'warn' : 'ok'}">Voltage drop ${vd.toFixed(2)} V (${((vd / sys) * 100).toFixed(1)}% of 12 V) one way at ${esc(w.current)} A.${vd > sys * 0.03 ? ' Over 3%: consider a heavier size.' : ''}</div>`;
+    if (vd != null) h += `<div class="callout ${vd > sys * 0.03 ? 'warn' : 'ok'}">Voltage drop ${vd.toFixed(2)} V (${((vd / sys) * 100).toFixed(1)}% of ${sys} V) one way at ${esc(w.current)} A.${vd > sys * 0.03 ? ' Over 3%: consider a heavier size.' : ''}</div>`;
     h += `<label class="fld"><span>Routing</span><select id="f-route" data-field="route"><option value="auto"${w.route !== 'straight' ? ' selected' : ''}>Square corners</option><option value="straight"${w.route === 'straight' ? ' selected' : ''}>Straight lines</option></select></label>`;
     h += `<label class="fld"><span>Notes</span><textarea id="f-notes" data-field="notes" placeholder="e.g. run inside chassis rail">${esc(w.notes)}</textarea></label></div>`;
     h += `<div class="row-btns"><button class="btn" data-act="swap">Swap ends</button><button class="btn" data-act="clear-bends">Clear bends</button><button class="btn danger" data-act="delete">Delete</button></div>`;
@@ -738,6 +738,7 @@
         ${checks.length ? `<button class="callout warn" data-act="show-checks">${plural(checks.length, 'design check')} to review on this sheet</button>` : ''}
       </div>
       <div class="sec"><h3>Drawing</h3>
+        <label class="fld"><span>System voltage</span><select id="f-volts" data-field="settings:volts">${[12, 24, 48].map((v) => `<option value="${v}"${(parseFloat(s.volts) || 12) === v ? ' selected' : ''}>${v} V</option>`).join('')}</select></label>
         <label class="fld"><span>Colour codes</span><select id="f-std" data-field="settings:standard">${Object.values(L.STANDARDS).map((x) => `<option value="${x.id}"${x.id === s.standard ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
         <label class="fld"><span>Wire labels</span><select id="f-labels" data-field="settings:labels"><option value="full"${s.labels === 'full' ? ' selected' : ''}>Number, colour, size</option><option value="code"${s.labels === 'code' ? ' selected' : ''}>Colour code only</option><option value="none"${s.labels === 'none' ? ' selected' : ''}>None</option></select></label>
         <label class="fld check"><input type="checkbox" id="f-tb" data-field="settings:titleBlock"${s.titleBlock !== false ? ' checked' : ''}><span>Title block on exports</span></label>
