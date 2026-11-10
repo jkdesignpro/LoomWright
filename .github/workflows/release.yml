@@ -48,12 +48,38 @@ jobs:
       - run: npm ci
 
       - uses: tauri-apps/tauri-action@v0
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
           releaseName: 'LoomWright v__VERSION__'
-          releaseBody: 'Download the installer for your computer below. Windows: .msi or -setup.exe. Apple Silicon Mac: .dmg. Linux: .AppImage or .deb.'
+          releaseBody: 'Download the installer for your computer below. Windows: .msi or -setup.exe, or the -portable.zip to run from a folder or USB stick without installing. Apple Silicon Mac: .dmg. Linux: .AppImage or .deb.'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      # A portable copy for Windows: unzip anywhere and run. The `portable` file next to the
+      # program makes LoomWright keep its data in a LoomWright-data folder beside it.
+      - name: Portable Windows zip
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $v = "${{ steps.tauri.outputs.appVersion }}"
+          $dir = "LoomWright-$v-portable"
+          $zip = "LoomWright_${v}_x64-portable.zip"
+          New-Item -ItemType Directory $dir | Out-Null
+          Copy-Item src-tauri/target/release/loomwright.exe "$dir/LoomWright.exe"
+          Set-Content "$dir/portable" "This file makes LoomWright keep its settings and components in the LoomWright-data folder next to it. Delete it to use the normal user folders."
+          Copy-Item LICENSE "$dir/LICENSE.txt"
+          Compress-Archive -Path $dir -DestinationPath $zip
+          gh api --method POST -H "Content-Type: application/zip" "https://uploads.github.com/repos/${{ github.repository }}/releases/${{ steps.tauri.outputs.releaseId }}/assets?name=$zip" --input $zip
+
+      - name: Keep the portable zip as a build artifact
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: LoomWright_*_x64-portable.zip

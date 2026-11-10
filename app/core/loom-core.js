@@ -14,7 +14,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const FORMAT = 'loomwright';
   const GRID = 10;
   const INK = '#1d2320';
@@ -476,7 +476,7 @@
   });
   def('offpage', {
     name: 'Off-sheet reference', cat: 'Wiring & connectors', prefix: 'REF', w: 100, h: 20, noLabel: true,
-    props: [{ k: 'text', l: 'Goes to', d: 'TO REAR LOOM' }],
+    props: [{ k: 'text', l: 'Text', d: 'TO REAR LOOM' }, { k: 'link', l: 'Link name (same on both sheets)', d: '' }],
     pins: [pin('L', 0, 10, 'Left end'), pin('R', 100, 10, 'Right end')],
     shapes: [L(0, 10, 10, 10), P('M10 2 H86 L96 10 L86 18 H10 Z', { fill: 'paper', w: 1.6 }), L(96, 10, 100, 10), T(50, 13, '{text}', { size: 7, weight: 600 })],
   });
@@ -621,15 +621,20 @@
      parts and wires; colours, custom components, harnesses and the title block
      details are shared across the project. */
   function newSheet(name) { return { id: uid('s'), name: name || 'Sheet 1', parts: [], wires: [] }; }
+  const DEFAULT_SETTINGS = {
+    standard: 'lr', volts: 12, labels: 'full', titleBlock: true, colourKey: true, stock: [], stockOnly: false,
+    page: 'fit', orientation: 'landscape', bw: false, junctions: true, xrefs: true, clouds: '',
+    cutAllowance: 0.15, currency: '£', cableCosts: {},
+  };
   function newDoc(title) {
     return {
-      format: FORMAT, version: 2, title: title || 'Untitled project',
+      format: FORMAT, version: 3, id: uid('prj'), title: title || 'Untitled project',
       meta: { project: '', drawnBy: '', revision: 'A', date: new Date().toISOString().slice(0, 10), notes: '' },
-      settings: { standard: 'lr', volts: 12, labels: 'full', titleBlock: true, colourKey: true, stock: [], stockOnly: false },
-      harnesses: [], customColours: [], customParts: [], sheets: [newSheet('Sheet 1')],
+      settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
+      harnesses: [], cables: [], customColours: [], customParts: [], revisions: [], harnessLayouts: {}, vehicle: null, sheets: [newSheet('Sheet 1')],
     };
   }
-  const SHARED = ['format', 'version', 'title', 'meta', 'settings', 'harnesses', 'customColours', 'customParts', 'sheets'];
+  const SHARED = ['format', 'version', 'id', 'title', 'meta', 'settings', 'harnesses', 'cables', 'customColours', 'customParts', 'revisions', 'harnessLayouts', 'vehicle', 'sheets'];
   /* A view of one sheet that reads and writes through to the project, so every
      function that takes a "doc" (parts + wires + settings) works on a sheet. */
   function view(project, sheetRef) {
@@ -658,7 +663,8 @@
   function resolved(doc, part) {
     const d = partDef(doc, part.type);
     if (!d) return { w: 40, h: 40, pins: [], shapes: [R2(0, 0, 40, 40, { dash: '4 3' }), T(20, 24, '?', { size: 14 })], def: null };
-    const props = { ...defaultProps(d), ...(part.props || {}) };
+    let props = { ...defaultProps(d), ...(part.props || {}) };
+    if (d.derive) props = { ...props, ...d.derive(props) };
     if (d.gen) { const g = d.gen(props); return { ...g, def: d, props }; }
     return { w: d.w, h: d.h, pins: d.pins, shapes: d.shapes, def: d, props };
   }
@@ -762,14 +768,20 @@
       if (!Array.isArray(doc.parts) || !Array.isArray(doc.wires)) throw new Error('This file is not a LoomWright project.');
       sheets = [{ id: uid('s'), name: doc.title || 'Sheet 1', parts: doc.parts, wires: doc.wires }];
     }
-    const out = { ...base, ...doc, version: 2, meta: { ...base.meta, ...(doc.meta || {}) }, settings: { ...base.settings, ...(doc.settings || {}) } };
-    delete out.parts; delete out.wires; delete out.meta.sheet;
+    const out = { ...base, ...doc, version: 3, meta: { ...base.meta, ...(doc.meta || {}) }, settings: { ...base.settings, ...(doc.settings || {}) } };
+    delete out.parts; delete out.wires; delete out.meta.sheet; delete out.app;
+    if (!out.id) out.id = uid('prj');
     out.customColours = (out.customColours || []).map((c) => ({ ...c, custom: true }));
     out.customParts = out.customParts || [];
     out.harnesses = out.harnesses || [];
+    out.revisions = Array.isArray(out.revisions) ? out.revisions : [];
+    out.cables = Array.isArray(out.cables) ? out.cables : [];
+    out.harnessLayouts = out.harnessLayouts && typeof out.harnessLayouts === 'object' ? out.harnessLayouts : {};
+    out.vehicle = out.vehicle || null;
     out.settings.stock = out.settings.stock || [];
+    out.settings.cableCosts = out.settings.cableCosts || {};
     out.sheets = sheets.map((sh, i) => ({
-      id: sh.id || uid('s'), name: sh.name || `Sheet ${i + 1}`, ...(sh.notes ? { notes: sh.notes } : {}),
+      id: sh.id || uid('s'), name: sh.name || `Sheet ${i + 1}`, ...(sh.notes ? { notes: sh.notes } : {}), ...(sh.page ? { page: sh.page } : {}), ...(sh.orientation ? { orientation: sh.orientation } : {}),
       parts: (sh.parts || []).filter((p) => p && p.type).map((p) => ({ rot: 0, props: {}, ...p })),
       wires: (sh.wires || []).filter((w) => w && w.from && w.to),
     }));
@@ -782,10 +794,119 @@
   /* ------------------------------------------------------------------ */
   function symbolSVG(r, ink = INK) { return r.shapes.map((s) => shapeSVG(s, r.props, ink)).join(''); }
 
+  /* ---- Fixed sheet sizes. 4 drawing units = 1 mm. ---- */
+  const PAGES = { A4: [1188, 840, 6, 4], A3: [1680, 1188, 8, 6], A2: [2376, 1680, 12, 8], A1: [3364, 2376, 16, 12] };
+  function pageOf(doc) {
+    const s = (doc && doc.settings) || {}, sh = (doc && doc.sheet) || {};
+    const size = sh.page || s.page || 'fit', P = PAGES[size];
+    if (!P) return null;
+    const portrait = (sh.orientation || s.orientation) === 'portrait';
+    const [W, H, cols, rows] = portrait ? [P[1], P[0], P[3], P[2]] : P;
+    return { size, portrait, W, H, cols, rows, m: 40, b: 20 };
+  }
+  function zoneOf(page, x, y) {
+    if (!page) return '';
+    const o = page.m + page.b, iw = (page.W - 2 * o) / page.cols, ih = (page.H - 2 * o) / page.rows;
+    const c = Math.max(1, Math.min(page.cols, Math.floor((x - o) / iw) + 1)), r = Math.max(1, Math.min(page.rows, Math.floor((y - o) / ih) + 1));
+    return String.fromCharCode(64 + r) + c;
+  }
+  function frameSVG(page, o = {}) {
+    const { W, H, m, b, cols, rows } = page, iw = (W - 2 * (m + b)) / cols, ih = (H - 2 * (m + b)) / rows;
+    let s = '<g pointer-events="none">';
+    if (o.mode === 'edit') s += `<path d="M-20000 -20000 H20000 V20000 H-20000 Z M0 0 V${H} H${W} V0 Z" fill="#000" fill-opacity=".045" fill-rule="evenodd"/><rect x="0" y="0" width="${W}" height="${H}" fill="none" stroke="#9aa3ab" stroke-width="1"/>`;
+    s += `<rect x="${m}" y="${m}" width="${W - 2 * m}" height="${H - 2 * m}" fill="none" stroke="${INK}" stroke-width="1.6"/>`;
+    s += `<rect x="${m + b}" y="${m + b}" width="${W - 2 * (m + b)}" height="${H - 2 * (m + b)}" fill="none" stroke="${INK}" stroke-width="1"/>`;
+    const t = (x, y, v) => `<text x="${x}" y="${y}" font-size="9" text-anchor="middle" fill="${INK}" font-family="${MONO}">${v}</text>`;
+    for (let i = 0; i < cols; i++) {
+      const x = m + b + i * iw;
+      if (i) s += `<line x1="${x}" y1="${m}" x2="${x}" y2="${m + b}" stroke="${INK}" stroke-width="1"/><line x1="${x}" y1="${H - m - b}" x2="${x}" y2="${H - m}" stroke="${INK}" stroke-width="1"/>`;
+      s += t(x + iw / 2, m + b / 2 + 3.5, i + 1) + t(x + iw / 2, H - m - b / 2 + 3.5, i + 1);
+    }
+    for (let j = 0; j < rows; j++) {
+      const y = m + b + j * ih, L_ = String.fromCharCode(65 + j);
+      if (j) s += `<line x1="${m}" y1="${y}" x2="${m + b}" y2="${y}" stroke="${INK}" stroke-width="1"/><line x1="${W - m - b}" y1="${y}" x2="${W - m}" y2="${y}" stroke="${INK}" stroke-width="1"/>`;
+      s += t(m + b / 2, y + ih / 2 + 3.5, L_) + t(W - m - b / 2, y + ih / 2 + 3.5, L_);
+    }
+    return s + '</g>';
+  }
+
+  /* ---- Cross-references: where off-sheet links, net labels and repeated parts appear elsewhere ---- */
+  function xrefs(project) {
+    const groups = new Map(), out = new Map();
+    if (!project || !Array.isArray(project.sheets)) return out;
+    views(project).forEach((v, i) => {
+      const page = pageOf(v);
+      v.parts.forEach((p) => {
+        const pr = p.props || {};
+        let k = null;
+        if (p.type === 'offpage' && pr.link) k = 'N:' + String(pr.link).trim().toUpperCase();
+        else if (p.type === 'net_label' && pr.text) k = 'N:' + String(pr.text).trim().toUpperCase();
+        else if (p.label && !(partDef(v, p.type) || {}).noLabel) k = 'P:' + p.type + '|' + p.label;
+        if (!k) return;
+        const bb = partBox(v, p);
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push({ p, sheetNo: i + 1, sheetId: v.sheet.id, zone: zoneOf(page, bb.x + bb.w / 2, bb.y + bb.h / 2) });
+      });
+    });
+    groups.forEach((list) => list.forEach((e) => {
+      const t = list.filter((x) => x.sheetId !== e.sheetId).map((x) => ({ sheetNo: x.sheetNo, sheetId: x.sheetId, zone: x.zone, part: x.p.id, text: x.sheetNo + (x.zone ? '/' + x.zone : '') }));
+      if (t.length) out.set(e.p.id, t);
+    }));
+    return out;
+  }
+
+  /* ---- Revision clouds ---- */
+  function cloudPath(x, y, w, h, r = 9) {
+    const nx = Math.max(1, Math.round(w / (2 * r))), ny = Math.max(1, Math.round(h / (2 * r))), sx = w / nx, sy = h / ny;
+    let d = `M${x} ${y}`;
+    for (let i = 0; i < nx; i++) d += ` a${sx / 2} ${sx / 2} 0 0 1 ${sx} 0`;
+    for (let i = 0; i < ny; i++) d += ` a${sy / 2} ${sy / 2} 0 0 1 0 ${sy}`;
+    for (let i = 0; i < nx; i++) d += ` a${sx / 2} ${sx / 2} 0 0 1 ${-sx} 0`;
+    for (let i = 0; i < ny; i++) d += ` a${sy / 2} ${sy / 2} 0 0 1 0 ${-sy}`;
+    return d + ' Z';
+  }
+  function cloudsSVG(doc, c, ink) {
+    if (!c) return '';
+    const col = ink || '#c0392b', boxes = [];
+    doc.parts.forEach((p) => { if (c.parts.has(p.id)) boxes.push(partBox(doc, p)); });
+    doc.wires.forEach((w) => {
+      if (!c.wires.has(w.id)) return;
+      const pts = wirePoints(doc, w); if (!pts) return;
+      const xs = pts.map((q) => q.x), ys = pts.map((q) => q.y);
+      boxes.push({ x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) });
+    });
+    (c.removed || []).forEach((b) => boxes.push({ ...b, removed: true }));
+    // merge overlapping boxes so one change gets one cloud
+    const pad = 14, merged = [];
+    boxes.map((b) => ({ x: b.x - pad, y: b.y - pad - (b.removed ? 0 : 14), w: b.w + pad * 2, h: b.h + pad * 2 + (b.removed ? 0 : 28), removed: b.removed })).forEach((b) => {
+      const hit = merged.find((m) => !(b.x > m.x + m.w || b.x + b.w < m.x || b.y > m.y + m.h || b.y + b.h < m.y));
+      if (hit) { const x1 = Math.max(hit.x + hit.w, b.x + b.w), y1 = Math.max(hit.y + hit.h, b.y + b.h); hit.x = Math.min(hit.x, b.x); hit.y = Math.min(hit.y, b.y); hit.w = x1 - hit.x; hit.h = y1 - hit.y; hit.removed = hit.removed && b.removed; }
+      else merged.push(b);
+    });
+    // a grown cloud can now overlap one made earlier: keep merging until none overlap
+    for (let again = true; again;) {
+      again = false;
+      for (let i = 0; i < merged.length && !again; i++) {
+        for (let j = i + 1; j < merged.length; j++) {
+          const a = merged[i], b = merged[j];
+          if (b.x > a.x + a.w || b.x + b.w < a.x || b.y > a.y + a.h || b.y + b.h < a.y) continue;
+          const x1 = Math.max(a.x + a.w, b.x + b.w), y1 = Math.max(a.y + a.h, b.y + b.h);
+          a.x = Math.min(a.x, b.x); a.y = Math.min(a.y, b.y); a.w = x1 - a.x; a.h = y1 - a.y; a.removed = a.removed && b.removed;
+          merged.splice(j, 1); again = true; break;
+        }
+      }
+    }
+    return merged.map((b) => `<path d="${cloudPath(b.x, b.y, b.w, b.h)}" fill="none" stroke="${col}" stroke-width="1.4"${b.removed ? ' stroke-dasharray="5 4"' : ''} pointer-events="none"/>` +
+      `<path d="M${b.x - 4} ${b.y + 8} l9 -16 l9 16 z" fill="#ffffff" stroke="${col}" stroke-width="1.3" pointer-events="none"/><text x="${b.x + 5}" y="${b.y + 5.5}" font-size="8" font-weight="700" text-anchor="middle" fill="${col}" font-family="${MONO}" pointer-events="none">${esc(c.rev || '')}</text>`).join('');
+  }
+
   function partSVG(doc, p, o) {
     const r = resolved(doc, p), d = r.def || {}, bb = partBox(doc, p), edit = o.mode === 'edit';
     const tf = `translate(${p.x} ${p.y}) rotate(${(p.rot || 0) * 90} ${r.w / 2} ${r.h / 2})${p.flip ? ` translate(${r.w} 0) scale(-1 1)` : ''}`;
-    let s = `<g transform="${tf}"${edit ? ` data-part="${p.id}" class="part"` : ''}>`;
+    let s = '';
+    if (o.simLoads && o.simLoads.has(p.id)) s += `<rect x="${bb.x - 8}" y="${bb.y - 8}" width="${bb.w + 16}" height="${bb.h + 16}" rx="8" fill="#ffb400" fill-opacity=".28" stroke="#e09a00" stroke-width="1.2" pointer-events="none"/>`;
+    if (o.hlParts && o.hlParts.has(p.id)) s += `<rect x="${bb.x - 6}" y="${bb.y - 6}" width="${bb.w + 12}" height="${bb.h + 12}" rx="6" fill="#2f6fde" fill-opacity=".10" stroke="#2f6fde" stroke-width="1" pointer-events="none"/>`;
+    s += `<g transform="${tf}"${edit || o.tag ? ` data-part="${p.id}" class="part"` : ''}>`;
     if (edit) s += `<rect x="-4" y="-4" width="${r.w + 8}" height="${r.h + 8}" fill="transparent"${d.back ? ' pointer-events="stroke" stroke="transparent" stroke-width="10"' : ''}/>`;
     s += symbolSVG(r);
     if (!d.hidePins) r.pins.forEach((pn) => { s += `<circle cx="${pn.x}" cy="${pn.y}" r="2.6" fill="#ffffff" stroke="${INK}" stroke-width="1.2"/>`; });
@@ -793,7 +914,16 @@
     s += '</g>';
     if (!d.noLabel && p.label) s += `<text x="${bb.x + bb.w / 2}" y="${bb.y - 7}" font-size="11" font-weight="600" text-anchor="middle" fill="${INK}" font-family="${MONO}">${esc(p.label)}</text>`;
     const sub = d.sub ? tmpl(d.sub, r.props).trim() : '';
-    if (sub) s += `<text x="${bb.x + bb.w / 2}" y="${bb.y + bb.h + 13}" font-size="9" text-anchor="middle" fill="#4a524d" font-family="${MONO}">${esc(sub)}</text>`;
+    let ty = bb.y + bb.h + 13;
+    if (sub) { s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="9" text-anchor="middle" fill="#4a524d" font-family="${MONO}">${esc(sub)}</text>`; ty += 11; }
+    const xr = o.xref && o.xref.get(p.id);
+    if (xr) {
+      const link = p.type === 'offpage' || p.type === 'net_label';
+      const txt = (link ? '→ ' : 'also on ') + xr.map((x) => x.text).join(', ');
+      s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8" text-anchor="middle" fill="${o.bw ? INK : '#2b5fb8'}" font-family="${MONO}"${edit ? ` data-xref="${p.id}" class="xref"` : ''}>${esc(txt)}${edit ? '<title>Click to go there</title>' : ''}</text>`;
+      ty += 10;
+    }
+    if (o.states && o.states.has(p.id)) s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8.5" font-weight="700" text-anchor="middle" fill="#a35f00" font-family="${MONO}" pointer-events="none">${esc(o.states.get(p.id))}</text>`;
     return s;
   }
 
@@ -801,49 +931,96 @@
     const pts = wirePoints(doc, w);
     if (!pts) return '';
     const d = 'M' + pts.map((p) => `${p.x} ${p.y}`).join(' L');
-    const main = colourById(doc, w.colour) || { hex: '#888' };
+    const main = o.bw ? { hex: '#3a403c' } : colourById(doc, w.colour) || { hex: '#888' };
     const sw = gaugeWidth(w.gauge), edit = o.mode === 'edit', selected = edit && o.selWires && o.selWires.has(w.id);
-    let s = '';
+    const live = o.sim && o.sim.has(w.id), lit = o.hl && o.hl.has(w.id), dim = (o.sim && !live) || (o.hl && !lit);
+    let s = dim ? '<g opacity=".3">' : '';
+    if (live) s += `<path d="${d}" fill="none" stroke="#ffb400" stroke-opacity=".6" stroke-width="${sw + 10}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (lit) s += `<path d="${d}" fill="none" stroke="#2f6fde" stroke-opacity=".38" stroke-width="${sw + 10}" stroke-linejoin="round" stroke-linecap="round"/>`;
     if (selected) s += `<path d="${d}" fill="none" stroke="#2f7dff" stroke-opacity=".35" stroke-width="${sw + 10}" stroke-linejoin="round" stroke-linecap="round"/>`;
     s += `<path d="${d}" fill="none" stroke="#262b28" stroke-width="${sw + 1.6}" stroke-linejoin="round" stroke-linecap="round"/>`;
     s += `<path d="${d}" fill="none" stroke="${main.hex}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"/>`;
-    const tracers = [w.tracer, w.tracer2].filter(Boolean).map((id) => colourById(doc, id)).filter(Boolean);
+    const tracers = o.bw ? [] : [w.tracer, w.tracer2].filter(Boolean).map((id) => colourById(doc, id)).filter(Boolean);
     tracers.forEach((t, i) => {
       const dash = tracers.length === 2 ? `4 8` : `6 6`;
       s += `<path d="${d}" fill="none" stroke="${t.hex}" stroke-width="${sw * 0.62}" stroke-dasharray="${dash}" stroke-dashoffset="${i * 6}" stroke-linejoin="round"/>`;
     });
     [pts[0], pts[pts.length - 1]].forEach((p) => { s += `<circle cx="${p.x}" cy="${p.y}" r="${Math.max(2.4, sw / 2 + 1)}" fill="#262b28"/>`; });
-    if (edit) s += `<path d="${d}" fill="none" stroke="transparent" stroke-width="${Math.max(12, sw + 8)}" data-wire="${w.id}" class="wirehit"/>`;
-    return s;
+    if (edit || o.tag) s += `<path d="${d}" fill="none" stroke="transparent" stroke-width="${Math.max(12, sw + 8)}" data-wire="${w.id}" class="wirehit"/>`;
+    return s + (dim ? '</g>' : '');
   }
 
+  /* Where a wire's label sits: the middle of its longest run, plus any offset the user dragged it by. */
+  function wireLabelPos(doc, w) {
+    const pts = wirePoints(doc, w);
+    if (!pts) return null;
+    let best = null, bl = -1;
+    for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], l = Math.abs(a.x - b.x) + Math.abs(a.y - b.y); if (l > bl) { bl = l; best = [a, b]; } }
+    const [a, b] = best, horiz = a.y === b.y, lab = w.lab || {};
+    const ax = (a.x + b.x) / 2, ay = (a.y + b.y) / 2;
+    return { ax, ay, horiz, x: (horiz ? ax : a.x + 6) + (lab.dx || 0), y: (horiz ? a.y - 6 : ay + 3) + (lab.dy || 0), moved: !!(lab.dx || lab.dy) };
+  }
+  function wireLabelText(doc, w, mode) {
+    const cab = w.cable && ((doc.cables || []).find((c) => c.id === w.cable) || {}).name;
+    return (mode === 'code' ? wireCode(doc, w) : [w.name, wireCode(doc, w), w.gauge ? w.gauge + 'mm²' : ''].filter(Boolean).join(' ')) + (cab ? ` [${cab}]` : '');
+  }
   function wireLabelSVG(doc, w, o) {
     const mode = (doc.settings && doc.settings.labels) || 'full';
     if (mode === 'none') return '';
-    const pts = wirePoints(doc, w);
-    if (!pts) return '';
-    let best = null, bl = -1;
-    for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], l = Math.abs(a.x - b.x) + Math.abs(a.y - b.y); if (l > bl) { bl = l; best = [a, b]; } }
-    const [a, b] = best, horiz = a.y === b.y;
-    const txt = mode === 'code' ? wireCode(doc, w) : [w.name, wireCode(doc, w), w.gauge ? w.gauge + 'mm²' : ''].filter(Boolean).join(' ');
-    const x = horiz ? (a.x + b.x) / 2 : a.x + 6, y = horiz ? a.y - 6 : (a.y + b.y) / 2 + 3;
-    return `<text x="${x}" y="${y}" font-size="8.5" text-anchor="${horiz ? 'middle' : 'start'}" fill="${INK}" font-family="${MONO}" stroke="#ffffff" stroke-width="3" paint-order="stroke" stroke-linejoin="round"${o.mode === 'edit' ? ` data-wire="${w.id}" class="wirehit"` : ''}>${esc(txt)}</text>`;
+    const q = wireLabelPos(doc, w);
+    if (!q) return '';
+    const txt = wireLabelText(doc, w, mode), edit = o.mode === 'edit';
+    let s = '';
+    if (q.moved && Math.hypot(q.x - q.ax, q.y - q.ay) > 16) s += `<line x1="${q.ax}" y1="${q.ay}" x2="${q.x}" y2="${q.y - 3}" stroke="${INK}" stroke-width=".7" stroke-dasharray="2 2" pointer-events="none"/>`;
+    const dim = (o.sim && !o.sim.has(w.id)) || (o.hl && !o.hl.has(w.id));
+    s += `<text x="${q.x}" y="${q.y}" font-size="8.5" text-anchor="${q.horiz || q.moved ? 'middle' : 'start'}" fill="${INK}" font-family="${MONO}" stroke="#ffffff" stroke-width="3" paint-order="stroke" stroke-linejoin="round"${dim ? ' opacity=".3"' : ''}${edit ? ` data-wire="${w.id}" data-wlab="${w.id}" class="wirehit wlab"` : o.tag ? ` data-wire="${w.id}" class="wirehit"` : ''}>${esc(txt)}</text>`;
+    return s;
   }
 
+  /* Pins with two or more wires get a junction dot. */
+  function junctionsSVG(doc) {
+    const n = new Map();
+    doc.wires.forEach((w) => [w.from, w.to].forEach((e) => { const k = e.part + '|' + e.pin; n.set(k, (n.get(k) || 0) + 1); }));
+    let s = '';
+    n.forEach((c, k) => {
+      if (c < 2) return;
+      const [part, ...pin] = k.split('|'), p = doc.parts.find((x) => x.id === part);
+      if (!p || p.type === 'splice') return;
+      const at = pinPos(doc, { part, pin: pin.join('|') });
+      if (at) s += `<circle cx="${at.x}" cy="${at.y}" r="4.2" fill="#262b28" pointer-events="none"/>`;
+    });
+    return s;
+  }
+
+  /* Options shared by the editor and exports: cross-references, black and white, revision clouds. */
+  function renderOptions(doc, o = {}) {
+    const s = doc.settings || {}, project = doc.project;
+    const out = { ...o };
+    if (out.bw == null) out.bw = !!s.bw;
+    if (out.xref === undefined && s.xrefs !== false && project) out.xref = xrefs(project);
+    if (out.clouds === undefined && s.clouds && project && doc.sheet) out.clouds = cloudsFor(project, s.clouds, doc.sheet.id);
+    return out;
+  }
   function renderDiagram(doc, o = {}) {
-    o = { mode: 'export', ...o };
+    o = renderOptions(doc, { mode: 'export', ...o });
     const back = doc.parts.filter((p) => (partDef(doc, p.type) || {}).back), front = doc.parts.filter((p) => !(partDef(doc, p.type) || {}).back);
-    return back.map((p) => partSVG(doc, p, o)).join('') + doc.wires.map((w) => wireSVG(doc, w, o)).join('') + front.map((p) => partSVG(doc, p, o)).join('') + doc.wires.map((w) => wireLabelSVG(doc, w, o)).join('');
+    return back.map((p) => partSVG(doc, p, o)).join('') + doc.wires.map((w) => wireSVG(doc, w, o)).join('') +
+      ((doc.settings || {}).junctions !== false ? junctionsSVG(doc) : '') +
+      front.map((p) => partSVG(doc, p, o)).join('') + doc.wires.map((w) => wireLabelSVG(doc, w, o)).join('') +
+      cloudsSVG(doc, o.clouds, o.bw ? INK : null);
   }
 
+  /* Bounds of what is drawn on a sheet. */
   function bounds(doc) {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     const add = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
-    doc.parts.forEach((p) => { const b = partBox(doc, p); add(b.x - 10, b.y - 20); add(b.x + b.w + 10, b.y + b.h + 18); });
+    doc.parts.forEach((p) => { const b = partBox(doc, p); add(b.x - 10, b.y - 20); add(b.x + b.w + 10, b.y + b.h + 28); });
     doc.wires.forEach((w) => (wirePoints(doc, w) || []).forEach((p) => add(p.x, p.y)));
     if (x0 === Infinity) return { x: 0, y: 0, w: 400, h: 300 };
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
+  /* The sheet itself: the page for fixed sizes, otherwise the drawing. */
+  function sheetBounds(doc) { const pg = pageOf(doc); return pg ? { x: 0, y: 0, w: pg.W, h: pg.H } : bounds(doc); }
 
   /* Where each colour combination is used. Colours can be reused for different
      jobs in different harnesses or sheets; this shows every use side by side. */
@@ -861,38 +1038,222 @@
   }
   function usedColourCombos(doc) { return colourUsage(doc).map((e) => [e.code, e.sample, e.uses]); }
 
+  /* ---- Sheet furniture: colour key, revision table, title block ---- */
+  function keySVG(doc, kx, ky, maxRows, o) {
+    const combos = usedColourCombos(doc);
+    if (!combos.length) return '';
+    let out = `<text x="${kx}" y="${ky}" font-size="11" font-weight="700" fill="${INK}">WIRE COLOUR KEY</text>`;
+    const shown = maxRows && combos.length > maxRows ? combos.slice(0, maxRows - 1) : combos;
+    shown.forEach(([code, w, uses], i) => {
+      const yy = ky + 18 + i * 18, main = o.bw ? { hex: '#3a403c' } : colourById(doc, w.colour) || { hex: '#888' };
+      out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="#262b28" stroke-width="6.5"/><line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${main.hex}" stroke-width="5"/>`;
+      if (!o.bw) [w.tracer, w.tracer2].filter(Boolean).forEach((id, j) => { const t = colourById(doc, id); if (t) out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${t.hex}" stroke-width="3" stroke-dasharray="${w.tracer2 ? '4 8' : '6 6'}" stroke-dashoffset="${j * 6}"/>`; });
+      const what = uses.map((u) => u.circuit).filter(Boolean);
+      out += `<text x="${kx + 48}" y="${yy}" font-size="9" fill="${INK}"><tspan font-weight="700">${esc(code)}</tspan> ${esc(wireColourName(doc, w))}${what.length ? `<tspan fill="#5b625e"> · ${esc(what.join(', ').slice(0, 60))}</tspan>` : ''}</text>`;
+    });
+    if (shown.length < combos.length) out += `<text x="${kx}" y="${ky + 18 + shown.length * 18}" font-size="9" fill="#5b625e">+ ${combos.length - shown.length} more in the colour usage list</text>`;
+    return out;
+  }
+  const REV_ROW = 14;
+  function revRows(doc, max = 6) { return ((doc.revisions || []).slice(-max)).reverse(); }
+  function revTableSVG(doc, x, yBottom, w) {
+    const rows = revRows(doc);
+    if (!rows.length) return { svg: '', h: 0 };
+    const h = (rows.length + 1) * REV_ROW, y = yBottom - h;
+    const cols = [[0, 40, 'REV'], [40, 80, 'DATE'], [120, w - 180, 'DESCRIPTION'], [w - 60, 60, 'BY']];
+    const fit = (v, cw) => { const t = String(v == null ? '' : v), n = Math.floor((cw - 8) / (8 * 0.62)); return t.length > n ? t.slice(0, Math.max(1, n - 1)) + '…' : t; };
+    let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" stroke="${INK}" stroke-width="1"/>`;
+    cols.forEach(([cx, cw, label], i) => {
+      if (i) s += `<line x1="${x + cx}" y1="${y}" x2="${x + cx}" y2="${y + h}" stroke="${INK}" stroke-width=".8"/>`;
+      s += `<text x="${x + cx + 4}" y="${y + 10}" font-size="6.5" fill="#5b625e">${label}</text>`;
+    });
+    rows.forEach((r, i) => {
+      const yy = y + (i + 1) * REV_ROW;
+      s += `<line x1="${x}" y1="${yy}" x2="${x + w}" y2="${yy}" stroke="${INK}" stroke-width=".6"/>`;
+      [r.rev, r.date, r.description, r.by].forEach((v, j) => { s += `<text x="${x + cols[j][0] + 4}" y="${yy + 10}" font-size="8" ${j === 0 ? 'font-weight="700"' : ''} fill="${INK}">${esc(fit(v, cols[j][1]))}</text>`; });
+    });
+    return { svg: s, h };
+  }
+  const TB_W = 420, TB_H = 96;
+  function titleBlockSVG(doc, tx, ty) {
+    const m = doc.meta || {};
+    const fit = (v, w, size) => { const t = String(v == null ? '' : v), n = Math.floor((w - 10) / (size * 0.62)); return t.length > n ? t.slice(0, Math.max(1, n - 1)) + '…' : t; };
+    const cell = (x, y, w, h, label, val, big) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" stroke="${INK}" stroke-width="1"/><text x="${x + 5}" y="${y + 10}" font-size="6.5" fill="#5b625e">${esc(label)}</text><text x="${x + 5}" y="${y + h - 7}" font-size="${big ? 13 : 9}" font-weight="${big ? 700 : 500}" fill="${INK}">${esc(fit(val, w, big ? 13 : 9))}</text>`;
+    const sheetName = doc.sheet ? doc.sheet.name : doc.title, sheetNo = doc.sheet ? `${doc.sheetNo} of ${doc.sheets.length}` : '1 of 1';
+    const pg = pageOf(doc);
+    let out = cell(tx, ty, TB_W, 36, 'SHEET TITLE', sheetName, true);
+    out += cell(tx, ty + 36, 210, 30, 'PROJECT', doc.title) + cell(tx + 210, ty + 36, 150, 30, 'VEHICLE / CLIENT', m.project) + cell(tx + 360, ty + 36, 60, 30, 'SIZE', pg ? pg.size : '—');
+    out += cell(tx, ty + 66, 110, 30, 'DRAWN BY', m.drawnBy) + cell(tx + 110, ty + 66, 90, 30, 'DATE', m.date) + cell(tx + 200, ty + 66, 50, 30, 'REV', m.revision) + cell(tx + 250, ty + 66, 70, 30, 'SHEET', sheetNo) + cell(tx + 320, ty + 66, 100, 30, 'DRAWN WITH', 'LoomWright');
+    return out;
+  }
+  /* Frame, zones, key, revision table and title block for a fixed-size sheet. */
+  function sheetFurnitureSVG(doc, o = {}) {
+    const pg = pageOf(doc);
+    if (!pg) return '';
+    const s = doc.settings || {}, inner = pg.m + pg.b;
+    let out = frameSVG(pg, o);
+    out += '<g pointer-events="none">';
+    if (s.colourKey !== false) out += keySVG(doc, pg.W - inner - 330, inner + 22, Math.floor((pg.H / 2 - inner - 40) / 18), o);
+    if (s.titleBlock !== false) {
+      const tx = pg.W - inner - TB_W, ty = pg.H - inner - TB_H;
+      out += revTableSVG(doc, tx, ty, TB_W).svg + titleBlockSVG(doc, tx, ty);
+    }
+    return out + '</g>';
+  }
+
   function exportSVG(doc, o = {}) {
-    const b = bounds(doc), pad = 40, s = doc.settings || {};
+    const s = doc.settings || {}, pg = pageOf(doc);
+    const ro = renderOptions(doc, { mode: 'export', ...o });
+    if (pg) {
+      let out = `<svg xmlns="http://www.w3.org/2000/svg" width="${pg.W}" height="${pg.H}" viewBox="0 0 ${pg.W} ${pg.H}" font-family="${MONO}" data-page="${pg.size}${pg.portrait ? ' portrait' : ''}">`;
+      out += `<rect x="0" y="0" width="${pg.W}" height="${pg.H}" fill="#ffffff"/>`;
+      out += renderDiagram(doc, ro) + sheetFurnitureSVG(doc, ro);
+      return out + '</svg>';
+    }
+    const b = bounds(doc), pad = 40;
     const combos = s.colourKey !== false ? usedColourCombos(doc) : [];
     const keyW = combos.length ? 330 : 0;
-    const tbH = s.titleBlock !== false ? 96 : 0;
+    const revH = s.titleBlock !== false && (doc.revisions || []).length ? (revRows(doc).length + 1) * REV_ROW : 0;
+    const tbH = s.titleBlock !== false ? TB_H + revH : 0;
     const W = Math.max(b.w + pad * 2 + keyW, 520), H = Math.max(b.h + pad * 2 + tbH, combos.length * 18 + 80 + tbH);
     const X = b.x - pad, Y = b.y - pad;
     let out = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${X} ${Y} ${W} ${H}" font-family="${MONO}">`;
     out += `<rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="#ffffff"/>`;
     out += `<rect x="${X + 8}" y="${Y + 8}" width="${W - 16}" height="${H - 16}" fill="none" stroke="${INK}" stroke-width="1.5"/>`;
-    out += renderDiagram(doc, { mode: 'export' });
-    if (combos.length) {
-      const kx = X + W - keyW + 4, ky = Y + 30;
-      out += `<text x="${kx}" y="${ky}" font-size="11" font-weight="700" fill="${INK}">WIRE COLOUR KEY</text>`;
-      combos.forEach(([code, w, uses], i) => {
-        const yy = ky + 18 + i * 18, main = colourById(doc, w.colour) || { hex: '#888' };
-        out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="#262b28" stroke-width="6.5"/><line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${main.hex}" stroke-width="5"/>`;
-        [w.tracer, w.tracer2].filter(Boolean).forEach((id, j) => { const t = colourById(doc, id); if (t) out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${t.hex}" stroke-width="3" stroke-dasharray="${w.tracer2 ? '4 8' : '6 6'}" stroke-dashoffset="${j * 6}"/>`; });
-        const what = uses.map((u) => u.circuit).filter(Boolean);
-        out += `<text x="${kx + 48}" y="${yy}" font-size="9" fill="${INK}"><tspan font-weight="700">${esc(code)}</tspan> ${esc(wireColourName(doc, w))}${what.length ? `<tspan fill="#5b625e"> · ${esc(what.join(', ').slice(0, 60))}</tspan>` : ''}</text>`;
-      });
-    }
+    out += renderDiagram(doc, ro);
+    if (combos.length) out += keySVG(doc, X + W - keyW + 4, Y + 30, 0, ro);
     if (tbH) {
-      const m = doc.meta || {}, tw = 420, tx = X + W - tw - 8, ty = Y + H - tbH - 8;
-      const fit = (v, w, size) => { const t = String(v == null ? '' : v), n = Math.floor((w - 10) / (size * 0.62)); return t.length > n ? t.slice(0, Math.max(1, n - 1)) + '…' : t; };
-      const cell = (x, y, w, h, label, val, big) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" stroke="${INK}" stroke-width="1"/><text x="${x + 5}" y="${y + 10}" font-size="6.5" fill="#5b625e">${esc(label)}</text><text x="${x + 5}" y="${y + h - 7}" font-size="${big ? 13 : 9}" font-weight="${big ? 700 : 500}" fill="${INK}">${esc(fit(val, w, big ? 13 : 9))}</text>`;
-      const sheetName = doc.sheet ? doc.sheet.name : doc.title, sheetNo = doc.sheet ? `${doc.sheetNo} of ${doc.sheets.length}` : '1 of 1';
-      out += cell(tx, ty, tw, 36, 'SHEET TITLE', sheetName, true);
-      out += cell(tx, ty + 36, 210, 30, 'PROJECT', doc.title) + cell(tx + 210, ty + 36, 210, 30, 'VEHICLE / CLIENT', m.project);
-      out += cell(tx, ty + 66, 110, 30, 'DRAWN BY', m.drawnBy) + cell(tx + 110, ty + 66, 90, 30, 'DATE', m.date) + cell(tx + 200, ty + 66, 50, 30, 'REV', m.revision) + cell(tx + 250, ty + 66, 70, 30, 'SHEET', sheetNo) + cell(tx + 320, ty + 66, 100, 30, 'DRAWN WITH', 'LoomWright');
+      const tx = X + W - TB_W - 8, ty = Y + H - TB_H - 8;
+      out += revTableSVG(doc, tx, ty, TB_W).svg + titleBlockSVG(doc, tx, ty);
     }
     return out + '</svg>';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Revisions: issue, compare, restore                                  */
+  /* ------------------------------------------------------------------ */
+  const STATE_KEYS = ['title', 'meta', 'settings', 'harnesses', 'cables', 'customColours', 'customParts', 'harnessLayouts', 'sheets'];
+  function revisionState(project) { const o = {}; STATE_KEYS.forEach((k) => { if (project[k] !== undefined) o[k] = JSON.parse(JSON.stringify(project[k])); }); return o; }
+  function nextRevision(rev) {
+    const r = String(rev || '').trim();
+    if (!r) return 'A';
+    const m = /^(.*?)(\d+)$/.exec(r);
+    if (m) return m[1] + (parseInt(m[2], 10) + 1);
+    if (/^[A-Z]+$/.test(r)) {
+      const a = r.split(''); let i = a.length - 1;
+      while (i >= 0) { if (a[i] === 'Z') { a[i] = 'A'; i--; } else { a[i] = String.fromCharCode(a[i].charCodeAt(0) + 1); return a.join(''); } }
+      return 'A' + a.join('');
+    }
+    return r + '.1';
+  }
+  /* Record the project as it is now as a revision. The first issue keeps the current letter. */
+  function issueRevision(project, o = {}) {
+    project.revisions = project.revisions || [];
+    const last = project.revisions[project.revisions.length - 1];
+    const rev = o.rev || (last ? nextRevision(last.rev) : (project.meta.revision || 'A'));
+    const date = o.date || new Date().toISOString().slice(0, 10);
+    project.meta.revision = rev; project.meta.date = date;
+    if (o.by != null && !project.meta.drawnBy) project.meta.drawnBy = o.by;
+    const r = { id: uid('r'), rev, date, by: o.by || project.meta.drawnBy || '', description: o.description || '', snapshot: null };
+    r.snapshot = revisionState(project);
+    project.revisions.push(r);
+    return r;
+  }
+  function revisionById(project, id) { return (project.revisions || []).find((r) => r.id === id || r.rev === id) || null; }
+  const PART_FIELDS = ['type', 'label', 'props', 'mpn', 'supplier', 'cost', 'location', 'rot', 'flip'];
+  const WIRE_FIELDS = ['name', 'from', 'to', 'colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'notes', 'ends', 'insulation', 'cable', 'route'];
+  const same = (a, b) => JSON.stringify(a == null || a === '' ? null : a) === JSON.stringify(b == null || b === '' ? null : b);
+  /* What changed between two project states (older a, newer b). */
+  function diffStates(a, b) {
+    const out = { sheets: [], meta: [], harnesses: { added: [], removed: [] }, count: 0 };
+    ['title'].forEach((k) => { if (!same(a[k], b[k])) out.meta.push({ field: k, from: a[k], to: b[k] }); });
+    ['project', 'drawnBy', 'notes'].forEach((k) => { if (!same((a.meta || {})[k], (b.meta || {})[k])) out.meta.push({ field: k, from: (a.meta || {})[k], to: (b.meta || {})[k] }); });
+    out.harnesses.added = (b.harnesses || []).filter((h) => !(a.harnesses || []).includes(h));
+    out.harnesses.removed = (a.harnesses || []).filter((h) => !(b.harnesses || []).includes(h));
+    const as = a.sheets || [], bs = b.sheets || [];
+    const ids = [...new Set([...as.map((s) => s.id), ...bs.map((s) => s.id)])];
+    ids.forEach((id) => {
+      const sa = as.find((s) => s.id === id), sb = bs.find((s) => s.id === id);
+      const e = { id, name: (sb || sa).name, status: !sa ? 'added' : !sb ? 'removed' : sa.name !== sb.name ? 'renamed' : 'same', oldName: sa && sa.name, parts: { added: [], removed: [], changed: [] }, wires: { added: [], removed: [], changed: [] } };
+      const pa = (sa && sa.parts) || [], pb = (sb && sb.parts) || [], wa = (sa && sa.wires) || [], wb = (sb && sb.wires) || [];
+      const label = (p) => p.label || p.type;
+      pb.forEach((p) => {
+        const o = pa.find((x) => x.id === p.id);
+        if (!o) { e.parts.added.push({ id: p.id, label: label(p), type: p.type }); return; }
+        const f = PART_FIELDS.filter((k) => !same(o[k], p[k]));
+        const moved = o.x !== p.x || o.y !== p.y;
+        if (f.length || moved) e.parts.changed.push({ id: p.id, label: label(p), type: p.type, fields: f, moved, from: o, to: p });
+      });
+      pa.forEach((p) => { if (!pb.some((x) => x.id === p.id)) e.parts.removed.push({ id: p.id, label: label(p), type: p.type, was: p }); });
+      wb.forEach((w) => {
+        const o = wa.find((x) => x.id === w.id);
+        if (!o) { e.wires.added.push({ id: w.id, label: w.name }); return; }
+        const f = WIRE_FIELDS.filter((k) => !same(o[k], w[k]));
+        const rerouted = !same(o.points, w.points) || !same(o.dx, w.dx);
+        if (f.length || rerouted) e.wires.changed.push({ id: w.id, label: w.name, fields: f, rerouted, from: o, to: w });
+      });
+      wa.forEach((w) => { if (!wb.some((x) => x.id === w.id)) e.wires.removed.push({ id: w.id, label: w.name, was: w }); });
+      const n = e.parts.added.length + e.parts.removed.length + e.parts.changed.length + e.wires.added.length + e.wires.removed.length + e.wires.changed.length;
+      e.count = n + (e.status !== 'same' ? 1 : 0);
+      out.count += e.count;
+      if (e.count) out.sheets.push(e);
+    });
+    out.count += out.meta.length + out.harnesses.added.length + out.harnesses.removed.length;
+    return out;
+  }
+  /* Compare two revisions (ids, letters, or 'current'). */
+  function compareRevisions(project, fromId, toId) {
+    const st = (id) => (!id || id === 'current' ? revisionState(project) : (revisionById(project, id) || {}).snapshot);
+    const a = st(fromId), b = st(toId);
+    if (!a || !b) throw new Error('No such revision');
+    return diffStates(a, b);
+  }
+  /* Parts and wires on one sheet that changed since a revision, for clouds. */
+  function cloudsFor(project, revId, sheetId) {
+    const r = revisionById(project, revId);
+    if (!r || !r.snapshot) return null;
+    const d = diffStates(r.snapshot, revisionState(project)), e = d.sheets.find((x) => x.id === sheetId);
+    const c = { parts: new Set(), wires: new Set(), removed: [], rev: project.meta.revision === r.rev ? nextRevision(r.rev) : project.meta.revision };
+    if (!e) return c;
+    if (e.status === 'added') { const sh = project.sheets.find((s) => s.id === sheetId); sh.parts.forEach((p) => c.parts.add(p.id)); sh.wires.forEach((w) => c.wires.add(w.id)); return c; }
+    e.parts.added.concat(e.parts.changed.filter((x) => x.fields.length || x.moved)).forEach((x) => c.parts.add(x.id));
+    e.wires.added.concat(e.wires.changed).forEach((x) => c.wires.add(x.id));
+    const old = r.snapshot.sheets.find((s) => s.id === sheetId);
+    if (old) {
+      const ov = view({ ...r.snapshot, customParts: r.snapshot.customParts || project.customParts, sheets: r.snapshot.sheets }, old);
+      e.parts.removed.forEach((x) => { const p = old.parts.find((q) => q.id === x.id); if (p) c.removed.push(partBox(ov, p)); });
+    }
+    return c;
+  }
+  /* Human-readable list of changes, used by the compare dialog, the Claude add-on and exports. */
+  function describeDiff(d) {
+    const lines = [];
+    d.meta.forEach((m) => lines.push(`Project ${m.field}: "${m.from || ''}" → "${m.to || ''}"`));
+    d.harnesses.added.forEach((h) => lines.push(`Harness added: ${h}`));
+    d.harnesses.removed.forEach((h) => lines.push(`Harness removed: ${h}`));
+    d.sheets.forEach((s) => {
+      const at = s.name + ': ';
+      if (s.status === 'added') lines.push(`Sheet added: ${s.name}`);
+      if (s.status === 'removed') lines.push(`Sheet removed: ${s.name}`);
+      if (s.status === 'renamed') lines.push(`Sheet renamed: ${s.oldName} → ${s.name}`);
+      if (s.status === 'added' || s.status === 'removed') return;
+      s.parts.added.forEach((p) => lines.push(at + `added ${p.label}`));
+      s.parts.removed.forEach((p) => lines.push(at + `removed ${p.label}`));
+      s.parts.changed.forEach((p) => lines.push(at + `${p.label}: ` + [...p.fields.map((f) => f === 'props' ? Object.keys({ ...p.from.props, ...p.to.props }).filter((k) => !same((p.from.props || {})[k], (p.to.props || {})[k])).map((k) => `${k} ${(p.from.props || {})[k] ?? ''} → ${(p.to.props || {})[k] ?? ''}`).join(', ') : f === 'label' ? `renamed from ${p.from.label}` : ['mpn', 'supplier', 'cost', 'location'].includes(f) ? `${f === 'mpn' ? 'part no.' : f} ${p.from[f] ?? '—'} → ${p.to[f] ?? '—'}` : `${f} changed`), p.moved ? 'moved' : ''].filter(Boolean).join('; ')));
+      s.wires.added.forEach((w) => lines.push(at + `added wire ${w.label}`));
+      s.wires.removed.forEach((w) => lines.push(at + `removed wire ${w.label}`));
+      s.wires.changed.forEach((w) => lines.push(at + `wire ${w.label}: ` + [...w.fields.map((f) => (['from', 'to'].includes(f) ? `${f} end moved` : ['colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'name', 'insulation'].includes(f) ? `${f} ${w.from[f] || '—'} → ${w.to[f] || '—'}` : `${f} changed`)), w.rerouted ? 'rerouted' : ''].filter(Boolean).join('; ')));
+    });
+    return lines;
+  }
+  /* Put the project back to a revision. Revisions themselves are kept. */
+  function restoreRevision(project, id) {
+    const r = revisionById(project, id);
+    if (!r || !r.snapshot) throw new Error('No such revision');
+    const snap = JSON.parse(JSON.stringify(r.snapshot));
+    STATE_KEYS.forEach((k) => { if (snap[k] !== undefined) project[k] = snap[k]; });
+    project.settings.clouds = '';
+    return project;
   }
 
   /* ------------------------------------------------------------------ */
@@ -904,7 +1265,8 @@
   function wireListSheet(doc) {
     return doc.wires.map((w) => {
       const g = gaugeInfo(w.gauge), vd = voltageDrop(w);
-      return { id: w.id, sheet: doc.sheet ? doc.sheet.name : '', sheetId: doc.sheet ? doc.sheet.id : '', name: w.name, from: pinName(doc, w.from), to: pinName(doc, w.to), code: wireCode(doc, w), colour: wireColourName(doc, w), gauge: w.gauge, awg: g ? g.awg : '', length: w.length, current: w.current, drop: vd == null ? '' : vd.toFixed(2), circuit: w.circuit || '', harness: w.harness || '', notes: w.notes || '' };
+      const ends = w.ends || {}, ef = ends.from || {}, et = ends.to || {};
+      return { id: w.id, sheet: doc.sheet ? doc.sheet.name : '', sheetId: doc.sheet ? doc.sheet.id : '', name: w.name, from: pinName(doc, w.from), to: pinName(doc, w.to), code: wireCode(doc, w), colour: wireColourName(doc, w), gauge: w.gauge, awg: g ? g.awg : '', length: w.length, current: w.current, drop: vd == null ? '' : vd.toFixed(2), circuit: w.circuit || '', harness: w.harness || '', notes: w.notes || '', insulation: w.insulation || '', cable: w.cable || '', termFrom: ef.term || '', termTo: et.term || '' };
     });
   }
   function bom(d) {
@@ -914,20 +1276,25 @@
       if (p.label) seen.add(p.type + '|' + p.label);
       const d = partDef(doc, p.type); if (!d || d.cat === 'Annotation' || p.type === 'splice' || p.type === 'net_label' || p.type === 'offpage') return;
       const r = resolved(doc, p), spec = d.sub ? tmpl(d.sub, r.props).trim() : '';
-      const k = d.name + '|' + spec;
-      if (!m.has(k)) m.set(k, { name: d.name, spec, qty: 0, refs: [] });
+      const mpn = p.mpn || (p.type === 'conn' ? r.props.mpnShown : '') || '';
+      const k = d.name + '|' + spec + '|' + mpn + '|' + (p.supplier || '');
+      if (!m.has(k)) m.set(k, { name: d.name, spec, mpn, supplier: p.supplier || '', unit: null, qty: 0, refs: [], locations: [] });
       const e = m.get(k); e.qty++; if (p.label) e.refs.push(p.label);
+      const c = parseFloat(p.cost); if (c >= 0 && e.unit == null) e.unit = c;
+      if (p.location && !e.locations.includes(p.location)) e.locations.push(p.location);
     }));
-    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return [...m.values()].map((e) => ({ ...e, total: e.unit != null ? +(e.unit * e.qty).toFixed(2) : null })).sort((a, b) => a.name.localeCompare(b.name));
   }
   function cableTotals(d) {
     const m = new Map();
     eachView(d).forEach((doc) => doc.wires.forEach((w) => {
-      const k = w.gauge + '|' + wireCode(doc, w);
-      if (!m.has(k)) m.set(k, { gauge: w.gauge, code: wireCode(doc, w), colour: wireColourName(doc, w), metres: 0, wires: 0, unknown: 0 });
+      const k = w.gauge + '|' + wireCode(doc, w) + '|' + (w.insulation || '');
+      if (!m.has(k)) m.set(k, { gauge: w.gauge, code: wireCode(doc, w), colour: wireColourName(doc, w), insulation: w.insulation || '', metres: 0, wires: 0, unknown: 0 });
       const e = m.get(k); e.wires++; const l = parseFloat(w.length); if (l > 0) e.metres += l; else e.unknown++;
     }));
-    return [...m.values()].sort((a, b) => parseFloat(a.gauge) - parseFloat(b.gauge) || a.code.localeCompare(b.code));
+    const costs = (d && d.settings && d.settings.cableCosts) || {};
+    return [...m.values()].map((e) => { const pm = parseFloat(costs[e.gauge]); return { ...e, perMetre: pm >= 0 ? pm : null, cost: pm >= 0 ? +(pm * e.metres * 1.15).toFixed(2) : null }; })
+      .sort((a, b) => parseFloat(a.gauge) - parseFloat(b.gauge) || a.code.localeCompare(b.code));
   }
   function parseAmps(s) { const m = /([\d.]+)\s*A?/i.exec(String(s || '')); return m ? parseFloat(m[1]) : null; }
 
@@ -953,7 +1320,7 @@
       if (d.cat === 'Annotation') return;
       const free = r.pins.filter((pn) => !conn.get(p.id + '|' + pn.id));
       if (free.length && free.length === r.pins.length && r.pins.length) out.push({ level: 'info', part: p.id, text: `${p.label || d.name} has no wires connected.` });
-      else if (free.length && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'module', 'ic', 'switch_rotary'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
+      else if (free.length && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
       // Fuse rating against the wire it protects
       if (['fuse', 'fuse_maxi', 'breaker', 'fusible_link'].includes(p.type) || p.type === 'fuse_box') {
         const ratings = p.type === 'fuse_box' ? String(r.props.ratings || '').split(',').map(parseAmps) : null;
@@ -987,7 +1354,7 @@
     let x = 40, maxY = 0, y0 = 40;
     if (only) {
       const placed = doc.parts.filter((p) => !only.has(p.id));
-      if (placed.length) { const b = bounds({ ...doc, parts: placed, wires: [] }); y0 = snap(b.y + b.h + 80); x = snap(Math.max(40, b.x)); }
+      if (placed.length) { const b = bounds({ ...doc, parts: placed, wires: [], customParts: doc.customParts, settings: doc.settings }); y0 = snap(b.y + b.h + 80); x = snap(Math.max(40, b.x)); }
     }
     maxY = y0;
     cols.forEach((col) => {
@@ -1015,6 +1382,8 @@
     newDoc, newSheet, view, views, normalise, colourUsage, partDef, defaultProps, resolved, partBox, findPart, pinPos, pinName, wirePoints, rotPt,
     addPart, addWire, parseEnd, pruneWires, nextLabel, nextWireName,
     allColours, colourById, colourCode, wireCode, wireColourName, gaugeInfo, gaugeWidth, voltageDrop,
-    renderDiagram, exportSVG, bounds, wireList, bom, cableTotals, validate, autoLayout, libraryList,
+    renderDiagram, exportSVG, bounds, sheetBounds, wireList, bom, cableTotals, validate, autoLayout, libraryList, eachView,
+    PAGES, pageOf, zoneOf, frameSVG, sheetFurnitureSVG, xrefs, renderOptions, wireLabelPos, wireLabelText, cloudPath,
+    DEFAULT_SETTINGS, revisionState, nextRevision, issueRevision, revisionById, diffStates, compareRevisions, cloudsFor, describeDiff, restoreRevision,
   };
 });

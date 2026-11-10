@@ -52,9 +52,27 @@
       if (invoke) return invoke('open_diagram');
       return pickFile('.loom,.json,application/json');
     },
-    async openText(accept) {
-      if (invoke) return invoke('open_text', { filterName: 'LoomWright library', extensions: ['json'] });
+    /* Pick a text file. accept is a list like ".csv,.txt"; name labels the filter in the desktop dialog. */
+    async openText(accept, name) {
+      const exts = String(accept || '.json').split(',').map((x) => x.trim()).filter((x) => x.startsWith('.')).map((x) => x.slice(1));
+      if (invoke) return invoke('open_text', { filterName: name || 'Supported files', extensions: exts.length ? exts : ['json'] });
       return pickFile(accept || '.json,application/json');
+    },
+    /* Pick an image and return it as a data URL (vehicle pictures). */
+    pickImage() {
+      return new Promise((resolve) => {
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = 'image/png,image/jpeg,image/svg+xml,image/webp'; inp.style.display = 'none';
+        inp.addEventListener('change', () => {
+          const f = inp.files && inp.files[0]; inp.remove();
+          if (!f) return resolve(null);
+          const rd = new FileReader();
+          rd.onload = () => resolve({ name: f.name, url: String(rd.result) });
+          rd.onerror = () => resolve(null);
+          rd.readAsDataURL(f);
+        });
+        document.body.appendChild(inp); inp.click();
+      });
     },
     async initialFile() { if (!invoke) return null; try { return await invoke('initial_file'); } catch (e) { return null; } },
     async readFile(path) { return invoke('read_text', { path }); },
@@ -96,6 +114,9 @@
       if (invoke) { try { await invoke('save_user_library', { contents: t }); } catch (e) { console.warn(e); } }
       try { localStorage.setItem('loomwright.library.v1', t); } catch (e) { /* storage unavailable */ }
     },
+
+    /* Where the desktop app keeps its data, and whether it runs as a portable copy. */
+    async appInfo() { if (!invoke) return null; try { return await invoke('app_info'); } catch (e) { return null; } },
 
     async setTitle(title) {
       document.title = title;

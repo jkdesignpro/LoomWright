@@ -116,10 +116,44 @@ async fn export_file(app: AppHandle, suggested: String, extension: String, data_
     }
 }
 
-fn library_path(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+/// Portable mode: an empty file named `portable` next to the program keeps
+/// My components, settings and autosaved work in a `LoomWright-data` folder
+/// beside it instead of the user's profile, so LoomWright can run from a USB stick.
+fn portable_dir() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    if dir.join("portable").exists() || dir.join("portable.txt").exists() {
+        Some(dir.join("LoomWright-data"))
+    } else {
+        None
+    }
+}
+
+fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = match portable_dir() {
+        Some(d) => d,
+        None => app.path().app_data_dir().map_err(|e| e.to_string())?,
+    };
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir.join("library.json"))
+    Ok(dir)
+}
+
+fn library_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(data_dir(app)?.join("library.json"))
+}
+
+#[derive(Serialize)]
+struct AppInfo {
+    portable: bool,
+    data_dir: String,
+    library: String,
+}
+
+/// Where this copy keeps its data, shown in Help > About.
+#[tauri::command]
+fn app_info(app: AppHandle) -> Result<AppInfo, String> {
+    let dir = data_dir(&app)?;
+    Ok(AppInfo { portable: portable_dir().is_some(), library: dir.join("library.json").to_string_lossy().into_owned(), data_dir: dir.to_string_lossy().into_owned() })
 }
 
 #[tauri::command]
@@ -146,6 +180,14 @@ fn initial_file() -> Option<Opened> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // In portable mode the Windows web view keeps its storage (settings, autosave) beside the program too.
+    #[cfg(windows)]
+    if let Some(d) = portable_dir() {
+        let web = d.join("webview");
+        if fs::create_dir_all(&web).is_ok() {
+            std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", web);
+        }
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -157,7 +199,8 @@ pub fn run() {
             export_file,
             load_user_library,
             save_user_library,
-            initial_file
+            initial_file,
+            app_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running LoomWright");

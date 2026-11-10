@@ -12,6 +12,10 @@ circuit in plain English and have Claude draw it, check it and edit it for you, 
 > I only stock red, black, brown, green, purple and white. Put the rear work lights on a new sheet
 > using just those, and tell me where a colour is reused in the same harness.
 
+> Issue revision C, "moved the compressor to the rear body", and show me what changed since B.
+
+> If I switch S2 up with F3 blown, what still works? Then give me the cut list for the Dash harness.
+
 The add-on is a small [MCP](https://modelcontextprotocol.io) server in the `mcp/` folder. It reads
 and writes the same `.loom` files as the app. If the file is open in the LoomWright desktop app,
 the app reloads it as soon as Claude saves a change.
@@ -60,7 +64,9 @@ Components Claude makes are saved to the same library as the app's *My component
 | macOS | `~/Library/Application Support/org.loomwright.app/library.json` |
 | Linux | `~/.local/share/org.loomwright.app/library.json` |
 
-Set `LOOMWRIGHT_LIBRARY` to use another file. The app picks up new components when you switch back to it.
+Set `LOOMWRIGHT_LIBRARY` to use another file. With the portable Windows copy, point it at
+`LoomWright-data\library.json` next to `LoomWright.exe` (Help → About in the app shows the path).
+The app picks up new components when you switch back to it.
 
 ## A component from a picture
 
@@ -86,6 +92,19 @@ one). You can fine-tune it afterwards in the app's component builder.
 | `check_diagram` | Fuse vs cable size, current vs cable size, voltage drop, unconnected pins |
 | `wire_list` | Wire list, parts list and cable totals |
 | `export_svg` | Export an SVG with title block and colour key |
+| `list_connector_series`, `define_cable` | Connector series, terminals, insulation and sleeving; multicore and screened cables |
+| `issue_revision`, `list_revisions`, `compare_revisions`, `restore_revision` | Revision history: issue A, B, C…, see what changed between any two, go back to one |
+| `trace_circuit` | Follow a wire or pin through every sheet, off-page link and mated connector |
+| `test_circuit` | Live test: switch parts on or off, blow a fuse, and see what runs (connections only, not voltages) |
+| `load_budget` | Fuse and relay schedule, load on each fuse, relay and supply |
+| `report` | Build lists as CSV: wires, parts and costs, cable to buy, colour usage, fuses, connector tables, cut list, labels, locations, nets |
+| `harness_formboard` | A harness's branches, lengths and bundle sizes; copy routed lengths to the wires |
+| `project_settings` | Title block, voltage, colour standard, paper size per project or sheet, black and white, revision clouds, currency |
+| `export`, `import` | DXF, WireViz, a read-only web page, the build pack and formboard DXF; import CSV wire lists, WireViz, KiCad netlists and measured lengths |
+
+`update_part` also sets a part's part number, supplier, cost and fitted location. `update_wire` also sets
+insulation, the cable it runs in, and how each end is finished (terminal, crimp or solder, strip length,
+heat-shrink, seal). These feed the cut list, connector tables, costed parts list and build pack.
 
 Every editing tool takes an optional `sheet` (number or name; sheet 1 when left out).
 Wire ends are written `REF:PIN`, for example `F1:2` or `K1:87`. Colours accept names

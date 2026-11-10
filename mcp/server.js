@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /*
  * LoomWright Claude add-on: an MCP server that lets Claude create and edit
- * LoomWright projects (.loom files) from plain-English descriptions, and turn
- * a picture of a component into a custom library component.
+ * LoomWright projects (.loom files) from plain-English descriptions, turn
+ * a picture of a component into a custom library component, and use the
+ * app's checks, build lists, revision history and live circuit test.
  * Entirely optional; the LoomWright app works without it.
  *
  * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
@@ -15,11 +16,13 @@ const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { z } = require('zod');
 
+// The core library: copied into ./core when packaged, or read from the app in a checkout.
 const L = (() => {
-  for (const p of ['./loom-core.js', '../app/core/loom-core.js']) {
-    try { return require(path.join(__dirname, p)); } catch (e) { /* try next */ }
+  for (const p of ['core/loom.js', '../app/core/loom.js']) {
+    const f = path.join(__dirname, p);
+    if (fs.existsSync(f)) return require(f);
   }
-  throw new Error('Could not find loom-core.js');
+  throw new Error('Could not find the LoomWright core (core/loom.js).');
 })();
 
 const HOME_DIR = process.env.LOOMWRIGHT_DIR || path.join(os.homedir(), 'Documents', 'LoomWright');
@@ -172,7 +175,12 @@ const server = new McpServer({ name: 'loomwright', version: L.VERSION }, {
     'When the user shares a picture of a component (pinout, datasheet symbol, connector face), trace it with define_component using shapes and pin positions, and save_to_library: true so it appears in My components in the app.',
     'Use describe_component to see a part\'s pin ids before wiring it (relays use DIN numbers 30, 85, 86, 87, 87a).',
     'Always give wires a colour (and tracer where useful), a size in mm², and where known a length in metres and current in amps, so LoomWright can check fuse sizing and voltage drop. Earth every load.',
-    'After building, call check_diagram and fix warnings. Tell the user they can open the file in LoomWright; the desktop app reloads it live when you change it.',
+    'After building, call check_diagram and fix warnings, then load_budget to check fuse and relay loading. Tell the user they can open the file in LoomWright; the desktop app reloads it live when you change it.',
+    'Connectors: use part type "conn" with props series (see list_connector_series), ways, gender and mate (the reference of the other half). Mated connectors join cavity for cavity, so circuits trace through them.',
+    'Build details: update_wire takes insulation, a multicore cable, and end_a/end_b with terminal, method, strip length, sleeve and seal. update_part takes part number, supplier, cost and fitted location. These feed the cut list, connector tables, costed parts list and build pack (report and export tools).',
+    'Revision history: when the user signs off a change, call issue_revision with a short description. compare_revisions shows what changed since any revision, and project_settings clouds marks it on the drawing.',
+    'Use trace_circuit to follow a circuit across sheets and test_circuit to check what a switch or relay powers. The test checks connections only, never claim it proves voltages or currents.',
+    'Never invent pinouts or part numbers for a specific vehicle, ECU or module from memory. Ask for the documentation or a picture, and say part numbers must be checked against the maker.',
   ].join('\n'),
 });
 
@@ -232,6 +240,12 @@ const wireShape = z.object({
   circuit: z.string().optional().describe('What the wire is for, e.g. "Spot lamps"'),
   harness: z.string().optional().describe('The loom it runs in, e.g. "Engine bay". Added to the project\'s harness list.'),
   notes: z.string().optional(), name: z.string().optional().describe('Wire number; auto W1, W2... when omitted'),
+});
+
+const endShape = z.object({
+  term: z.string().optional().describe('Terminal id or name, e.g. ring_m6_red or dt16_socket'),
+  method: z.string().optional().describe('crimp, crimp_solder, solder, screw or ferrule'), strip: z.union([z.string(), z.number()]).optional().describe('Strip length in mm'),
+  shrink: z.string().optional().describe('Heat-shrink or sleeve, e.g. "3:1 adhesive 6 mm"'), seal: z.string().optional().describe('seal, plug or gel'),
 });
 
 server.registerTool('create_diagram', {
@@ -352,8 +366,11 @@ server.registerTool('add_wire', {
 
 server.registerTool('update_part', {
   title: 'Update part',
-  description: 'Change a part\'s reference, fields, position or rotation.',
-  inputSchema: { path: z.string(), sheet: sheetArg, ref: z.string().describe('Current reference, e.g. F1'), newRef: z.string().optional(), props: z.record(z.any()).optional(), x: z.number().optional(), y: z.number().optional(), rotation: z.number().optional() },
+  description: 'Change a part\'s reference, fields, position, rotation, or its build details: part number, supplier, unit cost and where it is fitted on the vehicle.',
+  inputSchema: {
+    path: z.string(), sheet: sheetArg, ref: z.string().describe('Current reference, e.g. F1'), newRef: z.string().optional(), props: z.record(z.any()).optional(), x: z.number().optional(), y: z.number().optional(), rotation: z.number().optional(),
+    mpn: z.string().optional().describe('Manufacturer part number'), supplier: z.string().optional(), cost: z.number().optional().describe('Unit price in the project currency'), location: z.string().optional().describe('Where it is fitted, e.g. "Engine bay, left inner wing"'),
+  },
 }, wrap(async (a) => {
   const { full, project } = load(a.path);
   const doc = sheetView(project, a.sheet);
@@ -363,14 +380,20 @@ server.registerTool('update_part', {
   if (a.x != null) p.x = L.snap(a.x);
   if (a.y != null) p.y = L.snap(a.y);
   if (a.rotation != null) p.rot = ((Math.round(a.rotation / 90) % 4) + 4) % 4;
+  ['mpn', 'supplier', 'location'].forEach((k) => { if (a[k] != null) p[k] = a[k]; });
+  if (a.cost != null) p.cost = a.cost;
   L.pruneWires(doc); save(full, project);
   return ok(`Updated ${p.label}.`);
 }));
 
 server.registerTool('update_wire', {
   title: 'Update wire',
-  description: 'Change a wire\'s colour, tracer, size, length, current, circuit, harness, notes or number. Identify it by wire number (W3) or by its two ends. Wire numbers are searched on every sheet.',
-  inputSchema: { path: z.string(), sheet: sheetArg, wire: z.string().describe('Wire number like W3, or "F1:2 -> K1:30"'), colour: z.string().optional(), tracer: z.string().optional(), tracer2: z.string().optional(), gauge: z.union([z.string(), z.number()]).optional(), length: z.number().optional(), current: z.number().optional(), circuit: z.string().optional(), harness: z.string().optional(), notes: z.string().optional(), name: z.string().optional() },
+  description: 'Change a wire\'s colour, tracer, size, length, current, circuit, harness, notes or number, and its build details: insulation, the multicore cable it runs in, and how each end is finished (terminal, crimp or solder, strip length, heat-shrink, seal). Identify it by wire number (W3) or by its two ends. Wire numbers are searched on every sheet.',
+  inputSchema: {
+    path: z.string(), sheet: sheetArg, wire: z.string().describe('Wire number like W3, or "F1:2 -> K1:30"'), colour: z.string().optional(), tracer: z.string().optional(), tracer2: z.string().optional(), gauge: z.union([z.string(), z.number()]).optional(), length: z.number().optional(), current: z.number().optional(), circuit: z.string().optional(), harness: z.string().optional(), notes: z.string().optional(), name: z.string().optional(),
+    insulation: z.string().optional().describe('Insulation id or name from list_connector_series, e.g. flry_b'), cable: z.string().optional().describe('Name of a cable from define_cable; "" for a single core'),
+    end_a: endShape.optional().describe('The "from" end'), end_b: endShape.optional().describe('The "to" end'),
+  },
 }, wrap(async (a) => {
   const { full, project } = load(a.path);
   const { doc, w } = findWireIn(project, a.sheet, a.wire);
@@ -379,8 +402,23 @@ server.registerTool('update_wire', {
   ['length', 'current'].forEach((k) => { if (a[k] != null) w[k] = String(a[k]); });
   ['circuit', 'notes', 'name', 'harness'].forEach((k) => { if (a[k] != null) w[k] = a[k]; });
   if (a.harness) addHarness(project, a.harness);
+  if (a.insulation != null) w.insulation = pick(L.INSULATION, a.insulation, 'insulation');
+  if (a.cable != null) {
+    if (!a.cable) w.cable = '';
+    else { const c = (project.cables || []).find((x) => x.id === a.cable || x.name.toLowerCase() === a.cable.toLowerCase()); if (!c) throw new Error(`No cable ${a.cable}. Add it with define_cable.`); w.cable = c.id; }
+  }
+  [['end_a', 'from'], ['end_b', 'to']].forEach(([k, side]) => {
+    const e = a[k]; if (!e) return;
+    w.ends = w.ends || {}; const cur = w.ends[side] = { ...(w.ends[side] || {}) };
+    if (e.term != null) cur.term = pick(L.TERMINALS, e.term, 'terminal');
+    if (e.method != null) cur.method = pick(pairs(L.METHODS), e.method, 'method');
+    if (e.seal != null) cur.seal = pick(pairs(L.SEALS), e.seal, 'seal');
+    if (e.strip != null) cur.strip = String(e.strip);
+    if (e.shrink != null) cur.shrink = e.shrink;
+  });
   save(full, project);
-  return ok(`Updated ${w.name} on sheet ${doc.sheetNo}: ${L.wireCode(doc, w)} ${w.gauge}mm²`);
+  const warn = [w.ends && w.ends.from, w.ends && w.ends.to].filter((e) => e && e.term).map((e) => L.TERMINALS.find((x) => x.id === e.term)).filter((t) => t && (parseFloat(w.gauge) < t.min || parseFloat(w.gauge) > t.max)).map((t) => `${t.name} does not suit ${w.gauge} mm².`);
+  return ok(`Updated ${w.name} on sheet ${doc.sheetNo}: ${L.wireCode(doc, w)} ${w.gauge}mm²${warn.length ? '\n' + warn.join('\n') : ''}`);
 }));
 function findWire(doc, s) {
   const byName = doc.wires.find((w) => (w.name || '').toLowerCase() === String(s).toLowerCase() || w.id === s);
@@ -575,6 +613,331 @@ server.registerTool('export_svg', {
     return target;
   });
   return ok(`Wrote ${written.join(', ')}`);
+}));
+
+/* ---------------- reference data ---------------- */
+const pick = (list, value, what) => {
+  if (value == null) return undefined;
+  const q = String(value).trim().toLowerCase();
+  if (!q || q === 'none' || q === 'not set') return '';
+  const hit = list.find((x) => String(x.id).toLowerCase() === q) || list.find((x) => x.name.toLowerCase() === q) || list.find((x) => x.name.toLowerCase().includes(q));
+  if (!hit) throw new Error(`Unknown ${what} "${value}". Use list_connector_series to see the choices.`);
+  return hit.id;
+};
+const pairs = (list) => list.map(([id, name]) => ({ id, name }));
+
+server.registerTool('list_connector_series', {
+  title: 'Connector series, terminals and materials',
+  description: 'List the connector series LoomWright knows (Deutsch DT/DTM/DTP, Superseal, Econoseal, Metri-Pack, Anderson and more) with ways, ratings and housing part numbers, plus terminals, wire insulation types, sleeving, termination methods, seals and cable types. Use the ids with add_part (type "conn", props series/ways/gender/mate) and update_wire (insulation, end_a/end_b).',
+  inputSchema: {},
+}, wrap(async () => {
+  const lines = ['Connector series (part type "conn"; props: series, ways, gender plug|receptacle, mate, mpn):'];
+  L.SERIES.forEach((s) => lines.push(`  ${s.id} — ${s.name}${s.ways ? ', ways ' + s.ways.join('/') : ''}${s.rating ? ', ' + s.rating : ''}${s.sealed ? ', sealed' : ''}${s.housing && s.ways ? `, e.g. ${s.housing(s.ways[0], 'plug')} / ${s.housing(s.ways[0], 'receptacle')}` : ''}`));
+  lines.push('', 'Terminals (end_a/end_b term):');
+  L.TERMINALS.filter((x) => x.id).forEach((x) => lines.push(`  ${x.id} — ${x.name}${x.max < 999 ? ` (${x.min}–${x.max} mm²)` : ''}`));
+  lines.push('', 'Insulation (update_wire insulation):');
+  L.INSULATION.filter((x) => x.id).forEach((x) => lines.push(`  ${x.id} — ${x.name}${x.temp ? ', ' + x.temp : ''}`));
+  lines.push('', 'Sleeving (harness_formboard sleeve):');
+  L.SLEEVING.filter((x) => x.id).forEach((x) => lines.push(`  ${x.id} — ${x.name}${x.sizes ? ', sizes ' + x.sizes.join('/') + ' mm' : ''}`));
+  lines.push('', 'Termination methods: ' + L.METHODS.filter((m) => m[0]).map((m) => `${m[0]} (${m[1]})`).join(', '));
+  lines.push('Seals: ' + L.SEALS.filter((m) => m[0]).map((m) => `${m[0]} (${m[1]})`).join(', '));
+  lines.push('Cable types (define_cable): ' + L.CABLE_TYPES.map((m) => `${m[0]} (${m[1]})`).join(', '));
+  lines.push('', 'Part numbers are a guide. Check them against the maker\'s current catalogue before ordering.');
+  return ok(lines.join('\n'));
+}));
+
+server.registerTool('define_cable', {
+  title: 'Multicore or screened cable',
+  description: 'Add or change a multicore, twisted or screened cable and put wires in it as its cores. The cable report then shows used and spare cores.',
+  inputSchema: {
+    path: z.string(), name: z.string().describe('Cable name, e.g. C1 or "Rear lights 7-core"'),
+    type: z.enum(['single', 'multicore', 'twisted', 'screened', 'twisted_screened']).optional(), cores: z.number().optional(), mpn: z.string().optional(),
+    wires: z.array(z.string()).optional().describe('Wire numbers that run in this cable'), remove: z.boolean().optional().describe('Delete the cable (its wires become single cores)'),
+  },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  project.cables = project.cables || [];
+  let c = project.cables.find((x) => x.id === a.name || x.name.toLowerCase() === a.name.toLowerCase());
+  if (a.remove) {
+    if (!c) throw new Error(`No cable ${a.name}.`);
+    project.cables = project.cables.filter((x) => x !== c);
+    L.views(project).forEach((v) => v.wires.forEach((w) => { if (w.cable === c.id) w.cable = ''; }));
+    save(full, project); return ok(`Removed cable ${c.name}.`);
+  }
+  if (!c) { c = { id: L.uid('cab'), name: a.name, type: 'multicore', cores: 2, mpn: '' }; project.cables.push(c); }
+  if (a.type) c.type = a.type;
+  if (a.cores != null) c.cores = a.cores;
+  if (a.mpn != null) c.mpn = a.mpn;
+  (a.wires || []).forEach((n) => { findWireIn(project, null, n).w.cable = c.id; });
+  save(full, project);
+  const r = L.cableReport(project).find((x) => x.id === c.id);
+  return ok(`Cable ${r.name}: ${r.typeName}, ${r.cores || '?'} cores, ${r.used} used${r.spare != null ? ', ' + r.spare + ' spare' : ''}${r.wires.length ? ' (' + r.wires.join(', ') + ')' : ''}.${r.cores && r.used > r.cores ? ' More wires than cores.' : ''}`);
+}));
+
+/* ---------------- circuits ---------------- */
+server.registerTool('trace_circuit', {
+  title: 'Trace a circuit',
+  description: 'Follow a wire or pin through the whole project: every pin and wire electrically joined to it, across sheets, off-page links, net labels and mated connectors. Switches and relays are treated as open.',
+  inputSchema: { path: z.string(), sheet: sheetArg.describe('Sheet of the pin; wire numbers are searched on every sheet'), from: z.string().describe('Wire number like W3, or a pin like "K1:87"') },
+}, wrap(async (a) => {
+  const { project } = load(a.path);
+  let sheetId, end;
+  if (/:/.test(a.from)) {
+    const docs = a.sheet != null ? [sheetView(project, a.sheet)] : L.views(project);
+    for (const v of docs) { try { end = L.parseEnd(v, a.from.trim()); sheetId = v.sheet.id; break; } catch (e) { /* next sheet */ } }
+    if (!end) throw new Error(`No pin ${a.from} on ${a.sheet != null ? 'that sheet' : 'any sheet'}.`);
+  } else { const { doc, w } = findWireIn(project, a.sheet, a.from); sheetId = doc.sheet.id; end = w.from; }
+  const n = L.netOf(project, sheetId, end);
+  if (!n) return ok(`${a.from} is not connected to anything.`);
+  const bySheet = {};
+  n.pins.forEach((p) => { (bySheet[p.sheet.name] = bySheet[p.sheet.name] || { pins: [], wires: [] }).pins.push(p.label); });
+  n.wires.forEach((x) => { const v = L.view(project, x.sheet); (bySheet[x.sheet.name] = bySheet[x.sheet.name] || { pins: [], wires: [] }).wires.push(`${x.wire.name} ${L.pinName(v, x.wire.from)} -> ${L.pinName(v, x.wire.to)} ${L.wireCode(v, x.wire)} ${x.wire.gauge}mm²${x.wire.harness ? ' {' + x.wire.harness + '}' : ''}`); });
+  const lines = [`Net "${n.name}": ${n.pins.length} pins, ${n.wires.length} wires${n.earth ? ' (earth)' : ''}.`];
+  Object.entries(bySheet).forEach(([s, x]) => { lines.push('', `${s}:`, '  pins: ' + x.pins.join(', ')); x.wires.forEach((w) => lines.push('  ' + w)); });
+  return ok(lines.join('\n'));
+}));
+
+server.registerTool('test_circuit', {
+  title: 'Live circuit test',
+  description: 'Switch parts on and off and see what would be powered: which loads run, which relays pull in, which wires are live, and any short to earth. Without set, lists the parts that can be switched and their states. Fuses can be set to Blown. Checks connections only, not voltages or currents.',
+  inputSchema: { path: z.string(), set: z.record(z.union([z.string(), z.number()])).optional().describe('Part reference to state name or number, e.g. {"S1":"On","S2":"Up","F2":"Blown"}') },
+}, wrap(async (a) => {
+  const { project } = load(a.path);
+  const sw = [];
+  L.views(project).forEach((v) => v.parts.forEach((p) => { const st = L.partStates(v, p); if (st && p.label && !sw.some((x) => x.key === st.key)) sw.push({ ...st, ref: p.label, sheet: v.sheet.name }); }));
+  const list = sw.map((x) => `  ${x.ref}: ${x.states.map((s, i) => (i === x.def ? `[${s}]` : s)).join(' | ')}`).join('\n');
+  if (!a.set || !Object.keys(a.set).length) return ok(`Parts you can switch (default state in brackets):\n${list || '  none'}`);
+  const state = {};
+  Object.entries(a.set).forEach(([ref, val]) => {
+    const x = sw.find((s) => s.ref.toLowerCase() === ref.toLowerCase());
+    if (!x) throw new Error(`${ref} cannot be switched. Switchable parts:\n${list}`);
+    const i = typeof val === 'number' ? val : x.states.findIndex((s) => String(s).toLowerCase() === String(val).toLowerCase());
+    if (i < 0 || i >= x.states.length) throw new Error(`${ref} has no state "${val}". States: ${x.states.join(', ')}`);
+    state[x.key] = i;
+  });
+  const r = L.simulate(project, state);
+  const loads = [], relays = [...r.relays].map((k) => k.split('|')[1]);
+  const live = {};
+  L.views(project).forEach((v) => {
+    v.parts.forEach((p) => { const n = `${p.label || p.type} (${(L.partDef(v, p.type) || {}).name})`; if (r.loads.has(p.id) && !relays.includes(p.label) && !loads.includes(n)) loads.push(n); });
+    v.wires.forEach((w) => { if (r.wires.has(w.id)) (live[v.sheet.name] = live[v.sheet.name] || []).push(w.name); });
+  });
+  const lines = [`Set: ${Object.entries(a.set).map(([k, v]) => `${k}=${v}`).join(', ')}`];
+  if (r.shorts.length) lines.push(`SHORT TO EARTH from ${r.shorts.join(', ')}: a fuse would blow.`);
+  lines.push(`Running: ${loads.join(', ') || 'nothing'}`, `Relays pulled in: ${relays.join(', ') || 'none'}`, 'Live wires:');
+  Object.entries(live).forEach(([s, ws]) => lines.push(`  ${s}: ${ws.join(', ')}`));
+  if (!Object.keys(live).length) lines.push('  none');
+  lines.push('', 'This checks connections only, not voltages or currents.');
+  return ok(lines.join('\n'));
+}));
+
+server.registerTool('load_budget', {
+  title: 'Fuses, relays and load budget',
+  description: 'The fuse and relay schedule and load budget: for each fuse, breaker and fuse box way, the loads it feeds, their total current against its rating, and the smallest wire; for relays, the load on the contacts; for batteries, alternators and DC-DC chargers, what hangs off them and hours of running. Worst case, everything switched on.',
+  inputSchema: { path: z.string() },
+}, wrap(async ({ path: p }) => {
+  const { project } = load(p);
+  const sc = L.schedule(project), lines = [`System voltage ${sc.volts} V. Loads all on together (worst case).`, '', 'Fuses and breakers:'];
+  const ld = (l) => l.map((x) => `${x.ref} ${x.amps}A`).join(', ') || '—';
+  sc.fuses.forEach((f) => lines.push(`  ${f.ref} (${f.sheet}): ${f.load} A of ${f.rating ?? '?'} A${f.pct != null ? ` (${f.pct}%)` : ''} ${f.status.toUpperCase()}${f.smallest ? `, smallest wire ${f.smallest} mm²` : ''}; feeds ${ld(f.loads)}${f.circuits.length ? '; circuits ' + f.circuits.join(', ') : ''}`));
+  if (!sc.fuses.length) lines.push('  none');
+  lines.push('', 'Relays:');
+  sc.relays.forEach((f) => lines.push(`  ${f.ref} (${f.sheet}): contacts carry ${f.load} A of ${f.rating} A (${f.pct}%) ${f.status.toUpperCase()}; switches ${ld(f.loads)}`));
+  if (!sc.relays.length) lines.push('  none');
+  lines.push('', 'Supplies:');
+  sc.supplies.forEach((f) => lines.push(`  ${f.ref} ${f.type} (${f.sheet}): ${f.load} A${f.rating ? ` of ${f.rating.toFixed ? +f.rating.toFixed(1) : f.rating} A (${f.pct}%)` : ''}${f.capacity ? `, ${f.capacity} Ah` : ''}${f.hours != null ? `, about ${f.hours} h at full load using 50% of the battery` : ''}; feeds ${ld(f.loads)}`));
+  if (!sc.supplies.length) lines.push('  none');
+  return ok(lines.join('\n'));
+}));
+
+/* ---------------- build lists ---------------- */
+server.registerTool('report', {
+  title: 'Build lists and reports',
+  description: 'Get a build list for the whole project as CSV text, or save it as a .csv file: wires, bom (parts with prices and totals), cable (metres to buy by colour and size), usage (colour reuse), fuses (fuse schedule and load budget), connectors (connector cavity tables), cut (cut list by harness with terminals, strip lengths and seals), labels (a label for each wire end), locations (where each part is fitted), nets (every electrical net).',
+  inputSchema: { path: z.string(), kind: z.enum(['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cut', 'labels', 'locations', 'nets']), out: z.string().optional().describe('Save as this .csv file (relative to the project) instead of returning the text'), single: z.boolean().optional().describe('labels: one label per wire instead of one per end') },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  const text = L.toCSV(L.reportRows(project, a.kind, { single: a.single }));
+  if (a.out) { const target = path.isAbsolute(a.out) ? a.out : path.join(path.dirname(full), a.out); fs.writeFileSync(target, '﻿' + text); return ok(`Wrote ${target}`); }
+  return ok(text);
+}));
+
+/* ---------------- revision history ---------------- */
+const unrecorded = (project) => { const last = project.revisions[project.revisions.length - 1]; return last ? L.compareRevisions(project, last.id, 'current').count : null; };
+server.registerTool('issue_revision', {
+  title: 'Issue a revision',
+  description: 'Record the project as it is now as a numbered revision (A, B, C...), with a description of what changed. Each revision keeps a full copy of the drawing, so any two can be compared later and the project can go back to one. The revision table on the sheets shows the latest revisions.',
+  inputSchema: { path: z.string(), description: z.string().describe('What changed in this revision, e.g. "Added rear work lamp"'), by: z.string().optional(), rev: z.string().optional().describe('Revision letter or number; the next one when omitted'), date: z.string().optional().describe('YYYY-MM-DD; today when omitted') },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  const prev = project.revisions[project.revisions.length - 1];
+  const r = L.issueRevision(project, { description: a.description, by: a.by, rev: a.rev, date: a.date });
+  save(full, project);
+  const lines = prev ? L.describeDiff(L.compareRevisions(project, prev.id, r.id)) : [];
+  return ok(`Issued revision ${r.rev} (${r.date})${prev ? `. Changes since ${prev.rev}:\n- ${lines.join('\n- ') || 'none'}` : ', the first issue.'}`);
+}));
+
+server.registerTool('list_revisions', {
+  title: 'Revision history',
+  description: 'List the revisions issued for a project, newest first, with the number of changes in each, and whether the drawing has changed since the latest one.',
+  inputSchema: { path: z.string() },
+}, wrap(async ({ path: p }) => {
+  const { project } = load(p);
+  const revs = project.revisions;
+  if (!revs.length) return ok('No revisions issued yet. Use issue_revision to record one.');
+  const lines = revs.map((r, i) => `${r.rev}  ${r.date}  ${r.by || ''}  ${r.description || ''}${i ? `  (${L.compareRevisions(project, revs[i - 1].id, r.id).count} changes)` : '  (first issue)'}`).reverse();
+  const n = unrecorded(project);
+  return ok(lines.join('\n') + `\n\n${n ? `${n} change${n > 1 ? 's' : ''} since ${revs[revs.length - 1].rev} not yet issued.` : `No changes since ${revs[revs.length - 1].rev}.`}`);
+}));
+
+server.registerTool('compare_revisions', {
+  title: 'Compare revisions',
+  description: 'List what changed between two revisions, or between a revision and the drawing as it is now: parts and wires added, removed or changed on each sheet, colour, size and length changes, sheets added or renamed.',
+  inputSchema: { path: z.string(), from: z.string().optional().describe('Older revision letter; the latest revision when omitted'), to: z.string().optional().describe('Newer revision letter, or "current" (default)') },
+}, wrap(async (a) => {
+  const { project } = load(a.path);
+  const last = project.revisions[project.revisions.length - 1];
+  const from = a.from || (last && last.rev);
+  if (!from) throw new Error('No revisions issued yet.');
+  const d = L.compareRevisions(project, from, a.to || 'current');
+  const lines = L.describeDiff(d);
+  return ok(`${from} → ${a.to || 'now'}: ${d.count} change${d.count === 1 ? '' : 's'}${lines.length ? '\n- ' + lines.join('\n- ') : ''}`);
+}));
+
+server.registerTool('restore_revision', {
+  title: 'Go back to a revision',
+  description: 'Put the drawing back to how it was at a revision. The revision list is kept. If the drawing has changes that were never issued, they are lost, so this needs confirm: true in that case; issue a revision first to keep them.',
+  inputSchema: { path: z.string(), rev: z.string(), confirm: z.boolean().optional() },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  if (!L.revisionById(project, a.rev)) throw new Error(`No revision ${a.rev}. Revisions: ${project.revisions.map((r) => r.rev).join(', ') || 'none'}`);
+  const n = unrecorded(project);
+  if (n && !a.confirm) throw new Error(`The drawing has ${n} change${n > 1 ? 's' : ''} since the latest revision that would be lost. Issue a revision first, or pass confirm: true.`);
+  L.restoreRevision(project, a.rev);
+  save(full, project);
+  return ok(`The drawing is back to revision ${a.rev}. The revision list is unchanged.`);
+}));
+
+/* ---------------- harness formboard ---------------- */
+server.registerTool('harness_formboard', {
+  title: 'Harness formboard',
+  description: 'The formboard for one harness: its ends (connectors and parts) and breakout points joined by branches, with each branch\'s length, the wires through it and the bundle diameter. Set branch lengths (mm) and sleeving, then copy the routed lengths onto the wires. A starting layout is made the first time; reshape it in the app\'s Formboard view.',
+  inputSchema: {
+    path: z.string(), harness: z.string(),
+    lengths: z.record(z.number()).optional().describe('Branch length in mm, keyed by branch id or "FROM-TO" end labels, e.g. {"K1-S1": 450}'),
+    sleeve: z.record(z.string()).optional().describe('Sleeving id per branch (same keys), e.g. {"b1":"braid"}'),
+    apply_lengths: z.boolean().optional().describe('Copy the routed length of each wire onto it'), end_allowance_mm: z.number().optional().describe('Extra at each end when copying lengths (default 50)'),
+  },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  const hs = [...new Set(L.wireList(project).map((w) => w.harness).filter(Boolean))];
+  if (!hs.includes(a.harness)) throw new Error(`No wires in harness "${a.harness}". Harnesses with wires: ${hs.join(', ') || 'none'}`);
+  let fb = L.formboard(project, a.harness);
+  const lab = (id) => (fb.nodes.find((n) => n.id === id) || {}).label || 'point ' + id;
+  const branchFor = (k) => {
+    const b = fb.layout.branches.find((x) => x.id === k);
+    if (b) return b;
+    const [x, y] = String(k).split(/\s*-\s*|\s*→\s*/).map((s) => s.trim().toLowerCase());
+    const hit = fb.layout.branches.find((q) => { const p = lab(q.a).toLowerCase(), r = lab(q.b).toLowerCase(); return (p === x && r === y) || (p === y && r === x); });
+    if (!hit) throw new Error(`No branch "${k}". Branches: ${fb.layout.branches.map((q) => `${q.id} (${lab(q.a)}-${lab(q.b)})`).join(', ')}`);
+    return hit;
+  };
+  Object.entries(a.lengths || {}).forEach(([k, mm]) => { branchFor(k).length = Math.round(mm); });
+  Object.entries(a.sleeve || {}).forEach(([k, s]) => { branchFor(k).sleeve = pick(L.SLEEVING, s, 'sleeving'); });
+  let applied = null;
+  if (a.apply_lengths) applied = L.applyFormboardLengths(project, a.harness, a.end_allowance_mm != null ? a.end_allowance_mm : 50);
+  fb = L.formboard(project, a.harness);
+  save(full, project);
+  const sl = (b) => [(L.SLEEVING.find((s) => s.id === b.sleeve) || {}).name, b.sleeveSize && b.sleeveSize + ' mm'].filter((x) => x && x !== 'None').join(' ');
+  const lines = [`Harness ${a.harness}: ${fb.total} m of trunk and branches.`, '', 'Branches:'];
+  fb.branches.forEach((b) => lines.push(`  ${b.id}: ${lab(b.a)} - ${lab(b.b)}, ${b.length ? b.length + ' mm' : 'no length'}, ${b.count} wire${b.count === 1 ? '' : 's'}, bundle ${b.diameter} mm${sl(b) ? ', ' + sl(b) : ''}`));
+  lines.push('', 'Wires:');
+  fb.wires.forEach((w) => lines.push(`  ${w.name} ${w.code} ${w.gauge}mm² ${w.from || '?'} -> ${w.to || '?'}: ${w.routed ? (w.mm ? w.mm + ' mm routed' : 'routed, branches need lengths') : 'not routed'}${w.was ? `, wire length ${w.was} m` : ''}`));
+  if (applied != null) lines.push('', `Copied routed lengths to ${applied} wire${applied === 1 ? '' : 's'}, with ${a.end_allowance_mm != null ? a.end_allowance_mm : 50} mm extra at each end.`);
+  return ok(lines.join('\n'));
+}));
+
+/* ---------------- settings ---------------- */
+server.registerTool('project_settings', {
+  title: 'Project and sheet settings',
+  description: 'Read or change project settings: title block details, system voltage, colour code standard, paper size and orientation (for the whole project or one sheet), black-and-white drawings, cross-references, junction dots, wire label style, revision clouds, currency and cut allowance. Returns the settings after the change.',
+  inputSchema: {
+    path: z.string(), title: z.string().optional(), project: z.string().optional().describe('Vehicle or client name'), drawnBy: z.string().optional(), notes: z.string().optional(),
+    volts: z.number().optional(), standard: z.enum(['lr', 'din', 'sae', 'custom']).optional(),
+    page: z.enum(['fit', 'A4', 'A3', 'A2', 'A1']).optional().describe('Paper size for every sheet; "fit" sizes the sheet to the drawing'), orientation: z.enum(['landscape', 'portrait']).optional(),
+    sheet: sheetArg.describe('Set sheet_page / sheet_orientation on this sheet'), sheet_page: z.enum(['', 'fit', 'A4', 'A3', 'A2', 'A1']).optional().describe('This sheet only; "" uses the project setting'), sheet_orientation: z.enum(['', 'landscape', 'portrait']).optional(),
+    bw: z.boolean().optional().describe('Black-and-white drawings with colour codes written on the wires'), xrefs: z.boolean().optional().describe('Show where off-page links continue (sheet and zone)'), junctions: z.boolean().optional(),
+    labels: z.enum(['full', 'code', 'none']).optional().describe('Wire labels: full (number, colour, size), code (colour code only) or none'), titleBlock: z.boolean().optional(), colourKey: z.boolean().optional(),
+    clouds: z.string().optional().describe('Draw revision clouds round what changed since this revision letter; "" for none'),
+    currency: z.string().optional(), cutAllowance: z.number().optional().describe('Metres added to each wire in the cut list'),
+  },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  const s = project.settings, m = project.meta;
+  if (a.title != null) project.title = a.title;
+  ['project', 'drawnBy', 'notes'].forEach((k) => { if (a[k] != null) m[k] = a[k]; });
+  ['volts', 'standard', 'page', 'orientation', 'bw', 'xrefs', 'junctions', 'labels', 'titleBlock', 'colourKey', 'currency', 'cutAllowance'].forEach((k) => { if (a[k] != null) s[k] = a[k]; });
+  if (a.clouds != null) { if (a.clouds && !L.revisionById(project, a.clouds)) throw new Error(`No revision ${a.clouds}.`); s.clouds = a.clouds; }
+  if (a.sheet_page != null || a.sheet_orientation != null) {
+    const v = sheetView(project, a.sheet);
+    if (a.sheet_page != null) { if (a.sheet_page) v.sheet.page = a.sheet_page; else delete v.sheet.page; }
+    if (a.sheet_orientation != null) { if (a.sheet_orientation) v.sheet.orientation = a.sheet_orientation; else delete v.sheet.orientation; }
+  }
+  save(full, project);
+  const sheets = project.sheets.map((x, i) => `${i + 1} "${x.name}"${x.page || x.orientation ? ` (${[x.page, x.orientation].filter(Boolean).join(' ')})` : ''}`).join(', ');
+  return ok(`Settings for ${project.title}`, { meta: m, settings: { ...s, stock: undefined, cableCosts: undefined }, sheets });
+}));
+
+/* ---------------- export and import ---------------- */
+const writeOut = (full, out, suffix, text) => {
+  const target = out ? (path.isAbsolute(out) ? out : path.join(path.dirname(full), out)) : full.replace(/\.(loom|json)$/i, '') + suffix;
+  fs.writeFileSync(target, text);
+  return target;
+};
+server.registerTool('export', {
+  title: 'Export',
+  description: 'Write the project in another format next to it (or to out): dxf (each sheet for CAD), wireviz (YAML for the WireViz harness tool, optionally one harness), html (a read-only page anyone can open in a browser, with clickable nets), pack (the build pack: drawings, revision history, wire, cut and connector lists, fuses, parts and costs, checks, ready to print), formboard_dxf (one harness formboard at 1:1 in mm). For CSV lists use report; for SVG use export_svg.',
+  inputSchema: { path: z.string(), format: z.enum(['dxf', 'wireviz', 'html', 'pack', 'formboard_dxf']), sheet: sheetArg.describe('dxf: only this sheet'), harness: z.string().optional().describe('wireviz: only this harness; formboard_dxf: required'), out: z.string().optional(), bw: z.boolean().optional().describe('pack: black-and-white drawings'), labels: z.boolean().optional().describe('pack: include wire labels') },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  let written;
+  if (a.format === 'dxf') {
+    const vs = a.sheet != null ? [sheetView(project, a.sheet)] : L.views(project);
+    written = vs.map((v) => writeOut(full, vs.length === 1 ? a.out : null, project.sheets.length > 1 ? `-${v.sheetNo}.dxf` : '.dxf', L.exportDXF(v)));
+  } else if (a.format === 'wireviz') {
+    if (!L.hasYAML) throw new Error('WireViz export needs js-yaml, which is missing from this install.');
+    written = [writeOut(full, a.out, a.harness ? `-${a.harness.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.yml` : '.yml', L.exportWireViz(project, { harness: a.harness }))];
+  } else if (a.format === 'html') {
+    written = [writeOut(full, a.out, '-view.html', L.shareHTML(project))];
+  } else if (a.format === 'pack') {
+    const body = L.buildPackHTML(project, { bw: a.bw, labels: a.labels });
+    written = [writeOut(full, a.out, '-build-pack.html', `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${L.esc(project.title)} build pack</title><style>@page{size:A4;margin:12mm}body{margin:0;padding:12mm;background:#fff}@media print{body{padding:0}}${L.PACK_CSS}</style></head><body>${body}</body></html>`)];
+  } else {
+    if (!a.harness) throw new Error('Give the harness for formboard_dxf.');
+    const dxf = L.exportFormboardDXF(project, a.harness);
+    save(full, project); // keeps the layout made for a new harness
+    written = [writeOut(full, a.out, `-${a.harness.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-formboard.dxf`, dxf)];
+  }
+  return ok(`Wrote ${written.join(', ')}`);
+}));
+
+server.registerTool('import', {
+  title: 'Import',
+  description: 'Bring wiring into a project from another format, onto a new sheet (or a named one): csv (a wire list from a spreadsheet; first row names the columns, ends as part:pin or From part/From pin columns), wireviz (a WireViz YAML file), kicad (a KiCad netlist .net), lengths (a CSV of wire number and measured length that updates existing wires). Parts not in the project are made as plain boxes with the pins used.',
+  inputSchema: { path: z.string(), format: z.enum(['csv', 'wireviz', 'kicad', 'lengths']), file: z.string().optional().describe('File to read'), text: z.string().optional().describe('Or the content itself'), sheet: z.string().optional().describe('Name of the sheet to import onto') },
+}, wrap(async (a) => {
+  const { full, project } = load(a.path);
+  let text = a.text;
+  if (a.file) { const f = a.file.startsWith('~') ? path.join(os.homedir(), a.file.slice(1)) : path.isAbsolute(a.file) ? a.file : path.join(path.dirname(full), a.file); text = fs.readFileSync(f, 'utf8'); }
+  if (!text) throw new Error('Give file or text.');
+  let r, msg;
+  if (a.format === 'lengths') { r = L.importLengths(project, text); msg = `Updated the length of ${r.updated} wire${r.updated === 1 ? '' : 's'} (${r.unit}).${r.missing.length ? ' Not found: ' + r.missing.join(', ') : ''}`; }
+  else {
+    r = a.format === 'csv' ? L.importWireList(project, text, { sheetName: a.sheet }) : a.format === 'wireviz' ? L.importWireViz(project, text, { sheetName: a.sheet }) : L.importKiCad(project, text, { sheetName: a.sheet });
+    msg = `Imported ${r.wires} wire${r.wires === 1 ? '' : 's'} and ${r.parts} part${r.parts === 1 ? '' : 's'} onto sheet "${r.sheet}".`;
+  }
+  save(full, project);
+  return ok(msg + (r.warnings && r.warnings.length ? '\n\nWarnings:\n- ' + r.warnings.join('\n- ') : ''));
 }));
 
 if (require.main === module) {

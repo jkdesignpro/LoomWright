@@ -30,45 +30,61 @@
   <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 10h18M3 15h18M9 5v14"/></symbol>
+  <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M6 15h5l3-5h4M11 15l2 2h3"/><circle cx="6" cy="15" r="1"/><circle cx="18" cy="10" r="1"/><circle cx="16" cy="17" r="1"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5"/><path d="M4 12h11a5 5 0 0 1 0 10h-3"/></symbol>
+  <symbol id="i-trace" viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h6a3 3 0 0 1 0 6h-2a3 3 0 0 0 0 6h6"/></symbol>
+  <symbol id="i-test" viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5M12 8v4l3 2"/></symbol>
+  <symbol id="i-vehicle" viewBox="0 0 24 24"><path d="M4 16V9l2-4h9l3 4h2v7z"/><circle cx="8" cy="16.5" r="2"/><circle cx="16.5" cy="16.5" r="2"/><path d="M6 9h12"/></symbol>
+  <symbol id="i-pack" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 15h7M9 18h4"/></symbol>
 </svg>
 
 <header id="titlebar">
   <div class="brand"><span class="mark">LW</span>LoomWright</div>
   <nav id="menubar" aria-label="Menu"></nav>
-  <button id="cmdbtn" type="button" title="Search commands, parts and sheets (Ctrl+K)"><svg class="i"><use href="#i-search"/></svg><span>Search</span><kbd>Ctrl+K</kbd></button>
+  <button id="cmdbtn" type="button" title="Search commands, parts and sheets (Ctrl+K)"><svg class="i"><use href="#i-search"/></svg><span data-t>Search</span><kbd>Ctrl+K</kbd></button>
   <span class="mc" id="mc-project" title="Project"></span>
   <button class="iconbtn" data-cmd="theme" title="Light or dark" aria-label="Light or dark"><svg class="i"><use href="#i-moon"/></svg></button>
 </header>
 
 <div id="shell">
   <nav id="ribbon" aria-label="Tools">
-    <button class="rb primary" data-cmd="new" title="New project"><svg class="i"><use href="#i-new"/></svg><span>New</span></button>
-    <button class="rb" data-cmd="open" title="Open project (Ctrl+O)"><svg class="i"><use href="#i-open"/></svg><span>Open</span></button>
-    <button class="rb" data-cmd="save" title="Save project (Ctrl+S)"><svg class="i"><use href="#i-save"/></svg><span>Save</span></button>
+    <button class="rb primary" data-cmd="new" title="New project"><svg class="i"><use href="#i-new"/></svg><span data-t>New</span></button>
+    <button class="rb" data-cmd="open" title="Open…"><svg class="i"><use href="#i-open"/></svg><span data-t>Open</span></button>
+    <button class="rb" data-cmd="save" title="Save"><svg class="i"><use href="#i-save"/></svg><span data-t>Save</span></button>
     <div class="sep"></div>
-    <button class="rb" data-cmd="pane-parts" id="rb-parts" title="Component library"><svg class="i"><use href="#i-parts"/></svg><span>Parts</span></button>
-    <button class="rb" data-cmd="pane-project" id="rb-project" title="Project, sheets and harnesses"><svg class="i"><use href="#i-project"/></svg><span>Project</span></button>
-    <button class="rb" data-cmd="sheet-new" title="Add a sheet"><svg class="i"><use href="#i-sheet"/></svg><span>Sheet</span></button>
+    <button class="rb" data-cmd="pane-parts" id="rb-parts" title="Parts library"><svg class="i"><use href="#i-parts"/></svg><span data-t>Parts</span></button>
+    <button class="rb" data-cmd="pane-project" id="rb-project" title="Project and sheets"><svg class="i"><use href="#i-project"/></svg><span data-t>Project</span></button>
+    <button class="rb" data-cmd="pane-history" id="rb-history" title="Revision history"><svg class="i"><use href="#i-history"/></svg><span data-t>History</span></button>
     <div class="sep"></div>
-    <button class="rb" data-cmd="builder" title="Component builder"><svg class="i"><use href="#i-builder"/></svg><span>Builder</span></button>
-    <button class="rb" data-cmd="colours" title="Wire colours"><svg class="i"><use href="#i-colours"/></svg><span>Colours</span></button>
-    <button class="rb" data-cmd="tables" title="Wire list and reports"><svg class="i"><use href="#i-table"/></svg><span>Lists</span></button>
-    <button class="rb" data-cmd="check" title="Run design checks"><svg class="i"><use href="#i-check"/></svg><span>Check</span></button>
-    <button class="rb" data-cmd="print" id="rb-print" title="Print or save all sheets as PDF"><svg class="i"><use href="#i-pdf"/></svg><span>PDF</span></button>
+    <button class="rb" data-cmd="trace" title="Trace circuit"><svg class="i"><use href="#i-trace"/></svg><span data-t>Trace</span></button>
+    <button class="rb" data-cmd="test" title="Live circuit test"><svg class="i"><use href="#i-test"/></svg><span data-t>Test</span></button>
+    <button class="rb" data-cmd="check" title="Run design checks"><svg class="i"><use href="#i-check"/></svg><span data-t>Check</span></button>
+    <div class="sep"></div>
+    <button class="rb" data-cmd="builder" title="Component builder…"><svg class="i"><use href="#i-builder"/></svg><span data-t>Builder</span></button>
+    <button class="rb" data-cmd="colours" title="Wire colours and stock…"><svg class="i"><use href="#i-colours"/></svg><span data-t>Colours</span></button>
+    <button class="rb" data-cmd="formboard" title="Harness formboard…"><svg class="i"><use href="#i-board"/></svg><span data-t>Formboard</span></button>
+    <button class="rb" data-cmd="locations" title="Component locations (vehicle view)…"><svg class="i"><use href="#i-vehicle"/></svg><span data-t>Vehicle</span></button>
+    <div class="sep"></div>
+    <button class="rb" data-cmd="tables" title="Lists and reports"><svg class="i"><use href="#i-table"/></svg><span data-t>Lists</span></button>
+    <button class="rb" data-cmd="print-pack" title="Build pack (PDF)…"><svg class="i"><use href="#i-pack"/></svg><span data-t>Pack</span></button>
+    <button class="rb" data-cmd="print" id="rb-print" title="Print or save PDF (all sheets)"><svg class="i"><use href="#i-pdf"/></svg><span>PDF</span></button>
     <div class="grow"></div>
-    <button class="rb" data-cmd="claude" title="Use LoomWright with Claude"><svg class="i"><use href="#i-claude"/></svg><span>Claude</span></button>
+    <button class="rb" data-cmd="claude" title="Use with Claude…"><svg class="i"><use href="#i-claude"/></svg><span>Claude</span></button>
   </nav>
 
   <aside id="task" class="pane" aria-label="Library and project">
-    <div class="pane-tabs"><button class="ptab on" data-pane="parts">Parts</button><button class="ptab" data-pane="project">Project</button></div>
+    <div class="pane-tabs"><button class="ptab on" data-pane="parts" data-t>Parts</button><button class="ptab" data-pane="project" data-t>Project</button><button class="ptab" data-pane="history" data-t>History</button></div>
     <div id="pane-parts" class="pane-body">
       <div class="pane-search"><svg class="i"><use href="#i-search"/></svg><input id="lib-search" type="search" placeholder="Search parts" aria-label="Search parts"></div>
       <div id="lib-list" class="lib-list"></div>
     </div>
     <div id="pane-project" class="pane-body" hidden></div>
+    <div id="pane-history" class="pane-body" hidden></div>
   </aside>
 
   <main id="work">
+    <div id="doctabs" class="doctabs" role="tablist" aria-label="Open projects"></div>
     <div id="doc">
       <div id="sheetbar">
         <div id="sheet-tabs" class="sheet-tabs" role="tablist" aria-label="Sheets"></div>
@@ -76,7 +92,7 @@
         <div class="grow"></div>
         <div class="seg"><div class="bt">
           <button data-cmd="zoom-out" title="Zoom out (-)">−</button>
-          <button data-cmd="fit" id="zoom-label" title="Fit to window (0)">100%</button>
+          <button data-cmd="fit" id="zoom-label" title="Fit sheet to window">100%</button>
           <button data-cmd="zoom-in" title="Zoom in (+)">+</button>
         </div></div>
       </div>
@@ -97,21 +113,27 @@
     </div>
     <section class="tables" id="tables">
       <div class="tabs" role="tablist">
-        <button role="tab" class="tab on" data-tab="wires">Wire list <span class="count" id="c-wires"></span></button>
-        <button role="tab" class="tab" data-tab="bom">Parts list <span class="count" id="c-bom"></span></button>
-        <button role="tab" class="tab" data-tab="cable">Cable totals</button>
-        <button role="tab" class="tab" data-tab="usage">Colour usage</button>
-        <button role="tab" class="tab" data-tab="checks">Checks <span class="count" id="c-checks"></span></button>
+        <button role="tab" class="tab on" data-tab="wires"><span data-t>Wire list</span> <span class="count" id="c-wires"></span></button>
+        <button role="tab" class="tab" data-tab="bom"><span data-t>Parts & costs</span></button>
+        <button role="tab" class="tab" data-tab="cable"><span data-t>Cable totals</span></button>
+        <button role="tab" class="tab" data-tab="usage"><span data-t>Colour usage</span></button>
+        <button role="tab" class="tab" data-tab="fuses"><span data-t>Fuses & loads</span></button>
+        <button role="tab" class="tab" data-tab="connectors"><span data-t>Connectors</span></button>
+        <button role="tab" class="tab" data-tab="cut"><span data-t>Cut list</span></button>
+        <button role="tab" class="tab" data-tab="nets"><span data-t>Circuits</span></button>
+        <button role="tab" class="tab" data-tab="checks"><span data-t>Checks</span> <span class="count" id="c-checks"></span></button>
         <div class="grow"></div>
-        <label class="scope"><input type="checkbox" id="scope-all" checked> All sheets</label>
-        <button class="iconbtn sm" id="tables-toggle" aria-expanded="true" title="Hide lists" aria-label="Hide lists"><svg class="i"><use href="#i-down"/></svg></button>
+        <div class="tabs-end">
+          <label class="scope"><input type="checkbox" id="scope-all" checked> <span data-t>All sheets</span></label>
+          <button class="iconbtn sm" id="tables-toggle" aria-expanded="true" title="Hide lists" aria-label="Hide lists"><svg class="i"><use href="#i-down"/></svg></button>
+        </div>
       </div>
       <div class="table-wrap" id="table-wrap"></div>
     </section>
   </main>
 
   <aside id="props" class="pane" aria-label="Properties">
-    <div class="pane-head">Properties</div>
+    <div class="pane-head" data-t>Properties</div>
     <div id="inspector" class="pane-body inspector"></div>
   </aside>
 </div>
@@ -140,12 +162,20 @@
 </div>
 
 <div id="builder" class="builder" hidden></div>
+<div id="views" class="views" hidden></div>
 <div id="print-area" class="print-area"></div>
 
+<script src="vendor/js-yaml.min.js"></script>
 <script src="core/loom-core.js"></script>
+<script src="core/loom-data.js"></script>
+<script src="core/loom-nets.js"></script>
+<script src="core/loom-reports.js"></script>
+<script src="core/loom-io.js"></script>
+<script src="i18n.js"></script>
 <script src="sample.js"></script>
 <script src="platform.js"></script>
 <script src="editor.js"></script>
 <script src="builder.js"></script>
+<script src="views.js"></script>
 </body>
 </html>
