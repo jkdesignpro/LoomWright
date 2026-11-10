@@ -1,0 +1,19 @@
+{
+  "name": "loomwright-mcp",
+  "version": "0.1.0",
+  "description": "Optional Claude add-on (MCP server) for Loomwright: create and edit wiring diagrams from plain-English descriptions",
+  "license": "GPL-3.0-or-later",
+  "type": "commonjs",
+  "bin": { "loomwright-mcp": "server.js" },
+  "main": "server.js",
+  "files": ["server.js", "loom-core.js", "README.md"],
+  "scripts": {
+    "prepack": "node -e \"require('fs').copyFileSync('../app/core/loom-core.js','loom-core.js')\"",
+    "test": "node test.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "3.25.76"
+  }
+}

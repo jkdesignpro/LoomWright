@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--PAGE-->
+<title>Loomwright</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Free, open-source wiring diagram editor for vehicles and electronics.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="icon.png">
+</head>
+<body>
+<header class="bar" id="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 10h8m10 0h8M3 22h8m10 0h8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="11" y="6" width="10" height="8" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M11 22c3-6 7 6 10 0" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>
+    <span class="brand-name">Loomwright</span>
+    <input id="doc-title" class="title-input" aria-label="Diagram title" spellcheck="false">
+    <span id="dirty" class="dirty" hidden title="Unsaved changes">●</span>
+  </div>
+  <nav class="tools" aria-label="Main tools">
+    <div class="group">
+      <button class="btn" data-cmd="new" id="btn-new" title="New diagram">New</button>
+      <button class="btn" data-cmd="open" title="Open (Ctrl+O)">Open</button>
+      <button class="btn" data-cmd="save" title="Save (Ctrl+S)">Save</button>
+      <button class="btn" data-cmd="saveas" title="Save as (Ctrl+Shift+S)">Save as</button>
+    </div>
+    <div class="group menu-wrap">
+      <button class="btn" id="export-btn" aria-haspopup="true" aria-expanded="false">Export ▾</button>
+      <div class="menu" id="export-menu" hidden>
+        <button data-cmd="export-svg">Diagram as SVG</button>
+        <button data-cmd="export-png">Diagram as PNG</button>
+        <button data-cmd="print" id="btn-print">Print or save as PDF</button>
+        <hr>
+        <button data-cmd="export-wires">Wire list (CSV)</button>
+        <button data-cmd="export-bom">Parts list (CSV)</button>
+        <button data-cmd="export-cable">Cable totals (CSV)</button>
+      </div>
+    </div>
+    <div class="group">
+      <button class="btn icon" data-cmd="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 20 20"><path d="M7 5 3 9l4 4M3 9h9a5 5 0 0 1 0 10h-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="btn icon" data-cmd="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 20 20"><path d="m13 5 4 4-4 4m4-4H8a5 5 0 0 0 0 10h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <div class="group">
+      <button class="btn icon" data-cmd="zoom-out" title="Zoom out (-)" aria-label="Zoom out">−</button>
+      <button class="btn zoom" data-cmd="fit" id="zoom-label" title="Fit to screen (0)">100%</button>
+      <button class="btn icon" data-cmd="zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
+    </div>
+    <div class="group">
+      <button class="btn" data-cmd="builder" title="Design your own component">Component builder</button>
+      <button class="btn" data-cmd="colours" title="Wire colour standard and custom colours">Wire colours</button>
+      <button class="btn icon" data-cmd="help" title="Help and shortcuts" aria-label="Help">?</button>
+    </div>
+  </nav>
+</header>
+
+<main class="work">
+  <aside class="panel library" id="library" aria-label="Component library">
+    <div class="lib-head">
+      <input id="lib-search" type="search" placeholder="Search 80+ components" aria-label="Search components">
+    </div>
+    <div id="lib-list" class="lib-list"></div>
+  </aside>
+
+  <section class="stage" id="stage">
+    <svg id="canvas" tabindex="0" aria-label="Diagram canvas">
+      <defs>
+        <pattern id="g-minor" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#edf0ec" stroke-width="1"/></pattern>
+        <pattern id="g-major" width="100" height="100" patternUnits="userSpaceOnUse"><rect width="100" height="100" fill="url(#g-minor)"/><path d="M100 0H0V100" fill="none" stroke="#dbe1dc" stroke-width="1"/></pattern>
+      </defs>
+      <g id="vp">
+        <rect x="-20000" y="-20000" width="40000" height="40000" fill="url(#g-major)"/>
+        <g id="content"></g>
+        <g id="overlay"></g>
+      </g>
+    </svg>
+    <div class="hint" id="hint" role="status"></div>
+    <div class="toast" id="toast" role="status" hidden></div>
+  </section>
+
+  <aside class="panel inspector" id="inspector" aria-label="Properties"></aside>
+</main>
+
+<section class="tables" id="tables">
+  <div class="tabs" role="tablist">
+    <button role="tab" class="tab on" data-tab="wires">Wire list <span class="count" id="c-wires"></span></button>
+    <button role="tab" class="tab" data-tab="bom">Parts list <span class="count" id="c-bom"></span></button>
+    <button role="tab" class="tab" data-tab="cable">Cable totals</button>
+    <button role="tab" class="tab" data-tab="checks">Checks <span class="count" id="c-checks"></span></button>
+    <button class="tab collapse" id="tables-toggle" aria-expanded="true" title="Show or hide">▾</button>
+  </div>
+  <div class="table-wrap" id="table-wrap"></div>
+</section>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head"><h2 id="modal-title"></h2><button class="btn icon" id="modal-x" aria-label="Close">✕</button></div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+
+<div id="builder" class="builder" hidden></div>
+<div id="print-area" class="print-area"></div>
+
+<script src="core/loom-core.js"></script>
+<script src="sample.js"></script>
+<script src="platform.js"></script>
+<script src="editor.js"></script>
+<script src="builder.js"></script>
+</body>
+</html>
