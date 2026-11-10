@@ -192,6 +192,7 @@ kbd { font: 11.5px var(--sans); color: var(--muted); }
 .callout { border-radius: var(--r); padding: 6px 8px; font-size: 12px; border: 1px solid transparent; text-align: left; }
 .callout.warn { background: var(--warn-bg); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
 .callout.ok { background: var(--ok-bg); color: var(--ok); }
+.src-url { word-break: break-all; overflow-wrap: anywhere; }
 button.callout { cursor: pointer; width: 100%; }
 .tips { margin: 0; padding-left: 16px; color: var(--muted); font-size: 12px; display: grid; gap: 2px; }
 

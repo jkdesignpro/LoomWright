@@ -91,7 +91,7 @@ Things the live test does not do on a panel:
 
 ## The factory checks
 
-The factory checks run in factory and mixed projects. They appear in the **Checks** tab with the other [design checks](10-design-checks.md). Each has a rule code, which links it to its sources in [the list of standards sources](../standards-sources.md) in the LoomWright source code. The codes are not shown in the app.
+The factory checks run in factory and mixed projects. They appear in the **Checks** tab with the other [design checks](10-design-checks.md). Each has a rule code, which links it to its sources in [the list of standards sources](../standards-sources.md) in the LoomWright source code. The code is shown in grey after each finding.
 
 | Rule | Level | What it means |
 | --- | --- | --- |

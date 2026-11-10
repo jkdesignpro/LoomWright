@@ -67,6 +67,8 @@ All ground symbols are the same point, so two boards whose GND pins each go to a
 
 Each wire can say what it carries in its **Signal** field: power, ground (0 V), digital, analogue, PWM, I2C SDA or SCL, SPI MOSI, MISO, SCK or CS, UART TX or RX, CAN H or L, RS-485 A or B, USB D+ or D−, 1-Wire, or shield.
 
+Set it in the wire's **Identity** section, under **Signal**. To mark several wires at once, select them and use **Signal** under **Set on all selected wires**. The field shows in electronics and mixed projects, and on any wire that already has a signal.
+
 The signal is shown in the **Signal** column of the wire list and its CSV export. It also helps the checks: a wire marked **I2C SDA** that ends on an SCL pin is reported, for example.
 
 When you mark a UART wire, mark it from the side that sends. A wire from the TX pin of one board to the RX pin of another is **UART TX**.
@@ -101,7 +103,7 @@ These run with the other [Design checks](10-design-checks.md) in electronics and
 
 ## Power budget
 
-The **power** report lists each supply rail: every supply output that has something on it. For each rail it shows:
+The **Power rails** tab in the lists, also under **Reports › Power rails**, lists each supply rail: every supply output that has something on it. Click a row to select its supply on the drawing. For each rail it shows:
 
 - the supply, its pin and its voltage,
 - its rating in mA, where there is one: the **Current it can give** of a DC supply, the **Output current rating** of a converter, or the maker's figure for a board output, such as 50 mA for the `3V3` pin of an Arduino UNO R3,
@@ -111,7 +113,11 @@ The **power** report lists each supply rail: every supply output that has someth
 
 The figures come from each part's **Current it draws (mA)** field, or its current or wattage. A board passes on what its own outputs feed: if a sensor on an Arduino's `3V3` pin draws 10 mA, the supply feeding the Arduino gives those 10 mA as well. A converter takes its output power from its input, with 85% efficiency assumed.
 
-The power report is the **Power rails** table in the PDF export, and the `power` report of the [Claude add-on](26-claude-add-on.md).
+Save it as a spreadsheet with **Reports › Export power rails (CSV)**. It is also the **Power rails** table in the PDF export and the build pack, and the `power` report of the [Claude add-on](26-claude-add-on.md).
+
+## Where the board data comes from
+
+Select a board, or a connector of one of the series below, and the **Properties** panel shows where its pinout or rating came from, with the maker's page. Click **Copy link** to copy the address, then paste it into your web browser.
 
 ## Connector series
 

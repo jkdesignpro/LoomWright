@@ -158,7 +158,7 @@ With **Title block and revision table** ticked, each sheet carries a title block
 
 Above it, once you have issued revisions, a revision table lists the latest six: revision, date, description and who issued it.
 
-In household, factory and mixed projects, each sheet also carries a short disclaimer line along the bottom left: "LoomWright is a basic planning tool. Its checks are guidance only, not proof that work meets BS 7671, IEC 60204 or any other code, and it does not replace a qualified electrician or engineer." It is on the screen for sheets with a fixed paper size, and on every print and export.
+In household, factory and mixed projects, each sheet also carries a short disclaimer line along the bottom left: "LoomWright is a basic planning tool. Its checks are guidance only, not proof that work meets BS 7671, BS EN 60204-1 or any other code, and it does not replace a qualified electrician or engineer." It is on the screen for sheets with a fixed paper size, and on every print and export.
 
 ## Black and white drawings
 

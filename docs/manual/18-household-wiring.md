@@ -135,7 +135,7 @@ At the top, a note says that the schedule is a planning aid and not a design or 
 | Column | What it shows |
 | --- | --- |
 | Way | The breaker's reference. |
-| Circuit | The kind of circuit, such as `ring`, `radial`, `lighting`, `shower` or `cooker`. |
+| Circuit | The kind of circuit, such as **Socket ring**, **Socket radial**, **Lighting**, **Shower** or **Cooker**. When its cables have a **Circuit** name that says something more, such as `Kitchen`, it is shown first: **Kitchen (socket radial)**. |
 | Device | The breaker's curve and rating, such as `B32`. |
 | RCD | The RCD protecting it, such as `30 mA A`. |
 | AFDD | `yes` if it has arc fault detection. |
@@ -146,6 +146,7 @@ At the top, a note says that the schedule is a planning aid and not a design or 
 | Cable A (derated) | The rating of the weakest cable, once derated. |
 | Volt drop % | The voltage drop at the design current. |
 | Zs Ω, Max Zs Ω | The worked-out earth fault loop impedance, and the maximum for the breaker. |
+| Zs to read Ω (0.8 × max) | 0.8 of the maximum: the most a tester should measure on a cold cable, allowing for the cable warming up in use. |
 | Status | **ok**, **check** if the circuit has a finding at check level, or **fix** if it has an error. Rows to fix are marked. |
 
 Click a row to select the breaker on the drawing. **Reports › Export circuit schedule (CSV)** saves the schedule for a spreadsheet, and the [PDF export](15-build-pack-and-labels.md#export-pdf) can include it.
@@ -171,7 +172,7 @@ The total, and each group, are shown at the top of the circuit schedule. The che
 
 The household checks run in household and mixed projects, and in factory projects that have an MCB or RCBO. They appear in the **Checks** tab with the other [design checks](10-design-checks.md), at three levels: **error**, **check** and **info**.
 
-Each check has a rule code. The codes are not shown in the app, but they link each check to its sources in [the list of standards sources](../standards-sources.md) in the LoomWright source code. In plain words:
+Each check has a rule code, shown in grey after the finding in the **Checks** tab and in the **Rule** column of the build pack. The codes link each check to its sources in [the list of standards sources](../standards-sources.md) in the LoomWright source code. In plain words:
 
 | Rule | Level | What it means |
 | --- | --- | --- |

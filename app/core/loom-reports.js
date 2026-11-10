@@ -291,6 +291,12 @@
       const lv = Loom.loadVoltages(project);
       add('voltages', 'Voltage at each load', lv.length ? table(['Load', 'Sheet', 'Switched on by', 'Volts', 'Supply V', 'Drop %', 'Amps', 'Status'], lv.map((x) => [x.ref, x.sheet, x.state || 'always on', x.volts, x.supply, x.dropPct, x.amps, x.status || ''])) + '<p class="muted">Worked out from wire sizes, lengths and load ratings with a 12.6 V resting battery (scaled for other systems). A guide, not a measurement.</p>' : '');
     }
+    // lists added by the household, factory and electronics modules, when the project has any rows for them
+    [['circuits', 'Circuit schedule (household)'], ['motors', 'Motors'], ['terminals', 'Terminal plan'], ['plcio', 'PLC inputs and outputs'], ['power', 'Power rails']].forEach(([k, title]) => {
+      if (!want(k) || !Loom.REPORTS.includes(k)) return;
+      const rows = Loom.reportRows(project, k);
+      if (rows.length > 1) add(k, title, table(rows[0], rows.slice(1)));
+    });
     if (Loom.faultFind && want('faults')) {
       const ts = Loom.faultTargets(project).filter((x) => x.kind === 'load');
       add('faults', 'Fault-finding sheets', ts.map((x) => Loom.faultSheetHTML(Loom.faultFind(project, x.part, 'dead'), { project: project.title })).join(''));
@@ -309,10 +315,11 @@
     add('colours', 'Colour usage', use.length ? table(['Code', 'Colour', 'Circuit', 'Harness', 'Wires'], use.flatMap((e) => e.uses.map((u) => [e.code, e.colour, u.circuit, u.harness, u.wires.join(', ')]))) : '');
     if (o.labels) add('labels', 'Wire labels', labelSheetHTML(wireLabels(project), o.labelSize));
     const issues = Loom.validate(project).filter((c) => c.level !== 'info');
-    add('checks', 'Design checks', issues.length ? table(['Level', 'Finding'], issues.map((c) => [c.level === 'warn' ? 'check' : c.level, c.text])) : '<p>No problems found.</p>');
+    add('checks', 'Design checks', issues.length ? table(['Level', 'Rule', 'Finding'], issues.map((c) => [c.level === 'warn' ? 'check' : c.level, c.rule || '', c.text])) : '<p>No problems found.</p>');
     const cover = `<section class="cover"><h1>${esc(project.title)}</h1><dl><dt>Vehicle / client</dt><dd>${esc(m.project || '')}</dd><dt>Revision</dt><dd>${esc(m.revision || '')}</dd><dt>Date</dt><dd>${esc(m.date || '')}</dd><dt>Drawn by</dt><dd>${esc(m.drawnBy || '')}</dd><dt>Sheets</dt><dd>${vs.length}</dd><dt>Wires</dt><dd>${wl.length}</dd></dl>
       <h2 style="margin-top:10mm">Contents</h2><ol class="toc">${sections.map((s) => `<li>${esc(s.title)}${s.id === 'sheets' ? ': ' + vs.map((v, i) => `${i + 1} ${esc(v.sheet.name)}`).join(', ') : ''}</li>`).join('')}</ol>
-      <p class="muted" style="margin-top:10mm">Drawn with LoomWright ${esc(Loom.VERSION)}. Part numbers and ratings are a guide: check them against the maker's data before ordering.</p></section>`;
+      <p class="muted" style="margin-top:10mm">Drawn with LoomWright ${esc(Loom.VERSION)}. Part numbers and ratings are a guide: check them against the maker's data before ordering.</p>
+      ${Loom.disclaimerFor ? `<p class="${Loom.disclaimerFor(project).mains ? 'warn' : 'muted'}">${esc(Loom.disclaimerFor(project).short)}</p>` : ''}</section>`;
     return `<div class="pack">${cover}${sections.map((s) => `<section><h2>${esc(s.title)}</h2>${s.html}</section>`).join('')}</div>`;
   }
 

@@ -57,6 +57,9 @@ The PDF uses the standard PDF fonts, so a few symbols are written in letters: Ω
 | Connector tables | Every connector, cavity by cavity, with housing, wedge lock, terminal and the number of cavity plugs needed. |
 | Fuses, relays and load budget | The fuse and relay schedule and the supplies. |
 | Voltage at each load | The volts each load gets when it runs, worked out from the drawing. See [Voltage at each load](14-lists-and-reports.md#voltage-at-each-load). |
+| Circuit schedule (household) | Each breaker's circuit, cable, RCD, volt drop and Zs. Household and mixed projects only. See [The circuit schedule](18-household-wiring.md#the-circuit-schedule). |
+| Motors, Terminal plan, PLC inputs and outputs | The factory lists. Factory and mixed projects only, and the terminal plan when there are terminal strips. |
+| Power rails | Each supply rail with what it feeds. Electronics and mixed projects only. See [Power budget](21-electronics.md#power-budget). |
 | Fault-finding sheets | A **Does not work** fault sheet for each load with a reference. Not ticked to start with. See [Fault finding](12-fault-finding.md). |
 | Parts and costs | The parts to buy and the cable to buy, with prices and totals. |
 | Multicore and screened cables | Each cable, its type and cores, how many are used and spare, and its wires. |
@@ -64,9 +67,9 @@ The PDF uses the standard PDF fonts, so a few symbols are written in letters: Ω
 | Harness formboards | The formboard drawing of each harness, with its branch lengths. |
 | Colour usage | Every colour code and the circuits and harnesses it is used for. |
 | Wire labels | A sheet of wire labels. Not ticked to start with. |
-| Design checks | Any errors and checks still open. Information findings are left out. |
+| Design checks | Any errors and checks still open, with the rule code of household and factory checks. Information findings are left out. |
 
-The pack starts with a cover page giving the project title, vehicle, revision, date, who drew it and how many sheets and wires it has.
+The pack starts with a cover page giving the project title, vehicle, revision, date, who drew it and how many sheets and wires it has. The cover ends with the short disclaimer; in household, factory and mixed projects it is the mains version, which says the checks are guidance only and do not replace a qualified electrician.
 
 A section with nothing in it is left out. The formboard section only includes harnesses you have laid out in the formboard view; see [Harness formboard](16-harness-formboard.md).
 

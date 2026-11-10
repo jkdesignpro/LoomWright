@@ -44,7 +44,7 @@ qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
 
 ## Features
 
-- **129 built-in components** across power and charging, protection, switches, relays,
+- **138 built-in components** across power and charging, protection, switches, relays,
   lighting, motors and loads, gauges and sensors, connectors, electronics, household wiring
   and control panels, plus starter circuits that drop in ready drawn.
   Parametric parts (fuse boxes, connectors, busbars, terminal strips, modules, ICs) take any number of pins.
@@ -95,6 +95,10 @@ qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
 - **Factory and control panels.** Isolators, motor breakers, contactors, overloads, motors, e-stops,
   PLC cards and drives, with guidance checks from selected BS EN 60204-1 recommendations, motor,
   terminal and PLC I/O lists, and wire numbering by potential.
+- **Electronics projects.** Arduino, Raspberry Pi and ESP32 boards with pinouts from the makers'
+  documents, supplies and modules, electronics connector series, a signal on each wire, checks for
+  common mistakes between boards (5 V on 3.3 V pins, TX to TX, missing grounds) and a power budget
+  for each supply rail. For wiring between boards, not for designing circuit boards.
 - **Loads library.** Machines, household appliances and solar parts with typical ratings.
 - **Compressed air planner.** Plan a workshop or garage air system: compressor, receiver, air
   treatment, pipe runs, drops and tools. It estimates demand, pipe pressure drop and air speed,
@@ -187,7 +191,7 @@ list of shapes; see [docs/components.md](docs/components.md). Run `npm test` bef
 LoomWright is a basic tool for planning and drawing wiring.
 
 - Its design checks, load figures, wire size guide figures and other hints are **guidance only**. They are rules
-  of thumb and do not show that a design or an installation meets BS 7671, IEC 60204, the Building
+  of thumb and do not show that a design or an installation meets BS 7671, BS EN 60204-1, the Building
   Regulations or any other standard, regulation or code. The wire size figures assume single PVC
   automotive cable. Check wire sizes, fuse ratings and part numbers against the cable, fuse and
   component makers' data.

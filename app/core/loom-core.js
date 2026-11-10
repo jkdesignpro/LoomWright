@@ -694,6 +694,11 @@
   function pinName(doc, end) {
     const p = doc.parts.find((q) => q.id === end.part);
     if (!p) return '?';
+    // a net label or off-page link is named by its text, not by its pin
+    if (p.type === 'net_label' || p.type === 'offpage') {
+      const pr = resolved(doc, p).props || {}, txt = String(pr.text || pr.link || '').trim();
+      return txt || (p.type === 'net_label' ? 'Net label (no name)' : 'Off-sheet reference (no name)');
+    }
     const pn = resolved(doc, p).pins.find((q) => q.id === end.pin);
     // pn.term: the terminal number printed on the device, where it differs from the pin id
     return `${p.label || partDef(doc, p.type)?.name || p.type}:${pn ? pn.term || pn.id : end.pin}`;
@@ -1055,10 +1060,10 @@
   const DISCLAIMER = {
     title: 'Disclaimer',
     general: 'Drawn with LoomWright, a basic planning tool. Its checks are guidance only: check your work against the makers\' data and get a qualified person to check anything you are not sure of. No responsibility is accepted for its use.',
-    mains: 'LoomWright is a basic planning tool. Its checks are guidance only, not proof that work meets BS 7671, IEC 60204 or any other code, and it does not replace a qualified electrician or engineer. No responsibility is accepted for its use.',
+    mains: 'LoomWright is a basic planning tool. Its checks are guidance only, not proof that work meets BS 7671, BS EN 60204-1 or any other code, and it does not replace a qualified electrician or engineer. No responsibility is accepted for its use.',
     full: [
       'LoomWright is a free, basic tool for drawing and planning wiring. It is not a design service, and it does not replace training, the standards themselves or a qualified person.',
-      'Every check, warning, hint, calculation and suggestion it gives (cable sizes, voltage drop, fault loop impedance, protective devices, derating, compressed air sizing and the rest) is guidance only. It uses simplified models and the data you enter, and it can be wrong or incomplete. A clean report does not mean a design is safe, or that it meets BS 7671, IEC 60204-1, the Building Regulations (including Part P), the Electricity at Work Regulations 1989, the Pressure Systems Safety Regulations 2000 or any other standard, regulation or code.',
+      'Every check, warning, hint, calculation and suggestion it gives (cable sizes, voltage drop, fault loop impedance, protective devices, derating, compressed air sizing and the rest) is guidance only. It uses simplified models and the data you enter, and it can be wrong or incomplete. A clean report does not mean a design is safe, or that it meets BS 7671, BS EN 60204-1, the Building Regulations (including Part P), the Electricity at Work Regulations 1989, the Pressure Systems Safety Regulations 2000 or any other standard, regulation or code.',
       'Mains wiring in homes and workplaces, machine control panels and compressed air systems can kill or injure people and start fires. That work must be designed, installed, inspected, tested and certified by a competent, qualified person, such as a registered electrician, working to the current edition of the relevant standards and the makers\' instructions. Some household electrical work must be notified to building control.',
       'Vehicle wiring has its own risks: fire from overloaded or unprotected cables, and faults that affect lights, brakes or safety systems. Check your work against the vehicle and component makers\' data.',
       'LoomWright is free software under the GNU General Public License, version 3 or later. It is provided "as is", without any warranty, not even the implied warranty of merchantability or fitness for a particular purpose. As far as the law allows, its authors and contributors accept no responsibility or liability for any loss, damage, injury or death arising from its use, or from relying on anything it shows or produces.',

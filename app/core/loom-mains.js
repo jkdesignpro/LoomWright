@@ -356,9 +356,10 @@
         ids.forEach((id) => { if (!uf.has(K(v.sheet.id, p.id, id))) uf.set(K(v.sheet.id, p.id, id), K(v.sheet.id, p.id, id)); });
         const it = { v, p, d, props: r.props || {}, pins: ids, k: (id) => K(v.sheet.id, p.id, id) };
         parts.push(it);
-        if (PASS.includes(p.type) || ['busbar', 'terminal_block', 'connector', 'splice'].includes(p.type)) {
+        // a light switch is part of its circuit's cable run, so the lights after it belong to the circuit
+        if (PASS.includes(p.type) || ['busbar', 'terminal_block', 'connector', 'splice', 'switch_light'].includes(p.type)) {
           const b = Loom.behaviour(v, p);
-          if (PASS.includes(p.type) || p.type === 'splice') ids.slice(1).forEach((x) => union(it.k(ids[0]), it.k(x)));
+          if (PASS.includes(p.type) || p.type === 'splice' || p.type === 'switch_light') ids.slice(1).forEach((x) => union(it.k(ids[0]), it.k(x)));
           else b.links.forEach(([a, c]) => union(it.k(a), it.k(c)));
         }
         if ((p.type === 'net_label' && p.props.text) || (p.type === 'offpage' && p.props.link)) { const n = 'NET:' + String(p.type === 'net_label' ? p.props.text : p.props.link).trim().toUpperCase(); union(it.k('L'), n); union(it.k('R'), n); }
@@ -601,7 +602,8 @@
     const rcds = new Set(circuits.map((c) => (c.rcd && c.rcd.it.p.type === 'rcd' ? c.rcd.it.p.id : c.rcd ? 'own' : 'none')));
     if (circuits.length > 1 && rcds.size === 1 && !rcds.has('own') && !rcds.has('none')) add('warn', 'A2-RCD-FRONTEND', 'all circuits share one RCD. One fault will turn off everything, including the lights. Split the circuits between RCDs or use RCBOs.');
     if (!g.parts.some((x) => x.p.type === 'spd')) add('info', 'A2-SPD', 'no surge protection device drawn. BS 7671 requires one unless the owner has declined it in writing, and always where a fire alarm or other safety service is fed.');
-    g.parts.filter((x) => x.p.type === 'main_switch' && x.props.cu === 'plastic').forEach((x) => add('warn', 'A2-CU-CASE', `${refOf(x)}: a consumer unit inside a home must have a non-combustible (normally metal) case.`, x));
+    // Regulation 421.1.201 is for consumer units in homes, not commercial or industrial buildings
+    if (set.building !== 'commercial') g.parts.filter((x) => x.p.type === 'main_switch' && x.props.cu === 'plastic').forEach((x) => add('warn', 'A2-CU-CASE', `${refOf(x)}: a consumer unit inside a home must have a non-combustible (normally metal) case.`, x));
     const bonds = g.parts.filter((x) => x.p.type === 'bonding');
     if (!bonds.length) add('info', 'A7-MAIN-BOND', 'no main protective bonding drawn. Gas, water and oil pipes where they enter the building normally need bonding to the main earthing terminal.');
     else if (sup.earthing === 'TN-C-S') bonds.forEach((x) => { if ((parseFloat(x.props.size) || 0) < 10) add('warn', 'A7-MAIN-BOND', `${refOf(x)}: on a PME supply, main bonding is normally at least 10 mm².`, x); });
@@ -724,11 +726,20 @@
   }
 
   /* ---------------- Reports ---------------- */
+  const KIND_NAMES = { ring: 'Socket ring', radial: 'Socket radial', lighting: 'Lighting', shower: 'Shower', ev: 'EV charger', cooker: 'Cooker', immersion: 'Immersion heater', pv: 'Solar PV', battery: 'Home battery', smoke: 'Smoke alarms', machine: 'Machine', fixed: 'Fixed appliance', other: 'Other' };
+  // the circuit's name from its cables, such as "Kitchen sockets", with what kind it is
+  const circuitName = (c) => {
+    const kind = KIND_NAMES[c.kind] || c.kind, named = (c.cab.find((x) => x.w.circuit) || { w: {} }).w.circuit;
+    if (!named || !named.trim()) return kind;
+    // "Sockets" on a socket ring or "Lights" on a lighting circuit adds nothing
+    const stem = named.trim().toLowerCase().slice(0, 5);
+    return kind.toLowerCase().split(' ').some((w) => w.startsWith(stem)) ? kind : `${named.trim()} (${kind.toLowerCase()})`;
+  };
   function circuitRows(project) {
     const h = householdChecks(project);
     const st = (c) => { const lv = h.out.filter((x) => x.part === c.dev.p.id); return lv.some((x) => x.level === 'error') ? 'fix' : lv.some((x) => x.level === 'warn') ? 'check' : 'ok'; };
-    return [['Way', 'Circuit', 'Device', 'RCD', 'AFDD', 'Cable mm²', 'cpc mm²', 'Method', 'Length m', 'Design A', 'Cable A (derated)', 'Volt drop %', 'Zs Ω', 'Max Zs Ω', 'Status']]
-      .concat(h.circuits.map((c) => [c.ref, c.kind, `${c.curve}${c.In}${c.three ? ' 3P' : ''}`, c.rcd ? `${c.rcd.mA} mA ${c.rcd.type}` : '', c.afdd ? 'yes' : '', c.minSize, c.cab[0] ? c.cab[0].cpc : '', c.worst ? c.worst.method : '', c.L == null ? '' : r1(c.L), c.Ib, c.worst ? r1(c.worst.iz) : '', c.vdPct == null ? '' : c.vdPct, c.zs == null ? '' : c.zs, c.zsMax == null ? '' : c.zsMax, st(c)]));
+    return [['Way', 'Circuit', 'Device', 'RCD', 'AFDD', 'Cable mm²', 'cpc mm²', 'Method', 'Length m', 'Design A', 'Cable A (derated)', 'Volt drop %', 'Zs Ω', 'Max Zs Ω', 'Zs to read Ω (0.8 × max)', 'Status']]
+      .concat(h.circuits.map((c) => [c.ref, circuitName(c), `${c.curve}${c.In}${c.three ? ' 3P' : ''}`, c.rcd ? `${c.rcd.mA} mA ${c.rcd.type}` : '', c.afdd ? 'yes' : '', c.minSize, c.cab[0] ? c.cab[0].cpc : '', c.worst ? c.worst.method : '', c.L == null ? '' : r1(c.L), c.Ib, c.worst ? r1(c.worst.iz) : '', c.vdPct == null ? '' : c.vdPct, c.zs == null ? '' : c.zs, c.zsMax == null ? '' : c.zsMax, c.zsMax == null ? '' : Math.round(c.zsMax * 0.8 * 100) / 100, st(c)]));
   }
   function motorRows(project) {
     const rows = [['Motor', 'Sheet', 'kW', 'Full-load A', 'Starting', 'Starting A (about)']];
@@ -806,7 +817,7 @@
   Loom.reportRows = function (d, kind, o) { return extraReports[kind] ? extraReports[kind](d && d.project ? d.project : d) : baseRows(d, kind, o); };
   if (Loom.PDF_TABLES) {
     Object.assign(Loom.PDF_TABLES, {
-      circuits: { title: 'Circuit schedule (household)', cols: ['Way', 'Circuit', 'Device', 'RCD', 'AFDD', 'Cable mm²', 'cpc mm²', 'Method', 'Length m', 'Design A', 'Cable A (derated)', 'Volt drop %', 'Zs Ω', 'Max Zs Ω', 'Status'], ref: 'Way' },
+      circuits: { title: 'Circuit schedule (household)', cols: ['Way', 'Circuit', 'Device', 'RCD', 'AFDD', 'Cable mm²', 'cpc mm²', 'Method', 'Length m', 'Design A', 'Cable A (derated)', 'Volt drop %', 'Zs Ω', 'Max Zs Ω', 'Zs to read Ω (0.8 × max)', 'Status'], ref: 'Way' },
       motors: { title: 'Motors', cols: ['Motor', 'Sheet', 'kW', 'Full-load A', 'Starting', 'Starting A (about)'], ref: 'Motor', sheet: 'Sheet' },
       terminals: { title: 'Terminal plan', cols: ['Strip', 'Terminal', 'Sheet', 'Side A wire', 'Side A goes to', 'Side B wire', 'Side B goes to'], ref: 'Strip', sheet: 'Sheet' },
       plcio: { title: 'PLC inputs and outputs', cols: ['Address', 'Module', 'Sheet', 'Wire', 'Connected to'], ref: 'Module', sheet: 'Sheet' },

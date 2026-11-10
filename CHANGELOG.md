@@ -37,6 +37,11 @@ guidance only: see the disclaimer.
   follow their coil, overloads, motors, buttons, emergency stops, PLC cards and drives. Guidance checks
   from selected BS EN 60204-1 recommendations, motor, terminal plan and PLC I/O lists, and wire numbering
   by potential.
+- Electronics projects: Arduino UNO R3 and Nano, the Raspberry Pi 40-pin header, ESP32-DevKitC and
+  ESP32-S3-DevKitC-1 with pinouts from the makers' documents, supplies, converters, relay and I2C
+  modules, and JST, Molex, XT, barrel, USB-C, M8, M12 and screw terminal connector series. Each wire
+  can carry a signal (I2C, SPI, UART, CAN and more). Checks for 5 V on 3.3 V pins, TX to TX, SDA to SCL,
+  missing grounds and supplies fighting each other, and a Power rails list of what each supply feeds.
 - A loads library of machines, household appliances and solar parts with typical ratings.
 - Sources and known limits for every rule are listed in docs/standards-sources.md.
 
@@ -45,6 +50,11 @@ guidance only: see the disclaimer.
   tools. It estimates air demand, pipe pressure drop and air speed, pressure at each tool, receiver size,
   compressor duty, running and leak costs and water to drain, with plain-English checks.
 - Leak test and calculators, and CSV, SVG and PDF export.
+
+**Live test**
+- Relays and contactors stay pulled in, so a hold-in contact latches and a stop button drops it out.
+- Household circuits come on from the supply; three-phase motors run from L1, L2 and L3 labels;
+  drives, safety relays and indicator lamps work.
 
 **Help and disclaimers**
 - A built-in user manual (Help, or F1 for the chapter about what is on screen) with search.
@@ -59,6 +69,11 @@ guidance only: see the disclaimer.
 
 **Smaller changes and fixes**
 - Open a .loom file by double-clicking it on a Mac, or by dropping it on the window.
+- The circuit schedule names each circuit in words and gives the 0.8 × maximum Zs a tester should read.
+  Lights after a light switch now count in their circuit's design current.
+- Checks show their rule codes; the build pack can include the household, factory and power lists,
+  and its cover carries the disclaimer.
+- Wires to an unnamed net label say so in the wire list instead of "Net label:R".
 - Black-and-white drawings always show colour codes, even with wire labels turned off.
 - Motors, pumps, compressors, fans and wiper motors have a current draw field.
 - Closing the last tab opens a blank project rather than the example.

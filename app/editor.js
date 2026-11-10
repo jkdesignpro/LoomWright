@@ -38,10 +38,11 @@
   const showHouse = () => !!L.householdChecks && (['household', 'mixed'].includes(ptype()) || anyPart(['mcb', 'rcbo']));
   const showFactory = () => !!L.factoryChecks && (['factory', 'mixed'].includes(ptype()) || anyPart(['motor3', 'contactor', 'plc_in', 'plc_out']));
   const showTerminals = () => showFactory() || anyPart(['terminal_block']);
+  const showElec = () => !!L.electronicsPower && (['electronics', 'mixed'].includes(ptype()) || (!!project && project.sheets.some((sh) => sh.parts.some((p) => L.boardPins(p.type)))));
   function typeUI() {
     const type = ptype();
     if (lastWire.type !== type) { lastWire = { ...lastWire, tracer: '', ...(TYPE_WIRE[type] || TYPE_WIRE.vehicle), type }; }
-    const want = { schedule: showHouse(), motors: showFactory(), terminals: showTerminals(), plcio: showFactory() };
+    const want = { schedule: showHouse(), motors: showFactory(), terminals: showTerminals(), plcio: showFactory(), power: showElec() };
     Object.keys(want).forEach((k) => { const b = $(`.tab[data-tab="${k}"]`); if (b) b.hidden = !want[k]; });
     if (want[tab] === false) showTab('wires');
     if (menusReady) buildMenus();
@@ -1239,6 +1240,8 @@
     h += `<div class="row-btns"><button class="btn" data-cmd="fault">${esc(t('Fault finding…'))}</button></div>`;
     return h;
   }
+  /* Where a part's data came from: a note, and the maker's page as text to copy (the desktop app does not open web links). */
+  const sourceNote = (noteText, src) => (noteText || src ? `<div class="callout small" style="background:var(--raise);border-color:var(--line)">${noteText ? esc(noteText) : ''}${src ? `${noteText ? '<br>' : ''}<span class="muted">${esc(t('Source'))}:</span> <span class="mono src-url">${esc(src)}</span> <button class="linkbtn" data-act="copy-src" data-url="${esc(src)}">${esc(t('Copy link'))}</button>` : ''}</div>` : '');
   function partPanel(p) {
     const r = L.resolved(doc, p), d = r.def || { name: p.type, props: [], cat: 'Missing' };
     let h = `<div><span class="kicker">${esc(d.custom ? t('My components') : t(d.cat))}</span><h2>${esc(d.name)}</h2></div>`;
@@ -1252,9 +1255,10 @@
       else props += fld(pr.l, 'prop:' + pr.k, v);
     });
     h += sec('Properties', props);
+    if (!d.custom && (d.note || d.src)) h += sourceNote(d.note, d.src);
     if (p.type === 'conn') {
       const s = L.seriesById(r.props.series);
-      h += `<div class="callout" style="background:var(--raise);border-color:var(--line)"><b>${esc(s.name)}</b>${s.rating ? ' · ' + esc(s.rating) : ''}${s.sealed ? ' · ' + esc(t('sealed')) : ''}<br>${esc(t('Housing'))} <span class="mono">${esc(r.props.mpnShown || '—')}</span>${s.lock ? ` · ${esc(t('wedge lock'))} <span class="mono">${esc(s.lock(r.props.ways, r.props.gender))}</span>` : ''}<br>${esc(t('Terminal'))}: ${esc((L.TERMINALS.find((x) => x.id === (r.props.gender === 'receptacle' ? s.pin : s.socket)) || {}).name || '—')}<br><span class="muted">${esc(t('Check part numbers against the maker’s catalogue before ordering.'))}</span></div>`;
+      h += `<div class="callout" style="background:var(--raise);border-color:var(--line)"><b>${esc(s.name)}</b>${s.rating ? ' · ' + esc(s.rating) : ''}${s.sealed ? ' · ' + esc(t('sealed')) : ''}<br>${esc(t('Housing'))} <span class="mono">${esc(r.props.mpnShown || '—')}</span>${s.lock ? ` · ${esc(t('wedge lock'))} <span class="mono">${esc(s.lock(r.props.ways, r.props.gender))}</span>` : ''}<br>${esc(t('Terminal'))}: ${esc((L.TERMINALS.find((x) => x.id === (r.props.gender === 'receptacle' ? s.pin : s.socket)) || {}).name || '—')}<br><span class="muted">${esc(t('Check part numbers against the maker’s catalogue before ordering.'))}</span></div>${sourceNote(s.note, s.src)}`;
     }
     const xr = L.xrefs(project).get(p.id);
     if (xr) h += sec(p.type === 'offpage' || p.type === 'net_label' ? 'Continues on' : 'Also drawn on', `<div class="row-btns">${xr.map((x) => `<button class="chip" data-goto-part="${x.part}" data-goto-sheet="${x.sheetId}">${esc(t('Sheet'))} ${x.sheetNo}${x.zone ? ' · ' + x.zone : ''}</button>`).join('')}</div>`);
@@ -1284,7 +1288,8 @@
     const otherUses = others ? others.uses.filter((u) => u.circuit !== (w.circuit || '') || u.harness !== (w.harness || '')) : [];
     const clash = otherUses.filter((u) => u.harness && u.harness === w.harness && u.circuit !== (w.circuit || ''));
     let h = `<div><span class="kicker">${esc(t('Wire'))}</span><h2>${esc(w.name)} <span class="muted mono" style="font-size:12px;font-weight:500">${esc(code)}</span></h2><p class="sub">${esc(L.pinName(doc, w.from))} → ${esc(L.pinName(doc, w.to))}</p></div>`;
-    h += sec('Identity', `${fld('Wire number', 'name', w.name)}${fld('Circuit', 'circuit', w.circuit, 'text', 'list="dl-circuit" placeholder="e.g. Spot lamps"')}${fld('Harness', 'harness', w.harness, 'text', 'list="dl-harness" placeholder="e.g. Engine bay"')}${harnessList()}${circuitList()}`);
+    const signalFld = L.SIGNALS && (showElec() || w.signal) ? selFld('Signal', 'signal', w.signal || '', L.SIGNALS.map((x) => [x.id, t(x.name)])) : '';
+    h += sec('Identity', `${fld('Wire number', 'name', w.name)}${fld('Circuit', 'circuit', w.circuit, 'text', 'list="dl-circuit" placeholder="e.g. Spot lamps"')}${signalFld}${fld('Harness', 'harness', w.harness, 'text', 'list="dl-harness" placeholder="e.g. Engine bay"')}${harnessList()}${circuitList()}`);
     let col = `${colourField('Main', 'colour', w.colour, false)}${colourField('Tracer', 'tracer', w.tracer, true)}${colourField('Second tracer', 'tracer2', w.tracer2 || '', true)}`;
     if (otherUses.length) col += `<div class="callout ${clash.length ? 'warn' : ''}" style="${clash.length ? '' : 'background:var(--raise);border-color:var(--line)'}"><b>${esc(code)}</b> ${esc(t('is also used for'))} ${otherUses.map((u) => esc([u.circuit || t('no circuit'), u.harness].filter(Boolean).join(' in '))).join('; ')}.${clash.length ? ' ' + esc(t('Same harness, different circuit: make sure they can be told apart, for example with wire numbers or sleeves.')) : ''}</div>`;
     if (L.suggestColours) {
@@ -1292,7 +1297,7 @@
         const sg = ptype() === 'household' ? [] : L.suggestColours(project, sheetId, w, { inventory: userLib.inventory, limit: 6 }).suggestions.filter((x) => !(x.colour === w.colour && (x.tracer || '') === (w.tracer || '')));
         if (sg.length) col += `<div class="sugg"><span class="muted">${esc(t('Suggested'))}</span>${sg.slice(0, 5).map((x) => { const tr = x.tracer && L.colourById(doc, x.tracer); return `<button class="chip" data-sugg="${esc(x.colour)}|${esc(x.tracer || '')}" title="${esc(x.name + (x.reasons.length ? ': ' + x.reasons.join('; ') : ''))}"><span class="swatch" style="background:${tr ? `repeating-linear-gradient(90deg, ${x.hex} 0 5px, ${tr.hex} 5px 8px)` : x.hex}"></span>${esc(x.code)}</button>`; }).join('')}</div>`;
       } catch (e) { console.warn(e); }
-      col += `<label class="fld check"><input type="checkbox" data-field="settings:autoColour"${project.settings.autoColour ? ' checked' : ''}><span>${esc(t('Pick colours for new wires automatically'))}</span></label>`;
+      if (ptype() !== 'household') col += `<label class="fld check"><input type="checkbox" data-field="settings:autoColour"${project.settings.autoColour ? ' checked' : ''}><span>${esc(t('Pick colours for new wires automatically'))}</span></label>`;
     }
     h += sec('Colour', col);
     let cab = `<label class="fld"><span>${esc(t('Size'))}</span><select id="f-gauge" data-field="gauge">${gaugeOptions(w.gauge)}</select></label>`;
@@ -1334,7 +1339,7 @@
     return `<div><span class="kicker">${esc(t('Selection'))}</span><h2>${plural(sel.parts.size, t('part'))}, ${plural(sel.wires.size, t('wire'))}</h2></div>
       <div class="row-btns"><button class="btn" data-act="rotate">${esc(t('Rotate'))}</button><button class="btn" data-act="dup">${esc(t('Duplicate'))}</button><button class="btn" data-cmd="block-save">${esc(t('Save as block'))}</button><button class="btn danger" data-act="delete">${esc(t('Delete'))}</button></div>
       ${n > 1 ? sec('Arrange', `<div class="align-grid">${[['align-left', 'Align left'], ['align-centre', 'Align centres'], ['align-right', 'Align right'], ['align-top', 'Align tops'], ['align-middle', 'Align middles'], ['align-bottom', 'Align bottoms']].map(([c, l]) => `<button class="btn" data-cmd="${c}" title="${esc(t(l))}">${esc(t(l))}</button>`).join('')}${n > 2 ? `<button class="btn" data-cmd="dist-h">${esc(t('Space evenly across'))}</button><button class="btn" data-cmd="dist-v">${esc(t('Space evenly down'))}</button>` : ''}</div>`) : ''}
-      ${sel.wires.size ? sec('Set on all selected wires', `<label class="fld"><span>${esc(t('Main colour'))}</span><select id="f-all-colour" data-field="all:colour"><option value="" selected>${esc(t('Keep as is'))}</option>${colourOptions('', false)}</select></label><label class="fld"><span>${esc(t('Size'))}</span><select id="f-all-gauge" data-field="all:gauge"><option value="" selected>${esc(t('Keep as is'))}</option>${gaugeOptions('')}</select></label>${fld('Circuit', 'all:circuit', '', 'text', `list="dl-circuit" placeholder="${esc(t('Keep as is'))}"`)}${fld('Harness', 'all:harness', '', 'text', `list="dl-harness" placeholder="${esc(t('Keep as is'))}"`)}${selFld('Insulation', 'all:insulation', '', [['', t('Keep as is')]].concat(L.INSULATION.filter((x) => x.id).map((x) => [x.id, x.name])))}${harnessList()}${circuitList()}`) : ''}`;
+      ${sel.wires.size ? sec('Set on all selected wires', `<label class="fld"><span>${esc(t('Main colour'))}</span><select id="f-all-colour" data-field="all:colour"><option value="" selected>${esc(t('Keep as is'))}</option>${colourOptions('', false)}</select></label><label class="fld"><span>${esc(t('Size'))}</span><select id="f-all-gauge" data-field="all:gauge"><option value="" selected>${esc(t('Keep as is'))}</option>${gaugeOptions('')}</select></label>${fld('Circuit', 'all:circuit', '', 'text', `list="dl-circuit" placeholder="${esc(t('Keep as is'))}"`)}${fld('Harness', 'all:harness', '', 'text', `list="dl-harness" placeholder="${esc(t('Keep as is'))}"`)}${selFld('Insulation', 'all:insulation', '', [['', t('Keep as is')]].concat(L.INSULATION.filter((x) => x.id).map((x) => [x.id, x.name])))}${L.SIGNALS && showElec() ? selFld('Signal', 'all:signal', '', [['', t('Keep as is')], ['-', t('Not set')]].concat(L.SIGNALS.filter((x) => x.id).map((x) => [x.id, t(x.name)]))) : ''}${harnessList()}${circuitList()}`) : ''}`;
   }
   function sheetPanel() {
     const s = project.settings, n = project.sheets.indexOf(doc.sheet) + 1;
@@ -1349,7 +1354,7 @@
         ${issues.length ? `<button class="callout warn" data-act="show-checks">${esc(plural(issues.length, t('check')))} ${esc(t('to review on this sheet'))}</button>` : ''}`)}
       ${sec('Drawing', `
         ${selFld('Project type', 'settings:projectType', s.projectType || 'vehicle', L.PROJECT_TYPES.map((x) => [x.id, t(x.name)]))}
-        ${L.disclaimerFor(project).mains ? `<p class="callout warn small">${esc(t('Planning aid only. Checks are guidance, not proof the work meets BS 7671, IEC 60204 or any other code. Not a certificate. Use a qualified electrician.'))} <a href="#" data-act="disclaimer">${esc(t('Disclaimer'))}</a></p>` : ''}
+        ${L.disclaimerFor(project).mains ? `<p class="callout warn small">${esc(t('Planning aid only. Checks are guidance, not proof the work meets BS 7671, BS EN 60204-1 or any other code. Not a certificate. Use a qualified electrician.'))} <a href="#" data-act="disclaimer">${esc(t('Disclaimer'))}</a></p>` : ''}
         ${selFld('Paper size, all sheets', 'settings:page', s.page || 'fit', pages)}
         ${selFld('Orientation', 'settings:orientation', s.orientation || 'landscape', [['landscape', t('Landscape')], ['portrait', t('Portrait')]])}
         ${['household', 'factory', 'mixed'].includes(s.projectType) && L.BUILDING_TYPES ? `<div class="sub-sec"><h4>${esc(t('Mains installation'))}</h4>
@@ -1406,7 +1411,7 @@
     else if (f === 'sheet:page' || f === 'sheet:orientation') { const k = f.slice(6); if (v) doc.sheet[k] = v; else delete doc.sheet[k]; }
     else if (f.startsWith('all:')) {
       if (live || v === '') return;
-      const k = f.slice(4); sel.wires.forEach((id) => { wireById(id)[k] = v; });
+      const k = f.slice(4); sel.wires.forEach((id) => { const w = wireById(id); if (k === 'signal' && v === '-') delete w.signal; else w[k] = v; });
       if (k === 'harness') addHarness(v);
     } else if (only('part')) {
       const p = only('part');
@@ -1431,7 +1436,7 @@
         if (!Object.keys(w.ends).length) delete w.ends;
       } else {
         w[f] = f === 'harness' || f === 'circuit' ? (live ? v : v.trim()) : v;
-        if (['tracer2', 'insulation', 'cable', 'method', 'insul', 'grouped', 'groupKind', 'cpc', 'ambient'].includes(f) && !v) delete w[f];
+        if (['tracer2', 'insulation', 'cable', 'method', 'insul', 'grouped', 'groupKind', 'cpc', 'ambient', 'signal'].includes(f) && !v) delete w[f];
         if (f === 'harness' && !live) { addHarness(v); lastWire.harness = w.harness; }
         if (['colour', 'tracer', 'gauge'].includes(f)) lastWire[f] = v;
         if (f === 'colour' || f.startsWith('tracer')) { const sw = el.parentElement.querySelector('.swatch'); const c = L.colourById(doc, v); if (sw) sw.style.background = c ? c.hex : 'transparent'; }
@@ -1465,6 +1470,7 @@
     else if (act === 'edit-custom') window.LoomBuilder.open(defOf(only('part').type));
     else if (act === 'show-checks') showTab('checks');
     else if (act === 'disclaimer') { e.preventDefault(); disclaimerModal(); }
+    else if (act === 'copy-src') { const u = a.dataset.url; (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(() => toast(t('Link copied')), () => showMessage(t('Source'), `<p class="mono" style="user-select:text">${esc(u)}</p>`)); }
     else if (act === 'swap') { const w = only('wire'); pushHistory(); [w.from, w.to] = [w.to, w.from]; if (w.points) w.points.reverse(); if (w.ends) w.ends = { from: w.ends.to, to: w.ends.from }; commit(); }
     else if (act === 'clear-bends') { const w = only('wire'); pushHistory(); delete w.points; delete w.dx; commit(); }
     else if (act === 'reset-label') { const w = only('wire'); pushHistory(); delete w.lab; commit(); }
@@ -1472,7 +1478,7 @@
     else if (act === 'trace-off') clearTrace();
     else if (act === 'fault-part') faultModal(only('part').id);
     else if (act === 'test-off') endTest();
-    else if (act === 'test-reset') { test.state = {}; setTestState('__', 0); delete test.state.__; }
+    else if (act === 'test-reset') { test.state = {}; test.sim = null; setTestState('__', 0); delete test.state.__; }
   });
 
   /* ---------------- Lists and reports ---------------- */
@@ -1505,9 +1511,10 @@
     let h = '';
     if (tab === 'wires') {
       const wl = L.wireList(scope);
-      h = wl.length ? `<table class="data">${th([...sheetTh, 'Wire', 'From', 'To', 'Colour', 'Code', 'Size', 'AWG', 'Length m', 'Current A', 'Drop V', 'Circuit', 'Harness', 'Cable', 'Notes'])}<tbody>${wl.map((r) => {
+      const sigCol = !!L.signalName && showElec();
+      h = wl.length ? `<table class="data">${th([...sheetTh, 'Wire', 'From', 'To', 'Colour', 'Code', 'Size', 'AWG', 'Length m', 'Current A', 'Drop V', 'Circuit', ...(sigCol ? ['Signal'] : []), 'Harness', 'Cable', 'Notes'])}<tbody>${wl.map((r) => {
         const f = findWireAnywhere(r.id), wv = L.view(project, f.sheet), cab = r.cable && (project.cables || []).find((c) => c.id === r.cable);
-        return `<tr class="click${sel.wires.has(r.id) ? ' sel' : ''}${trace && trace.wires.has(r.id) ? ' traced' : ''}" data-wire="${r.id}" data-sheet="${r.sheetId}">${sheetTd(r.sheetId, r.sheet)}<td class="mono">${esc(r.name)}</td><td class="mono">${esc(r.from)}</td><td class="mono">${esc(r.to)}</td><td>${swatchHTML(wv, f.wire)} ${esc(r.colour)}</td><td class="mono">${esc(r.code)}</td><td class="mono">${esc(r.gauge)} mm²</td><td class="mono">${esc(r.awg)}</td><td class="mono">${esc(r.length)}</td><td class="mono">${esc(r.current)}</td><td class="mono">${esc(r.drop)}</td><td>${esc(r.circuit)}</td><td>${esc(r.harness)}</td><td>${esc(cab ? cab.name : '')}</td><td>${esc(r.notes)}</td></tr>`;
+        return `<tr class="click${sel.wires.has(r.id) ? ' sel' : ''}${trace && trace.wires.has(r.id) ? ' traced' : ''}" data-wire="${r.id}" data-sheet="${r.sheetId}">${sheetTd(r.sheetId, r.sheet)}<td class="mono">${esc(r.name)}</td><td class="mono">${esc(r.from)}</td><td class="mono">${esc(r.to)}</td><td>${swatchHTML(wv, f.wire)} ${esc(r.colour)}</td><td class="mono">${esc(r.code)}</td><td class="mono">${esc(r.gauge)} mm²</td><td class="mono">${esc(r.awg)}</td><td class="mono">${esc(r.length)}</td><td class="mono">${esc(r.current)}</td><td class="mono">${esc(r.drop)}</td><td>${esc(r.circuit)}</td>${sigCol ? `<td>${esc(t(L.signalName(f.wire.signal)))}</td>` : ''}<td>${esc(r.harness)}</td><td>${esc(cab ? cab.name : '')}</td><td>${esc(r.notes)}</td></tr>`;
       }).join('')}</tbody></table>` : empty('No wires yet. Click a pin, then another pin, to draw one.');
     } else if (tab === 'bom') {
       const cb = L.costedBom(project), rows = all ? cb.parts : L.bom(doc).map((r) => ({ ...r }));
@@ -1572,15 +1579,16 @@
       h = extraTab(tab, all);
     } else if (tab === 'checks') {
       const list = checks().filter((c) => all || !c.sheetId || c.sheetId === sheetId);
-      h = list.length ? `<table class="data">${th(['Level', 'Finding'])}<tbody>${list.map((c) => `<tr class="click" data-sheet="${c.sheetId || ''}" ${c.wire ? `data-wire="${c.wire}"` : c.part ? `data-part="${c.part}"` : ''}><td><span class="lvl ${c.level}">${esc(t(c.level === 'warn' ? 'check' : c.level))}</span></td><td class="wrap">${esc(c.text)}</td></tr>`).join('')}</tbody></table>${L.disclaimerFor(project).mains ? `<div class="callout warn small">${esc(t('Mains checks are guidance from selected rules of BS 7671 and BS EN 60204-1. They are not a design, test or certificate, and passing them does not mean the work meets the regulations. A qualified electrician must design, test and certify the work.'))}</div>` : note('Size guidance is a rule of thumb for single PVC automotive cable. Always check your cable maker\'s ratings.')}` : empty('No problems found.');
+      h = list.length ? `<table class="data">${th(['Level', 'Finding'])}<tbody>${list.map((c) => `<tr class="click" data-sheet="${c.sheetId || ''}" ${c.wire ? `data-wire="${c.wire}"` : c.part ? `data-part="${c.part}"` : ''}><td><span class="lvl ${c.level}">${esc(t(c.level === 'warn' ? 'check' : c.level))}</span></td><td class="wrap">${esc(c.text)}${c.rule ? ` <span class="muted mono" title="${esc(t('Rule code: see Where the mains checks come from'))}">${esc(c.rule)}</span>` : ''}</td></tr>`).join('')}</tbody></table>${L.disclaimerFor(project).mains ? `<div class="callout warn small">${esc(t('Mains checks are guidance from selected rules of BS 7671 and BS EN 60204-1. They are not a design, test or certificate, and passing them does not mean the work meets the regulations. A qualified electrician must design, test and certify the work.'))}</div>` : note('Size guidance is a rule of thumb for single PVC automotive cable. Always check your cable maker\'s ratings.')}` : empty('No problems found.');
     }
     wrap.innerHTML = h;
   }
   /* Lists for household and factory projects: circuit schedule, motors, terminal plan, PLC I/O. */
-  const EXTRA_TABS = { schedule: 'circuits', motors: 'motors', terminals: 'terminals', plcio: 'plcio' };
+  const EXTRA_TABS = { schedule: 'circuits', motors: 'motors', terminals: 'terminals', plcio: 'plcio', power: 'power' };
   const EXTRA_EMPTY = {
     schedule: 'No breakers yet. Add MCBs or RCBOs from Parts, Household, and draw the cables each one feeds.',
     motors: 'No three-phase motors yet.', terminals: 'No terminal strips yet.', plcio: 'No PLC input or output cards yet.',
+    power: 'No supply rails yet. Wire a supply, or a board\'s power pin, to the parts it feeds.',
   };
   function extraTab(name, all) {
     const rows = L.reportRows(project, EXTRA_TABS[name]), head = rows[0], si = head.indexOf('Sheet');
@@ -1595,14 +1603,18 @@
       if (hc.circuits.length) pre += `<div class="build-head"><span class="bh"><b>${esc(t('Supply'))}</b> ${esc(sp.earthing)}, Ze ${sp.ze} Ω${sp.zeTypical ? ' (' + esc(t('typical')) + ')' : ''}, ${sp.fuse} A ${esc(t('fuse'))}</span>${hc.demand ? `<span class="bh"><b>${esc(t('Estimated maximum demand'))}</b> ${esc(t('about'))} ${hc.demand.amps} A <span class="muted">${esc(hc.demand.items.map(([k, v]) => `${t(k)} ${v} A`).join(' · '))}</span></span>` : ''}</div>`;
       post = note('Volt drop and Zs are worked out from cable lengths at 70 °C, with 0.8 of the maximum Zs as the figure a tester should read. Rings use a quarter of the end-to-end resistance. Three-phase circuits are not worked out.');
     } else {
-      refs = body.map((r) => byLabel(String(r[0] || '').trim(), si >= 0 ? r[si] : null));
+      // each list names its parts in its own column: Module for PLC I/O, Supply for power rails
+      const spec = (L.PDF_TABLES && L.PDF_TABLES[EXTRA_TABS[name]]) || {}, ri = Math.max(0, head.indexOf(spec.ref));
+      refs = body.map((r) => byLabel(String(r[ri] || '').trim(), si >= 0 ? r[si] : null));
       if (!all && si >= 0) { const keep = body.map((r) => r[si] === doc.sheet.name); body = body.filter((_, i) => keep[i]); refs = refs.filter((_, i) => keep[i]); }
       if (name === 'motors') post = note('Full-load current is estimated from typical 400 V motor data when the rating plate figure is not entered. Starting current is a typical range for the starting method.');
       if (name === 'plcio') post = note('Connected to lists every pin on the same potential, through wires and terminals, with switches and contacts open.');
+      if (name === 'power') post = note('Each rail adds up the current drawn by the parts it feeds, from their mA figures, including parts fed through a board\'s own regulator. Parts with no figure are listed under No current figure. Check the ratings against the maker\'s data.');
     }
     if (!body.length) return pre + empty(EXTRA_EMPTY[name]);
     const st = head.indexOf('Status');
-    return `${pre}<table class="data">${th(head)}<tbody>${body.map((r, i) => `<tr class="${refs[i] ? 'click' : ''}${st >= 0 && r[st] === 'fix' ? ' failrow' : ''}"${refs[i] ? ` data-part="${refs[i].part}" data-sheet="${refs[i].sheet}"` : ''}>${r.map((c, j) => `<td class="${j === st ? '' : 'mono'}">${j === st ? `<span class="lvl ${c === 'fix' ? 'error' : c === 'check' ? 'warn' : 'info'}">${esc(t(c))}</span>` : esc(c == null ? '' : c)}</td>`).join('')}</tr>`).join('')}</tbody></table>${post}`;
+    const bad = (c) => c === 'fix' || c === 'over', lvl = (c) => (bad(c) ? 'error' : c === 'check' || c === 'close' ? 'warn' : 'info');
+    return `${pre}<table class="data">${th(head)}<tbody>${body.map((r, i) => `<tr class="${refs[i] ? 'click' : ''}${st >= 0 && bad(r[st]) ? ' failrow' : ''}"${refs[i] ? ` data-part="${refs[i].part}" data-sheet="${refs[i].sheet}"` : ''}>${r.map((c, j) => `<td class="${j === st ? '' : 'mono'}">${j === st ? `<span class="lvl ${lvl(c)}">${esc(t(c))}</span>` : esc(c == null ? '' : c)}</td>`).join('')}</tr>`).join('')}</tbody></table>${post}`;
   }
   function highlightRows() { $$('#table-wrap tr[data-wire]').forEach((tr) => tr.classList.toggle('sel', sel.wires.has(tr.dataset.wire))); }
   function showTab(name) {
@@ -1889,14 +1901,14 @@
     const wl = L.wireList(project);
     printHTML(sheetsPrintHTML(project.settings.bw) + (wl.length ? `<div class="plist"><h3>${esc(t('Wire list'))}: ${esc(project.title)}</h3><table><thead><tr>${['Sheet', 'Wire', 'From', 'To', 'Code', 'Colour', 'mm²', 'm', 'A', 'Circuit', 'Harness', 'Notes'].map((x) => `<th>${esc(t(x))}</th>`).join('')}</tr></thead><tbody>${wl.map((r) => `<tr><td>${esc(r.sheet)}</td><td>${esc(r.name)}</td><td>${esc(r.from)}</td><td>${esc(r.to)}</td><td>${esc(r.code)}</td><td>${esc(r.colour)}</td><td>${esc(r.gauge)}</td><td>${esc(r.length)}</td><td>${esc(r.current)}</td><td>${esc(r.circuit)}</td><td>${esc(r.harness)}</td><td>${esc(r.notes)}</td></tr>`).join('')}</tbody></table></div>` : ''));
   }
-  const PACK_SECTIONS = [['sheets', 'Drawings'], ['revisions', 'Revision history'], ['wires', 'Wire list'], ['cut', 'Cut lists by harness'], ['connectors', 'Connector tables'], ['fuses', 'Fuses, relays and load budget'], ['voltages', 'Voltage at each load'], ['faults', 'Fault-finding sheets'], ['bom', 'Parts and costs'], ['cables', 'Multicore and screened cables'], ['locations', 'Component locations'], ['formboards', 'Harness formboards'], ['colours', 'Colour usage'], ['labels', 'Wire labels'], ['checks', 'Design checks']];
+  const PACK_SECTIONS = [['sheets', 'Drawings'], ['revisions', 'Revision history'], ['wires', 'Wire list'], ['cut', 'Cut lists by harness'], ['connectors', 'Connector tables'], ['fuses', 'Fuses, relays and load budget'], ['voltages', 'Voltage at each load'], ['circuits', 'Circuit schedule (household)'], ['motors', 'Motors'], ['terminals', 'Terminal plan'], ['plcio', 'PLC inputs and outputs'], ['power', 'Power rails'], ['faults', 'Fault-finding sheets'], ['bom', 'Parts and costs'], ['cables', 'Multicore and screened cables'], ['locations', 'Component locations'], ['formboards', 'Harness formboards'], ['colours', 'Colour usage'], ['labels', 'Wire labels'], ['checks', 'Design checks']];
   function packDocument(html, title) {
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title><style>@page{size:A4;margin:12mm}body{margin:0;padding:12mm;background:#fff}@media print{body{padding:0}}${L.PACK_CSS}</style></head><body>${html}</body></html>`;
   }
   function packModal() {
     const V = window.LoomViews;
     showModal(t('Build pack'), `<p class="muted">${esc(t('Everything needed to build the loom in one document: drawings, wire and cut lists, connector tables, fuses and loads, parts and costs. Print it, or choose Save as PDF in the print window.'))}</p>
-      <div class="checks2">${PACK_SECTIONS.map(([k, l]) => `<label class="fld check"><input type="checkbox" data-pack="${k}"${k === 'labels' || k === 'faults' ? '' : ' checked'}><span>${esc(t(l))}</span></label>`).join('')}</div>
+      <div class="checks2">${PACK_SECTIONS.filter(([k]) => ({ circuits: showHouse(), motors: showFactory(), plcio: showFactory(), terminals: showTerminals(), power: showElec() })[k] !== false).map(([k, l]) => `<label class="fld check"><input type="checkbox" data-pack="${k}"${k === 'labels' || k === 'faults' ? '' : ' checked'}><span>${esc(t(l))}</span></label>`).join('')}</div>
       <label class="fld check"><input type="checkbox" id="pk-bw"${project.settings.bw ? ' checked' : ''}><span>${esc(t('Drawings in black and white (wire colours written as codes)'))}</span></label>
       <label class="fld"><span>${esc(t('Label size'))}</span><select id="pk-lsize">${LABEL_SIZES.map(([v, l]) => `<option value="${v}"${v === labelSize ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>
       <div class="row-btns"><button class="btn primary" id="pk-print"${PF.canPrint ? '' : ' disabled'}>${esc(t('Print or save PDF'))}</button><button class="btn" id="pk-html">${esc(t('Save as web page'))}</button><button class="btn" data-close>${esc(t('Cancel'))}</button></div>`);
@@ -1911,9 +1923,9 @@
   /* A real PDF: vector sheets, then tables, with bookmarks and links that jump to parts. */
   function pdfModal() {
     if (!L.projectPDFAsync) return;
-    const type = ptype(), only = { circuits: showHouse(), motors: showFactory(), plcio: showFactory(), terminals: showTerminals() };
+    const type = ptype(), only = { circuits: showHouse(), motors: showFactory(), plcio: showFactory(), terminals: showTerminals(), power: showElec() };
     const T = {}; Object.keys(L.PDF_TABLES).forEach((k) => { if (only[k] !== false) T[k] = L.PDF_TABLES[k]; });
-    const def = new Set(type === 'household' ? ['wires', 'circuits', 'bom'] : type === 'factory' ? ['wires', 'motors', 'terminals', 'plcio', 'bom'] : L.PDF_DEFAULT_TABLES);
+    const def = new Set(type === 'household' ? ['wires', 'circuits', 'bom'] : type === 'factory' ? ['wires', 'motors', 'terminals', 'plcio', 'bom'] : type === 'electronics' ? ['wires', 'power', 'connectors', 'bom'] : L.PDF_DEFAULT_TABLES);
     showModal(t('Export PDF'), `<p class="muted">${esc(t('Every sheet as a sharp drawing you can zoom into, then the tables you pick. Bookmarks list each sheet and every part on it, and cross-references and wire list entries are links that jump to the part.'))}</p>
       <label class="fld"><span>${esc(t('Sheets'))}</span><select id="pdf-sheets"><option value="all">${esc(t('All sheets'))} (${project.sheets.length})</option><option value="this">${esc(t('This sheet only'))}</option></select></label>
       <h3 class="mh">${esc(t('Tables after the drawings'))}</h3>
@@ -2297,6 +2309,8 @@
       ['Drag a wire label', 'Move the label; a leader line points back to the wire. Double-click it to put it back.'],
       ['Alt+click wire or pin', 'Trace the circuit across every sheet'],
       ['T', 'Trace the selected wire. Esc stops tracing.'],
+      ['Shift+T', 'Tidy wires: re-route them with square corners'],
+      ['F1', 'Open the user manual at the chapter for what you are doing'],
       ['Drag empty space', 'Select several parts'],
       ['Scroll', 'Pan. Hold Space and drag, or drag with the middle button, to pan too.'],
       ['Ctrl+scroll', 'Zoom (pinch on a trackpad)'],
@@ -2322,7 +2336,10 @@
     if (!M) { toast(t('The user manual is not included in this copy.')); return; }
     if (!context) { M.open(); return; }
     const views = $('#views'), vt = views && !views.hidden ? (views.dataset.kind || '') : '';
-    const ch = !$('#builder').hidden ? 'component-builder' : vt === 'formboard' ? 'harness-formboard' : vt === 'vehicle' ? 'vehicle-locations' : vt === 'air' ? 'compressed-air' : test ? 'trace-and-live-test' : null;
+    // the open list tab, when the lists are showing, says what the person is working on
+    const TAB_CH = { schedule: 'household-wiring', motors: 'factory-and-control-panels', terminals: 'factory-and-control-panels', plcio: 'factory-and-control-panels', power: 'electronics', checks: 'design-checks', fuses: 'fuses-and-loads', build: 'build-pack-and-labels' };
+    const listsOpen = $('#tables') && !$('#tables').classList.contains('collapsed');
+    const ch = !$('#builder').hidden ? 'component-builder' : vt === 'formboard' ? 'harness-formboard' : vt === 'vehicle' ? 'vehicle-locations' : vt === 'air' ? 'compressed-air' : test ? 'trace-and-live-test' : (listsOpen && TAB_CH[tab]) || null;
     const known = ch && M.chapters().some((c) => c.id === ch);
     if (known) M.open(ch); else M.open();
   }
@@ -2463,6 +2480,8 @@
     motors: { label: 'Motors', run: () => showTab('motors'), when: showFactory },
     terminals: { label: 'Terminal plan', run: () => showTab('terminals'), when: showTerminals },
     plcio: { label: 'PLC inputs and outputs', run: () => showTab('plcio'), when: showFactory },
+    power: { label: 'Power rails', run: () => showTab('power'), when: showElec },
+    'export-power': { label: 'Export power rails (CSV)', run: () => saveCSV('power-rails', L.reportRows(project, 'power')), when: showElec },
     'export-schedule': { label: 'Export circuit schedule (CSV)', run: () => saveCSV('circuit-schedule', L.reportRows(project, 'circuits')), when: showHouse },
     'export-motors': { label: 'Export motor list (CSV)', run: () => saveCSV('motors', L.reportRows(project, 'motors')), when: showFactory },
     'export-terminals': { label: 'Export terminal plan (CSV)', run: () => saveCSV('terminal-plan', L.reportRows(project, 'terminals')), when: showTerminals },
@@ -2560,7 +2579,7 @@
     ['Arrange', ['rotate', 'flip', '-', 'align-left', 'align-centre', 'align-right', 'align-top', 'align-middle', 'align-bottom', '-', 'dist-h', 'dist-v', '-', 'tidy']],
     ['Sheet', ['sheet-new', 'sheet-dup', 'sheet-rename', 'sheet-del', '-', 'sheet-left', 'sheet-right', '-', 'sheet-prev', 'sheet-next']],
     ['Tools', ['trace', 'test', 'fault', '-', 'formboard', 'locations', '-', 'builder', 'colours', 'cables', '-', 'stock', 'build-share', 'build-import', '-', 'lib-import', 'lib-export', '-', 'number-potential', 'check']],
-    ['Reports', ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cutlist', 'build', 'shop', 'nets', 'schedule', 'motors', 'terminals', 'plcio', '-', 'print-pack', 'print-labels', '-', 'export-wires', 'export-bom', 'export-cable', 'export-cut', 'export-connectors', 'export-fuses', 'export-voltages', 'export-shop', 'export-labels', 'export-usage', 'export-schedule', 'export-motors', 'export-terminals', 'export-plcio']],
+    ['Reports', ['wires', 'bom', 'cable', 'usage', 'fuses', 'connectors', 'cutlist', 'build', 'shop', 'nets', 'schedule', 'motors', 'terminals', 'plcio', 'power', '-', 'print-pack', 'print-labels', '-', 'export-wires', 'export-bom', 'export-cable', 'export-cut', 'export-connectors', 'export-fuses', 'export-voltages', 'export-shop', 'export-labels', 'export-usage', 'export-schedule', 'export-motors', 'export-terminals', 'export-plcio', 'export-power']],
     ['Revision', ['rev-issue', 'rev-compare', 'pane-history', '-', 'savepoint']],
     ['Help', ['manual', 'claude', 'help', '-', 'disclaimer', 'about']],
   ];
