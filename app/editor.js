@@ -2429,6 +2429,12 @@
   function isDark() { const th_ = document.documentElement.dataset.theme; return th_ ? th_ === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; }
   function setTheme(th_) { document.documentElement.dataset.theme = th_; try { localStorage.setItem(THEME, th_); } catch (e) { /* ignore */ } }
   try { const th_ = localStorage.getItem(THEME); if (th_) document.documentElement.dataset.theme = th_; } catch (e) { /* ignore */ }
+  /* The work area (the sheet and the component builder's drawing) can be dark on its own, whatever the
+     window theme. Only the screen changes: exports, prints and PDFs stay black on white. */
+  const WORK = 'loomwright.workarea';
+  function isWorkDark() { return document.documentElement.classList.contains('work-dark'); }
+  function setWorkDark(on) { document.documentElement.classList.toggle('work-dark', on); try { localStorage.setItem(WORK, on ? 'dark' : 'light'); } catch (e) { /* ignore */ } }
+  try { if (localStorage.getItem(WORK) === 'dark') document.documentElement.classList.add('work-dark'); } catch (e) { /* ignore */ }
 
   /* ---------------- Views: formboard and vehicle ---------------- */
   function harnessesInUse() { return [...new Set(project.harnesses.concat(project.sheets.flatMap((s) => s.wires.map((w) => w.harness))).filter(Boolean))]; }
@@ -2522,6 +2528,7 @@
     xrefs: { label: 'Sheet cross-references', run: () => toggleSetting('xrefs', 'Sheet cross-references'), on: () => project.settings.xrefs !== false },
     bw: { label: 'Black and white drawings', run: () => toggleSetting('bw', 'Black and white drawings'), on: () => !!project.settings.bw },
     theme: { label: 'Dark theme', run: () => setTheme(isDark() ? 'light' : 'dark'), on: isDark },
+    workdark: { label: 'Dark work area', run: () => setWorkDark(!isWorkDark()), on: isWorkDark },
     language: { label: 'Language…', run: languageModal },
     'sheet-new': { label: 'New sheet', run: () => addSheet(null) },
     'sheet-dup': { label: 'Duplicate sheet', run: () => addSheet(doc.sheet) },
@@ -2576,7 +2583,7 @@
   const MENUS = [
     ['File', ['new', 'open', 'sample', 'close-tab', '-', 'save', 'saveas', '-', 'print', 'print-pack', 'print-labels', '-', 'import-csv', 'import-wireviz', 'import-kicad', 'import-lengths', '-', 'export-pdf', 'export-svg', 'export-png', 'export-dxf', 'export-wireviz', 'export-share']],
     ['Edit', ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'dup', 'delete', '-', 'select-all', 'find', 'replace', 'renumber', '-', 'block-save']],
-    ['View', ['pane-parts', 'pane-project', 'pane-history', 'pane-props', 'tables', '-', 'zoom-in', 'zoom-out', 'fit', '-', 'junctions', 'xrefs', 'bw', '-', 'theme', 'language']],
+    ['View', ['pane-parts', 'pane-project', 'pane-history', 'pane-props', 'tables', '-', 'zoom-in', 'zoom-out', 'fit', '-', 'junctions', 'xrefs', 'bw', '-', 'theme', 'workdark', 'language']],
     ['Arrange', ['rotate', 'flip', '-', 'align-left', 'align-centre', 'align-right', 'align-top', 'align-middle', 'align-bottom', '-', 'dist-h', 'dist-v', '-', 'tidy']],
     ['Sheet', ['sheet-new', 'sheet-dup', 'sheet-rename', 'sheet-del', '-', 'sheet-left', 'sheet-right', '-', 'sheet-prev', 'sheet-next']],
     ['Tools', ['trace', 'test', 'fault', '-', 'formboard', 'locations', '-', 'builder', 'colours', 'cables', '-', 'stock', 'build-share', 'build-import', '-', 'lib-import', 'lib-export', '-', 'number-potential', 'check']],

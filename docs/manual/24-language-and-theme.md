@@ -28,3 +28,11 @@ What changes language, and what does not:
 LoomWright has a light theme and a dark theme. To start with, it follows your computer's setting. To choose one yourself, click the moon button at the right-hand end of the title bar, or choose **View › Dark theme**. LoomWright remembers your choice.
 
 The drawing sheet stays white in both themes, so wire colours look the same as they will on paper.
+
+## Dark work area
+
+The work area has its own setting, separate from the window theme. Choose **View › Dark work area** to draw on a dark sheet, with either window theme. The component builder's drawing follows the same setting. LoomWright remembers your choice.
+
+- Symbols, text and the grid turn light on the dark sheet.
+- Wire colours are not changed. Each wire's thin dark edge turns light instead, so black wires still show.
+- Only the screen changes. Exports, prints, PDFs and build packs are always black on white.

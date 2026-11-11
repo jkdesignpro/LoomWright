@@ -525,3 +525,25 @@ button.air-goto { display: block; box-sizing: border-box; width: calc(100% - 24p
 .air-calc-out .btn { margin-left: 6px; vertical-align: middle; }
 @media (max-width: 1100px) { .air-main { grid-template-columns: 340px minmax(0, 1fr); } .air-sumgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 860px) { .air-main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; overflow: auto; } .air-right { height: 90vh; } .air-sumgrid, .air-calcgrid { grid-template-columns: minmax(0, 1fr); } .air-disc a { display: none; } }
+
+/* ---------- Dark work area (View › Dark work area), separate from the window theme ----------
+   The drawing is generated black on white for export; on screen these rules swap the ink and paper
+   colours. Wire colours are left alone, and each wire's dark edge turns light so black wires show. */
+html.work-dark { --work: #1c1f22; --work-ink: #d6dade; --work-edge: #aab0b6; }
+html.work-dark .stage, html.work-dark .b-stage { background: var(--work); }
+html.work-dark :is(#canvas, #b-svg) [fill="#1d2320"] { fill: var(--work-ink); }
+html.work-dark :is(#canvas, #b-svg) [stroke="#1d2320"] { stroke: var(--work-ink); }
+html.work-dark :is(#canvas, #b-svg) :is([fill="#ffffff"], [fill="#fff"]) { fill: var(--work); }
+html.work-dark :is(#canvas, #b-svg) :is([stroke="#ffffff"], [stroke="#fff"]) { stroke: var(--work); }
+html.work-dark :is(#canvas, #b-svg) [stroke="#262b28"] { stroke: var(--work-edge); }
+html.work-dark :is(#canvas, #b-svg) [fill="#262b28"] { fill: var(--work-edge); }
+html.work-dark :is(#canvas, #b-svg) [fill="#5b625e"] { fill: #9aa0a6; }
+html.work-dark :is(#canvas, #b-svg) [fill="#4a524d"] { fill: #aeb4ba; }
+html.work-dark :is(#canvas, #b-svg) [fill="#a35f00"] { fill: #e0a24a; }
+html.work-dark :is(#canvas, #b-svg) [fill="#2b5fb8"] { fill: #86aef2; }
+html.work-dark :is(#canvas, #b-svg) [fill="#d9dcd8"] { fill: #3a3e42; }
+html.work-dark :is(#canvas, #b-svg) [fill="#e2e6e1"] { fill: #33373b; }
+html.work-dark :is(#canvas, #b-svg) [fill="#000"][fill-opacity] { fill: #fff; }
+html.work-dark :is(#canvas, #b-svg) :is([stroke="#eef0f2"], [stroke="#f1f3f1"]) { stroke: #25282c; }
+html.work-dark :is(#canvas, #b-svg) :is([stroke="#dde1e6"], [stroke="#dfe4e0"]) { stroke: #30343a; }
+html.work-dark :is(#canvas, #b-svg) [stroke="#9aa3ab"] { stroke: #5d646b; }
