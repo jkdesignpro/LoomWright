@@ -1,0 +1,8 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+mcp/loom-core.js
+mcp/core/
+mcp/vendor/
+*.loomwright-tmp
+.DS_Store
