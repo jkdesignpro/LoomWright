@@ -115,7 +115,30 @@ Built-in components can also have:
 
 ### How a part behaves in the trace and live test
 
-What a component does electrically is set in `behaviour()` in `app/core/loom-data.js`, by component id: which pins are joined inside it, whether it is a source, an earth, a load, a switch with positions, a relay or a fuse. A new built-in component that is more than a plain load needs an entry there. Anything without an entry, including every custom component, is treated as a load between its supply pins and its earth pins (pins named `-`, `31`, `E`, `GND`, `G` and similar), or, with two pins and no earth pin, as a load between them.
+What a component does electrically is set in `behaviour()` in `app/core/loom-data.js`, by component id: which pins are joined inside it, whether it is a source, an earth, a load, a switch with positions, a relay or a fuse. A new built-in component that is more than a plain load needs an entry there. Anything without an entry, including a custom component without `inside`, is treated as a load between its supply pins and its earth pins (pins named `-`, `31`, `E`, `GND`, `G` and similar), or, with two pins and no earth pin, as a load between them.
+
+### Parts inside a custom component
+
+A custom component can be made of real parts, such as the fuses and relays of a relay and fuse box. Give it an `inside`:
+
+```json
+"inside": {
+  "parts": [
+    { "id": "F2", "type": "fuse", "props": { "rating": "{f2}" } },
+    { "id": "R1", "type": "relay4", "props": { "rating": "{relay}" } }
+  ],
+  "links": [["BAT+", "F2.1"], ["F2.2", "R1.30"], ["R1.87", "R1 OUT"], ["R1.86", "R1 SW"], ["R1.85", "R1 GND"]]
+}
+```
+
+- `parts` are built-in components (`fuse`, `fuse_maxi`, `breaker`, `relay4`, `relay5`, `diode` and so on). Their fields can take the placed component's fields in braces, so `{f2}` is whatever is typed in that part's F2 field.
+- `links` join two points inside: a pin of the component itself (`BAT+`) or `SUBID.PIN`, a pin of a part inside (`F2.1`).
+- The trace, the live test, the voltage solver, the fuse and relay schedule and the design checks treat the parts inside as real parts. They are named after the component, so fuse F2 inside FB1 is `FB1/F2`.
+- Only one level: a part inside cannot have its own `inside`.
+
+### Editing a component without breaking its wiring
+
+Each save of a custom component counts up `rev`. When pins are renamed, `renames` records `{ "rev": 3, "map": { "old id": "new id" } }`. A project keeps the `rev` of its own copy, and when it takes a newer design it moves wires from old pin ids to new ones using the later entries only. Wires on pins the new design no longer has are left for the user to deal with: the builder warns before saving, and `Ctrl+Z` brings them back.
 
 ### Before you send a new component
 

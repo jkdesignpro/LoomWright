@@ -766,6 +766,30 @@
     doc.wires.push(w);
     return w;
   }
+  /* A custom component changed in the builder: put the new design in the project and move wires
+     from renamed pins to their new ids, so editing a component never unhooks its circuit.
+     def.renames lists { rev, map: { old id: new id } } for each saved edit; the project's own copy
+     records the rev it was at, and only later renames are applied. Returns the wires left on pins
+     the new design no longer has (they are not removed here). */
+  function updateCustomPart(project, def) {
+    const list = project.customParts || (project.customParts = []);
+    const i = list.findIndex((p) => p.id === def.id), was = i >= 0 ? list[i] : null, from = (was && was.rev) || 0;
+    const steps = (def.renames || []).filter((x) => x && x.rev > from).sort((a, b) => a.rev - b.rev);
+    const lost = [];
+    (project.sheets || []).forEach((sh) => {
+      const ids = new Set((sh.parts || []).filter((p) => p.type === def.id).map((p) => p.id));
+      if (!ids.size) return;
+      (sh.wires || []).forEach((w) => [w.from, w.to].forEach((e) => {
+        if (!e || !ids.has(e.part)) return;
+        steps.forEach((st) => { if (st.map && st.map[e.pin] != null) e.pin = String(st.map[e.pin]); });
+      }));
+      const have = new Set((def.pins || []).map((x) => String(x.id)));
+      if (!def.gen) (sh.wires || []).forEach((w) => { if ([w.from, w.to].some((e) => e && ids.has(e.part) && !have.has(String(e.pin)))) lost.push({ sheet: sh, wire: w }); });
+    });
+    const copy = JSON.parse(JSON.stringify(def));
+    if (i >= 0) list[i] = copy; else list.push(copy);
+    return lost;
+  }
   function pruneWires(doc) { doc.wires = doc.wires.filter((w) => pinPos(doc, w.from) && pinPos(doc, w.to)); }
 
   function normalise(doc) {
@@ -1400,7 +1424,7 @@
       // parts with many pins, such as boards, are rarely fully wired: d.partial skips this note
       const allFree = r.pins.filter((pn) => !conn.get(p.id + '|' + pn.id)), free = allFree.filter((pn) => !(d.optionalPins || []).includes(pn.id));
       if (allFree.length && allFree.length === r.pins.length && r.pins.length) out.push({ level: 'info', part: p.id, text: `${p.label || d.name} has no wires connected.` });
-      else if (free.length && !d.partial && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas', 'pdm'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
+      else if (free.length && !d.partial && !d.inside && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas', 'pdm'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
       // Fuse rating against the wire it protects
       if (['fuse', 'fuse_maxi', 'breaker', 'fusible_link'].includes(p.type) || p.type === 'fuse_box') {
         const ratings = p.type === 'fuse_box' ? String(r.props.ratings || '').split(',').map(parseAmps) : null;
@@ -1460,7 +1484,7 @@
     VERSION, FORMAT, GRID, INK, CATEGORIES, LIBRARY: lib, COLOURS, STANDARDS, GAUGES,
     shapes: { L, R: R2, C, P, T }, shapeSVG, symbolSVG, esc, tmpl, uid, snap,
     newDoc, newSheet, view, views, normalise, colourUsage, partDef, defaultProps, resolved, partBox, findPart, pinPos, pinName, wirePoints, rotPt,
-    addPart, addWire, parseEnd, pruneWires, nextLabel, nextWireName,
+    addPart, addWire, parseEnd, pruneWires, updateCustomPart, nextLabel, nextWireName,
     allColours, colourById, colourCode, wireCode, wireColourName, gaugeInfo, gaugeWidth, voltageDrop,
     renderDiagram, exportSVG, bounds, sheetBounds, wireList, bom, cableTotals, validate, autoLayout, libraryList, eachView,
     PAGES, pageOf, zoneOf, frameSVG, sheetFurnitureSVG, xrefs, renderOptions, wireLabelPos, wireLabelText, cloudPath,

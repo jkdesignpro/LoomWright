@@ -543,6 +543,10 @@ server.registerTool('define_component', {
     shapes: z.array(shapeSchema).optional().describe('Drawn mode: the symbol drawing'),
     pins: z.array(z.object({ id: z.string(), x: z.number(), y: z.number(), name: z.string().optional() })).optional().describe('Drawn mode: pins with positions on the outline'),
     fields: z.record(z.string()).optional().describe('Editable fields with defaults, e.g. {"part":"BTS7960"}'),
+    inside: z.object({
+      parts: z.array(z.object({ id: z.string(), type: z.string().describe('A built-in type such as fuse, relay4, relay5, diode'), props: z.record(z.string()).optional().describe('May use the component\'s fields in braces, e.g. {"rating":"{f2}"}') })),
+      links: z.array(z.tuple([z.string(), z.string()])).describe('Pairs joined inside: a component pin id, or SUBID.PIN for a pin of a part inside, e.g. ["BAT+","F2.1"], ["F2.2","R1.30"], ["R1.87","R1 OUT"]'),
+    }).optional().describe('Real parts inside the component, such as the fuses and relays of a relay and fuse box, so trace, live test and fuse loads work through it'),
   },
 }, wrap(async (a) => {
   const { L: Ln, R, T } = L.shapes;
@@ -566,6 +570,17 @@ server.registerTool('define_component', {
   if (new Set(pins.map((p) => p.id)).size !== pins.length) throw new Error('Pin ids must be unique.');
   const id = 'c_' + a.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
   const def = { id, custom: true, cat: 'My components', name: a.name, prefix: a.prefix, sub: a.sub || '', props: Object.entries(a.fields || {}).map(([k, d]) => ({ k, l: k, d })), w, h, pins, shapes };
+  if (a.inside) {
+    const subs = new Set(), pinIds = new Set(pins.map((p) => p.id));
+    a.inside.parts.forEach((sp) => { if (!L.LIBRARY[sp.type]) throw new Error(`Inside part ${sp.id}: unknown built-in type "${sp.type}".`); subs.add(sp.id); });
+    a.inside.links.flat().forEach((e) => {
+      const i = e.indexOf('.'), sub = i > 0 ? e.slice(0, i) : null;
+      if (!pinIds.has(e) && !(sub && subs.has(sub))) throw new Error(`Inside link end "${e}" is neither a pin of the component nor SUBID.PIN of a part inside.`);
+    });
+    def.inside = a.inside;
+  }
+  const prev = loadLibrary().parts.find((x) => x.id === id);
+  def.rev = ((prev && prev.rev) || 0) + 1;
   const out = [];
   const toLib = a.save_to_library != null ? a.save_to_library : !a.path;
   if (toLib) {
@@ -576,8 +591,7 @@ server.registerTool('define_component', {
   }
   if (a.path) {
     const { full, project } = load(a.path);
-    const i = project.customParts.findIndex((x) => x.id === id);
-    if (i >= 0) project.customParts[i] = def; else project.customParts.push(def);
+    L.updateCustomPart(project, def);
     save(full, project);
     out.push(`Added to ${full}.`);
   }

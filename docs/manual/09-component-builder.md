@@ -70,7 +70,21 @@ The **Preview** shows the component as it will look on a sheet.
 
 A component needs at least one shape, and its pins need different ids, before it can be saved.
 
-Saved components appear in the Parts pane under **My components**, and can be used in any project on this computer. When you place one, LoomWright also stores a copy of it in the project file, so the project still opens correctly on a computer that does not have it. If you change a component's design, projects that use it pick up the new design when they are open.
+Saved components appear in the Parts pane under **My components**, and can be used in any project on this computer. When you place one, LoomWright also stores a copy of it in the project file, so the project still opens correctly on a computer that does not have it. If you change a component's design, the open project picks up the new design straight away, and other projects take it the next time you place that component in them.
+
+## Changing a component that is already wired
+
+You can open a component that is already used in your drawings, change it and save it without losing its wiring:
+
+- **Renaming a pin** keeps its wires. Change `OUT` to `87` and every wire on `OUT` moves to `87`, in this project and in other projects the next time they take the new design.
+- **Moving a pin, redrawing the symbol, or adding pins and fields** changes nothing in the wiring.
+- **Removing a pin that has wires on it** is the only change that disconnects anything. The builder warns you first and names the pins and how many wires they have. Put the pin back, or click **Save** again to go ahead. Afterwards <kbd>Ctrl</kbd>+<kbd>Z</kbd> on the drawing brings the wires back.
+
+## Components with fuses and relays inside
+
+A component can hold real fuses and relays, such as a relay and fuse box with its relays fed through their own fuses. The trace, the live test, the voltage solver, the fuse and relay schedule and the design checks then work through it as if each fuse and relay were drawn on the sheet. They are named after the box: fuse F2 in FB1 is **FB1/F2**, and its rating comes from the box's own F2 field.
+
+The builder shows what is inside a component under **Inside this component**, and keeps those parts linked to their pins when you rename a pin. To make a component like this, ask the Claude add-on (give it a picture of the box's diagram), or import a component file that has one. The format is in `docs/components.md`.
 
 ## Deleting a component
 

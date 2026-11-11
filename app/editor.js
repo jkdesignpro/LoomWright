@@ -109,8 +109,7 @@
     if (L.LIBRARY[type]) return;
     const fromUser = userLib.parts.find((p) => p.id === type);
     if (!fromUser) return;
-    const i = project.customParts.findIndex((p) => p.id === type);
-    if (i >= 0) project.customParts[i] = clone(fromUser); else project.customParts.push(clone(fromUser));
+    L.updateCustomPart(project, fromUser); // moves wires on renamed pins; wires on removed pins stay and show in the checks
   }
   function defOf(type) { return L.partDef(doc, type) || userLib.parts.find((p) => p.id === type) || null; }
 
@@ -2430,6 +2429,12 @@
   function isDark() { const th_ = document.documentElement.dataset.theme; return th_ ? th_ === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; }
   function setTheme(th_) { document.documentElement.dataset.theme = th_; try { localStorage.setItem(THEME, th_); } catch (e) { /* ignore */ } }
   try { const th_ = localStorage.getItem(THEME); if (th_) document.documentElement.dataset.theme = th_; } catch (e) { /* ignore */ }
+  /* The work area (the sheet and the component builder's drawing) can be dark on its own, whatever the
+     window theme. Only the screen changes: exports, prints and PDFs stay black on white. */
+  const WORK = 'loomwright.workarea';
+  function isWorkDark() { return document.documentElement.classList.contains('work-dark'); }
+  function setWorkDark(on) { document.documentElement.classList.toggle('work-dark', on); try { localStorage.setItem(WORK, on ? 'dark' : 'light'); } catch (e) { /* ignore */ } }
+  try { if (localStorage.getItem(WORK) === 'dark') document.documentElement.classList.add('work-dark'); } catch (e) { /* ignore */ }
 
   /* ---------------- Views: formboard and vehicle ---------------- */
   function harnessesInUse() { return [...new Set(project.harnesses.concat(project.sheets.flatMap((s) => s.wires.map((w) => w.harness))).filter(Boolean))]; }
@@ -2523,6 +2528,7 @@
     xrefs: { label: 'Sheet cross-references', run: () => toggleSetting('xrefs', 'Sheet cross-references'), on: () => project.settings.xrefs !== false },
     bw: { label: 'Black and white drawings', run: () => toggleSetting('bw', 'Black and white drawings'), on: () => !!project.settings.bw },
     theme: { label: 'Dark theme', run: () => setTheme(isDark() ? 'light' : 'dark'), on: isDark },
+    workdark: { label: 'Dark work area', run: () => setWorkDark(!isWorkDark()), on: isWorkDark },
     language: { label: 'Language…', run: languageModal },
     'sheet-new': { label: 'New sheet', run: () => addSheet(null) },
     'sheet-dup': { label: 'Duplicate sheet', run: () => addSheet(doc.sheet) },
@@ -2577,7 +2583,7 @@
   const MENUS = [
     ['File', ['new', 'open', 'sample', 'close-tab', '-', 'save', 'saveas', '-', 'print', 'print-pack', 'print-labels', '-', 'import-csv', 'import-wireviz', 'import-kicad', 'import-lengths', '-', 'export-pdf', 'export-svg', 'export-png', 'export-dxf', 'export-wireviz', 'export-share']],
     ['Edit', ['undo', 'redo', '-', 'cut', 'copy', 'paste', 'dup', 'delete', '-', 'select-all', 'find', 'replace', 'renumber', '-', 'block-save']],
-    ['View', ['pane-parts', 'pane-project', 'pane-history', 'pane-props', 'tables', '-', 'zoom-in', 'zoom-out', 'fit', '-', 'junctions', 'xrefs', 'bw', '-', 'theme', 'language']],
+    ['View', ['pane-parts', 'pane-project', 'pane-history', 'pane-props', 'tables', '-', 'zoom-in', 'zoom-out', 'fit', '-', 'junctions', 'xrefs', 'bw', '-', 'theme', 'workdark', 'language']],
     ['Arrange', ['rotate', 'flip', '-', 'align-left', 'align-centre', 'align-right', 'align-top', 'align-middle', 'align-bottom', '-', 'dist-h', 'dist-v', '-', 'tidy']],
     ['Sheet', ['sheet-new', 'sheet-dup', 'sheet-rename', 'sheet-del', '-', 'sheet-left', 'sheet-right', '-', 'sheet-prev', 'sheet-next']],
     ['Tools', ['trace', 'test', 'fault', '-', 'formboard', 'locations', '-', 'builder', 'colours', 'cables', '-', 'stock', 'build-share', 'build-import', '-', 'lib-import', 'lib-export', '-', 'number-potential', 'check']],
@@ -2679,9 +2685,24 @@
       if (i >= 0) userLib.parts[i] = def; else userLib.parts.push(def);
       await PF.saveUserLibrary(userLib);
       // keep projects that already use it up to date
-      const j = project.customParts.findIndex((p) => p.id === def.id);
-      if (j >= 0) { pushHistory(); project.customParts[j] = clone(def); L.views(project).forEach((v) => L.pruneWires(v)); }
+      // wires on renamed pins move with them; only wires on pins that were taken away are removed
+      // (the builder warns about those first), and Ctrl+Z puts everything back
+      if (project.customParts.some((p) => p.id === def.id)) {
+        pushHistory();
+        const lost = L.updateCustomPart(project, def), gone = new Set(lost.map((x) => x.wire));
+        project.sheets.forEach((sh) => { for (let k = sh.wires.length - 1; k >= 0; k--) if (gone.has(sh.wires[k])) sh.wires.splice(k, 1); });
+        if (gone.size) setTimeout(() => toast(`${plural(gone.size, t('wire'))} ${t('removed from pins that are no longer on')} ${def.name}`, { label: t('Undo'), run: () => undo() }), 2700);
+      }
       buildLibrary(); commit();
+    },
+    /* Wires on each pin of a component type in the open project, for the builder's warning. */
+    pinUse(type) {
+      const use = {};
+      project.sheets.forEach((sh) => {
+        const ids = new Set(sh.parts.filter((p) => p.type === type).map((p) => p.id));
+        sh.wires.forEach((w) => [w.from, w.to].forEach((e) => { if (ids.has(e.part)) use[e.pin] = (use[e.pin] || 0) + 1; }));
+      });
+      return use;
     },
     async deleteComponent(id) {
       userLib.parts = userLib.parts.filter((p) => p.id !== id);
