@@ -1,15 +1,17 @@
 {
   "name": "loomwright",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Free, open-source wiring diagram editor for vehicles and electronics",
-  "license": "GPL-3.0-or-later",
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
     "serve": "node scripts/serve.js",
-    "test": "node scripts/test-core.js"
+    "test": "node scripts/test-core.js && node scripts/test-air.js",
+    "test:air": "node scripts/test-air.js",
+    "manual": "node scripts/build-manual.js"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.4"

@@ -1,12 +1,14 @@
 /*
  * Component builder: draw your own symbol, place pins, save it to your library.
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function () {
   'use strict';
   const L = window.Loom;
   const $ = (s, el = document) => el.querySelector(s);
   const esc = L.esc;
+  const t = (x) => (window.LoomI18n ? window.LoomI18n.t(x) : x);
+  const T = (x) => esc(t(x));
   const root = $('#builder');
   const S5 = (v) => Math.round(v / 5) * 5;
   const S10 = (v) => Math.round(v / 10) * 10;
@@ -44,23 +46,23 @@
   function close() { root.hidden = true; root.innerHTML = ''; }
 
   function shell() {
-    const libOpts = Object.values(L.LIBRARY).map((d) => `<option value="${d.id}">${esc(d.cat)}: ${esc(d.name)}</option>`).join('');
+    const libOpts = Object.values(L.LIBRARY).map((d) => `<option value="${d.id}">${T(d.cat)}: ${T(d.name)}</option>`).join('');
     return `
     <div class="b-head">
-      <h2>Component builder</h2>
-      <button class="btn" id="b-undo">Undo</button>
-      ${editingId ? '<button class="btn danger" id="b-delete">Delete from library</button>' : ''}
-      <button class="btn" id="b-cancel">Cancel</button>
-      <button class="btn" id="b-save">Save to my components</button>
-      <button class="btn primary" id="b-place">Save and place</button>
+      <h2>${T('Component builder')}</h2>
+      <button class="btn" id="b-undo">${T('Undo')}</button>
+      ${editingId ? `<button class="btn danger" id="b-delete">${T('Delete from library')}</button>` : ''}
+      <button class="btn" id="b-cancel">${T('Cancel')}</button>
+      <button class="btn" id="b-save">${T('Save to my components')}</button>
+      <button class="btn primary" id="b-place">${T('Save and place')}</button>
     </div>
     <div class="b-main">
       <div class="panel b-tools">
-        ${TOOLS.map(([id, name, key]) => `<button class="btn" data-tool="${id}" title="${name} (${key})">${name}</button>`).join('')}
+        ${TOOLS.map(([id, name, key]) => `<button class="btn" data-tool="${id}" title="${T(name)} (${key})">${T(name)}</button>`).join('')}
         <hr style="border:0;border-top:1px solid var(--line);width:100%">
-        <label class="fld"><span>Start from a library symbol</span><select id="b-from"><option value="">Choose…</option>${libOpts}</select></label>
-        <button class="btn danger" id="b-clear">Clear drawing</button>
-        <p class="muted" style="font-size:11.5px;margin:4px 0 0">Pins snap to a 10-unit grid so wires line up. Shapes snap to 5. Text can show a field, for example {rating}.</p>
+        <label class="fld"><span>${T('Start from a library symbol')}</span><select id="b-from"><option value="">${T('Choose…')}</option>${libOpts}</select></label>
+        <button class="btn danger" id="b-clear">${T('Clear drawing')}</button>
+        <p class="muted" style="font-size:11.5px;margin:4px 0 0">${T('Pins snap to a 10-unit grid so wires line up. Shapes snap to 5. Text can show a field, for example {rating}.')}</p>
       </div>
       <div class="b-stage"><svg id="b-svg"></svg></div>
       <div class="panel b-side" id="b-side"></div>
@@ -74,8 +76,8 @@
     $('#b-place').onclick = () => save(true);
     if ($('#b-delete')) $('#b-delete').onclick = async (e) => {
       const b = e.currentTarget;
-      if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'Click again to delete'; b.classList.add('armed'); return; }
-      await window.LoomEditor.deleteComponent(editingId); window.LoomEditor.toast('Component deleted'); close();
+      if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = t('Click again to delete'); b.classList.add('armed'); return; }
+      await window.LoomEditor.deleteComponent(editingId); window.LoomEditor.toast(t('Component deleted')); close();
     };
     $('#b-from').onchange = (e) => { if (!e.target.value) return; remember(); const keepId = comp.id; comp = fromLibrary(e.target.value); comp.id = keepId; selected = null; e.target.value = ''; renderAll(); };
     $('#b-clear').onclick = () => { remember(); comp.shapes = []; comp.pins = []; selected = null; renderAll(); };
@@ -215,43 +217,43 @@
     return `<rect x="${(sh.tx || 0) - 2}" y="${(sh.ty || 0) - 2}" width="6" height="6" fill="#2f7dff" pointer-events="none"/>`;
   }
 
-  const num = (label, key, v, step = 5) => `<label class="fld"><span>${label}</span><input type="number" step="${step}" data-s="${key}" value="${esc(v)}"></label>`;
+  const num = (label, key, v, step = 5) => `<label class="fld"><span>${T(label)}</span><input type="number" step="${step}" data-s="${key}" value="${esc(v)}"></label>`;
   function renderSide() {
     const side = $('#b-side');
     const active = document.activeElement && side.contains(document.activeElement) ? document.activeElement.id : null;
-    let h = `<div class="fields"><h3>Component</h3>
-      <label class="fld"><span>Name</span><input id="bc-name" data-c="name" value="${esc(comp.name)}"></label>
-      <div class="two"><label class="fld"><span>Reference prefix</span><input id="bc-prefix" data-c="prefix" value="${esc(comp.prefix || '')}" placeholder="e.g. K, S, U"></label><label class="fld"><span>Text under symbol</span><input id="bc-sub" data-c="sub" value="${esc(comp.sub || '')}" placeholder="{rating}"></label></div>
-      <div class="two"><label class="fld"><span>Width</span><input id="bc-w" type="number" min="20" step="20" data-c="w" value="${comp.w}"></label><label class="fld"><span>Height</span><input id="bc-h" type="number" min="20" step="20" data-c="h" value="${comp.h}"></label></div>
-      <label class="fld"><span>Fields, one per line as <code>key = default</code></span><textarea id="bc-props" data-c="props" placeholder="rating = 15A">${esc((comp.props || []).map((p) => `${p.k} = ${p.d == null ? '' : p.d}`).join('\n'))}</textarea></label>
+    let h = `<div class="fields"><h3>${T('Component')}</h3>
+      <label class="fld"><span>${T('Name')}</span><input id="bc-name" data-c="name" value="${esc(comp.name)}"></label>
+      <div class="two"><label class="fld"><span>${T('Reference prefix')}</span><input id="bc-prefix" data-c="prefix" value="${esc(comp.prefix || '')}" placeholder="${T('e.g. K, S, U')}"></label><label class="fld"><span>${T('Text under symbol')}</span><input id="bc-sub" data-c="sub" value="${esc(comp.sub || '')}" placeholder="{rating}"></label></div>
+      <div class="two"><label class="fld"><span>${T('Width')}</span><input id="bc-w" type="number" min="20" step="20" data-c="w" value="${comp.w}"></label><label class="fld"><span>${T('Height')}</span><input id="bc-h" type="number" min="20" step="20" data-c="h" value="${comp.h}"></label></div>
+      <label class="fld"><span>${T('Fields, one per line as')} <code>key = default</code></span><textarea id="bc-props" data-c="props" placeholder="rating = 15A">${esc((comp.props || []).map((p) => `${p.k} = ${p.d == null ? '' : p.d}`).join('\n'))}</textarea></label>
     </div>`;
     if (selected && selected.kind === 'shape' && comp.shapes[selected.i]) {
       const s = comp.shapes[selected.i];
-      h += `<div class="fields"><h3>Selected ${s.t}</h3>`;
+      h += `<div class="fields"><h3>${T('Selected ' + s.t)}</h3>`;
       if (s.t === 'line') h += `<div class="two">${num('x1', 'x1', s.x1)}${num('y1', 'y1', s.y1)}${num('x2', 'x2', s.x2)}${num('y2', 'y2', s.y2)}</div>`;
       if (s.t === 'rect') h += `<div class="two">${num('x', 'x', s.x)}${num('y', 'y', s.y)}${num('Width', 'width', s.width)}${num('Height', 'h', s.h)}${num('Corner radius', 'rx', s.rx || 0, 1)}</div>`;
       if (s.t === 'circle') h += `<div class="two">${num('Centre x', 'cx', s.cx)}${num('Centre y', 'cy', s.cy)}${num('Radius', 'r', s.r, 1)}</div>`;
-      if (s.t === 'text') h += `<label class="fld"><span>Text</span><input id="bs-text" data-s="text" value="${esc(s.text)}"></label><div class="two">${num('x', 'x', s.x)}${num('y', 'y', s.y)}${num('Size', 'size', s.size || 9, 1)}<label class="fld"><span>Align</span><select data-s="anchor">${['start', 'middle', 'end'].map((a) => `<option${(s.anchor || 'middle') === a ? ' selected' : ''}>${a}</option>`).join('')}</select></label></div>`;
-      if (s.t === 'path') h += `<label class="fld"><span>Path data</span><input data-s="d" value="${esc(s.d)}" style="font-family:var(--mono)"></label>`;
+      if (s.t === 'text') h += `<label class="fld"><span>${T('Text')}</span><input id="bs-text" data-s="text" value="${esc(s.text)}"></label><div class="two">${num('x', 'x', s.x)}${num('y', 'y', s.y)}${num('Size', 'size', s.size || 9, 1)}<label class="fld"><span>${T('Align')}</span><select data-s="anchor">${['start', 'middle', 'end'].map((a) => `<option${(s.anchor || 'middle') === a ? ' selected' : ''} value="${a}">${T(a)}</option>`).join('')}</select></label></div>`;
+      if (s.t === 'path') h += `<label class="fld"><span>${T('Path data')}</span><input data-s="d" value="${esc(s.d)}" style="font-family:var(--mono)"></label>`;
       if (s.t !== 'text') {
         const swKey = s.t === 'rect' ? 'sw' : 'w';
         const swVal = s[swKey] != null ? s[swKey] : 2;
         h += `<div class="two">${num('Line width', swKey, swVal, 0.5)}`;
-        if (s.t !== 'line') h += `<label class="fld"><span>Fill</span><select data-s="fill">${[['paper', 'White'], ['none', 'None'], ['ink', 'Black']].map(([v, n]) => `<option value="${v}"${(s.fill || (s.t === 'path' ? 'none' : 'paper')) === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
-        h += `</div><label class="fld check"><input type="checkbox" data-s="dash"${s.dash ? ' checked' : ''}><span>Dashed</span></label>`;
+        if (s.t !== 'line') h += `<label class="fld"><span>${T('Fill')}</span><select data-s="fill">${[['paper', 'White'], ['none', 'None'], ['ink', 'Black']].map(([v, n]) => `<option value="${v}"${(s.fill || (s.t === 'path' ? 'none' : 'paper')) === v ? ' selected' : ''}>${T(n)}</option>`).join('')}</select></label>`;
+        h += `</div><label class="fld check"><input type="checkbox" data-s="dash"${s.dash ? ' checked' : ''}><span>${T('Dashed')}</span></label>`;
       }
-      h += `<div class="row-btns"><button class="btn danger" data-b="del">Delete shape</button><button class="btn" data-b="dup">Duplicate</button></div></div>`;
+      h += `<div class="row-btns"><button class="btn danger" data-b="del">${T('Delete shape')}</button><button class="btn" data-b="dup">${T('Duplicate')}</button></div></div>`;
     }
     if (selected && selected.kind === 'pin' && comp.pins[selected.i]) {
       const pn = comp.pins[selected.i];
-      h += `<div class="fields"><h3>Selected pin</h3><div class="two"><label class="fld"><span>Pin number / id</span><input id="bp-id" data-p="id" value="${esc(pn.id)}"></label><label class="fld"><span>Description</span><input id="bp-n" data-p="n" value="${esc(pn.n || '')}" placeholder="e.g. Ignition +"></label></div>
+      h += `<div class="fields"><h3>${T('Selected pin')}</h3><div class="two"><label class="fld"><span>${T('Pin number / id')}</span><input id="bp-id" data-p="id" value="${esc(pn.id)}"></label><label class="fld"><span>${T('Description')}</span><input id="bp-n" data-p="n" value="${esc(pn.n || '')}" placeholder="${T('e.g. Ignition +')}"></label></div>
         <div class="two"><label class="fld"><span>x</span><input type="number" step="10" data-p="x" value="${pn.x}"></label><label class="fld"><span>y</span><input type="number" step="10" data-p="y" value="${pn.y}"></label></div>
-        <div class="row-btns"><button class="btn danger" data-b="del">Delete pin</button></div></div>`;
+        <div class="row-btns"><button class="btn danger" data-b="del">${T('Delete pin')}</button></div></div>`;
     }
     const dupIds = comp.pins.map((p) => p.id).filter((id, i, a) => a.indexOf(id) !== i);
-    h += `<div class="fields"><h3>Pins (${comp.pins.length})</h3>${dupIds.length ? `<div class="callout warn">Pin ids must be unique: ${esc(dupIds.join(', '))}</div>` : ''}${comp.pins.length ? `<div class="b-list">${comp.pins.map((p, i) => `<button data-pick="pin:${i}" class="${selected && selected.kind === 'pin' && selected.i === i ? 'on' : ''}">${esc(p.id)} · ${esc(p.n || '')} (${p.x}, ${p.y})</button>`).join('')}</div>` : '<p class="muted" style="margin:0;font-size:12px">Use the Pin tool and click on the edge of the symbol where wires should attach.</p>'}</div>`;
-    h += `<div class="fields"><h3>Shapes (${comp.shapes.length})</h3><div class="b-list">${comp.shapes.map((s, i) => `<button data-pick="shape:${i}" class="${selected && selected.kind === 'shape' && selected.i === i ? 'on' : ''}">${s.t}${s.t === 'text' ? ' “' + esc(s.text) + '”' : ''}</button>`).join('')}</div></div>`;
-    h += `<div class="fields"><h3>Preview</h3><div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px">${previewSVG()}</div></div>`;
+    h += `<div class="fields"><h3>${T('Pins')} (${comp.pins.length})</h3>${dupIds.length ? `<div class="callout warn">${T('Pin ids must be unique:')} ${esc(dupIds.join(', '))}</div>` : ''}${comp.pins.length ? `<div class="b-list">${comp.pins.map((p, i) => `<button data-pick="pin:${i}" class="${selected && selected.kind === 'pin' && selected.i === i ? 'on' : ''}">${esc(p.id)} · ${esc(p.n || '')} (${p.x}, ${p.y})</button>`).join('')}</div>` : `<p class="muted" style="margin:0;font-size:12px">${T('Use the Pin tool and click on the edge of the symbol where wires should attach.')}</p>`}</div>`;
+    h += `<div class="fields"><h3>${T('Shapes')} (${comp.shapes.length})</h3><div class="b-list">${comp.shapes.map((s, i) => `<button data-pick="shape:${i}" class="${selected && selected.kind === 'shape' && selected.i === i ? 'on' : ''}">${T(s.t)}${s.t === 'text' ? ' “' + esc(s.text) + '”' : ''}</button>`).join('')}</div></div>`;
+    h += `<div class="fields"><h3>${T('Preview')}</h3><div style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:8px">${previewSVG()}</div></div>`;
     side.innerHTML = h;
     if (active && document.getElementById(active)) { const el = document.getElementById(active); el.focus(); if (el.setSelectionRange && el.type === 'text') { const n = el.value.length; el.setSelectionRange(n, n); } }
   }
@@ -308,13 +310,13 @@
   async function save(place) {
     const d = toDef();
     const ids = d.pins.map((p) => p.id);
-    if (new Set(ids).size !== ids.length) { window.LoomEditor.toast('Give every pin a different id before saving.'); return; }
-    if (!d.shapes.length) { window.LoomEditor.toast('Draw at least one shape first.'); return; }
+    if (new Set(ids).size !== ids.length) { window.LoomEditor.toast(t('Give every pin a different id before saving.')); return; }
+    if (!d.shapes.length) { window.LoomEditor.toast(t('Draw at least one shape first.')); return; }
     d.pins.forEach((p) => { p.x = Math.max(0, Math.min(d.w, S10(p.x))); p.y = Math.max(0, Math.min(d.h, S10(p.y))); });
     await window.LoomEditor.saveComponent(d);
     close();
     if (place) window.LoomEditor.place(d.id);
-    window.LoomEditor.toast(`Saved “${d.name}” to My components`);
+    window.LoomEditor.toast(t('Saved to My components:') + ' ' + d.name);
   }
 
   root.tabIndex = -1;

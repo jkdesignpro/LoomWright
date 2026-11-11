@@ -6,7 +6,7 @@
  * Claude MCP add-on (Node, via require). No dependencies.
  *
  * Copyright (C) 2026 LoomWright contributors
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -14,7 +14,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   const FORMAT = 'loomwright';
   const GRID = 10;
   const INK = '#1d2320';
@@ -354,21 +354,21 @@
 
   // ---- Motors & loads ----
   const motorLike = (letter) => [L(0, 20, 6, 20), L(34, 20, 40, 20), C(20, 20, 14), T(20, 25, letter, { size: 13, weight: 600 })];
-  def('motor', { name: 'Motor', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, pins: [pin(1, 0, 20), pin(2, 40, 20)], shapes: motorLike('M') });
-  def('pump', { name: 'Pump (fuel / water)', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'what', l: 'Use', d: 'Fuel' }], sub: '{what}', pins: [pin(1, 0, 20), pin(2, 40, 20)], shapes: motorLike('P') });
-  def('compressor', { name: 'Air compressor', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, pins: [pin('+', 0, 20, '+'), pin('-', 40, 20, '−')], shapes: motorLike('C') });
+  def('motor', { name: 'Motor', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'amps', l: 'Current draw (A)', d: '' }], pins: [pin(1, 0, 20), pin(2, 40, 20)], shapes: motorLike('M') });
+  def('pump', { name: 'Pump (fuel / water)', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'what', l: 'Use', d: 'Fuel' }, { k: 'amps', l: 'Current draw (A)', d: '' }], sub: '{what}', pins: [pin(1, 0, 20), pin(2, 40, 20)], shapes: motorLike('P') });
+  def('compressor', { name: 'Air compressor', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'amps', l: 'Current draw (A)', d: '' }], pins: [pin('+', 0, 20, '+'), pin('-', 40, 20, '−')], shapes: motorLike('C') });
   def('fan', {
-    name: 'Fan', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, pins: [pin(1, 0, 20), pin(2, 40, 20)],
+    name: 'Fan', cat: 'Motors & loads', prefix: 'M', w: 40, h: 40, props: [{ k: 'amps', l: 'Current draw (A)', d: '' }], pins: [pin(1, 0, 20), pin(2, 40, 20)],
     shapes: [L(0, 20, 6, 20), L(34, 20, 40, 20), C(20, 20, 14), P('M20 20 q-2 -10 6 -10 q-2 6 -6 10 M20 20 q10 -2 10 6 q-6 -2 -10 -6 M20 20 q2 10 -6 10 q2 -6 6 -10 M20 20 q-10 2 -10 -6 q6 2 10 6', { w: 1.2, fill: 'ink' })],
   });
   def('wiper_motor', {
-    name: 'Wiper motor', cat: 'Motors & loads', prefix: 'M', w: 80, h: 80,
+    name: 'Wiper motor', cat: 'Motors & loads', prefix: 'M', w: 80, h: 80, props: [{ k: 'amps', l: 'Current draw (A)', d: '' }],
     pins: [pin('53', 0, 20, '53 slow'), pin('53b', 0, 40, '53b fast'), pin('31b', 0, 60, '31b park'), pin('31', 80, 60, '31 earth'), pin('53a', 80, 20, '53a park feed')],
     shapes: [R2(0, 0, 80, 80, { rx: 4 }), C(44, 40, 16), T(44, 45, 'M', { size: 13, weight: 600 }), T(6, 16, '53', { size: 7, anchor: 'start' }), T(6, 36, '53b', { size: 7, anchor: 'start' }), T(6, 56, '31b', { size: 7, anchor: 'start' }), T(74, 76, '31', { size: 7, anchor: 'end' }), T(74, 16, '53a', { size: 7, anchor: 'end' })],
   });
   def('winch', {
     name: 'Winch motor', cat: 'Motors & loads', prefix: 'M', w: 60, h: 60,
-    props: [{ k: 'lbs', l: 'Rating', d: '9500lb' }], sub: '{lbs}',
+    props: [{ k: 'lbs', l: 'Rating', d: '9500lb' }, { k: 'amps', l: 'Current draw (A), full load', d: '' }], sub: '{lbs}',
     pins: [pin('A', 30, 0, 'A armature'), pin('F1', 0, 40, 'F1 field'), pin('F2', 60, 40, 'F2 field'), pin('-', 30, 60, '− earth')],
     shapes: [C(30, 30, 18), T(30, 35, 'M', { size: 13, weight: 600 }), L(30, 0, 30, 12), L(30, 48, 30, 60), L(0, 40, 13, 40), L(47, 40, 60, 40), T(5, 35, 'F1', { size: 7, anchor: 'start' }), T(55, 35, 'F2', { size: 7, anchor: 'end' }), T(34, 8, 'A', { size: 7, anchor: 'start' })],
   });
@@ -694,8 +694,14 @@
   function pinName(doc, end) {
     const p = doc.parts.find((q) => q.id === end.part);
     if (!p) return '?';
+    // a net label or off-page link is named by its text, not by its pin
+    if (p.type === 'net_label' || p.type === 'offpage') {
+      const pr = resolved(doc, p).props || {}, txt = String(pr.text || pr.link || '').trim();
+      return txt || (p.type === 'net_label' ? 'Net label (no name)' : 'Off-sheet reference (no name)');
+    }
     const pn = resolved(doc, p).pins.find((q) => q.id === end.pin);
-    return `${p.label || partDef(doc, p.type)?.name || p.type}:${pn ? pn.id : end.pin}`;
+    // pn.term: the terminal number printed on the device, where it differs from the pin id
+    return `${p.label || partDef(doc, p.type)?.name || p.type}:${pn ? pn.term || pn.id : end.pin}`;
   }
   function snap(v) { return Math.round(v / GRID) * GRID; }
 
@@ -747,13 +753,16 @@
     const p = findPart(doc, str.slice(0, i));
     if (!p) throw new Error(`No part called "${str.slice(0, i)}"`);
     const pinId = str.slice(i + 1), pins = resolved(doc, p).pins;
-    const pn = pins.find((q) => q.id === pinId) || pins.find((q) => q.id.toLowerCase() === pinId.toLowerCase()) || pins.find((q) => (q.n || '').toLowerCase() === pinId.toLowerCase());
+    const lc = pinId.toLowerCase();
+    // a pin can also carry other names it is known by (pin.a), such as GPIO17 for pin 11 of a Raspberry Pi header
+    const pn = pins.find((q) => q.id === pinId) || pins.find((q) => q.id.toLowerCase() === lc) || pins.find((q) => (q.n || '').toLowerCase() === lc) || pins.find((q) => (q.a || []).some((x) => String(x).toLowerCase() === lc));
     if (!pn) throw new Error(`${p.label} has no pin "${pinId}". Pins: ${pins.map((q) => q.id).join(', ')}`);
     return { part: p.id, pin: pn.id };
   }
   function addWire(doc, from, to, opts = {}) {
     const w = { id: uid('w'), name: opts.name || nextWireName(doc), from: parseEnd(doc, from), to: parseEnd(doc, to), colour: opts.colour || 'red', tracer: opts.tracer || '', gauge: String(opts.gauge || '1.0'), length: opts.length || '', current: opts.current || '', circuit: opts.circuit || '', harness: opts.harness || '', notes: opts.notes || '' };
     if (opts.tracer2) w.tracer2 = opts.tracer2;
+    if (opts.signal) w.signal = opts.signal;
     doc.wires.push(w);
     return w;
   }
@@ -839,7 +848,9 @@
       v.parts.forEach((p) => {
         const pr = p.props || {};
         let k = null;
-        if (p.type === 'offpage' && pr.link) k = 'N:' + String(pr.link).trim().toUpperCase();
+        const grp = (partDef(v, p.type) || {}).xrefGroup;
+        if (grp && p.label) k = 'G:' + grp + '|' + p.label;
+        else if (p.type === 'offpage' && pr.link) k = 'N:' + String(pr.link).trim().toUpperCase();
         else if (p.type === 'net_label' && pr.text) k = 'N:' + String(pr.text).trim().toUpperCase();
         else if (p.label && !(partDef(v, p.type) || {}).noLabel) k = 'P:' + p.type + '|' + p.label;
         if (!k) return;
@@ -919,11 +930,15 @@
     const xr = o.xref && o.xref.get(p.id);
     if (xr) {
       const link = p.type === 'offpage' || p.type === 'net_label';
-      const txt = (link ? '→ ' : 'also on ') + xr.map((x) => x.text).join(', ');
-      s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8" text-anchor="middle" fill="${o.bw ? INK : '#2b5fb8'}" font-family="${MONO}"${edit ? ` data-xref="${p.id}" class="xref"` : ''}>${esc(txt)}${edit ? '<title>Click to go there</title>' : ''}</text>`;
+      const lead = link ? '→ ' : d.xrefGroup ? (d.coil ? 'contacts on ' : 'coil on ') : 'also on ', targets = o.links ? xr.map((x) => `<tspan data-link="part|${esc(x.sheetId)}|${esc(x.part)}">${esc(x.text)}</tspan>`).join(', ') : esc(xr.map((x) => x.text).join(', '));
+      s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8" text-anchor="middle" fill="${o.bw ? INK : '#2b5fb8'}" font-family="${MONO}"${edit ? ` data-xref="${p.id}" class="xref"` : ''}>${esc(lead)}${targets}${edit ? '<title>Click to go there</title>' : ''}</text>`;
       ty += 10;
     }
-    if (o.states && o.states.has(p.id)) s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8.5" font-weight="700" text-anchor="middle" fill="#a35f00" font-family="${MONO}" pointer-events="none">${esc(o.states.get(p.id))}</text>`;
+    if (o.states && o.states.has(p.id)) { s += `<text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8.5" font-weight="700" text-anchor="middle" fill="#a35f00" font-family="${MONO}" pointer-events="none">${esc(o.states.get(p.id))}</text>`; ty += 10; }
+    if (o.badges && o.badges.has(p.id)) {
+      const bd = o.badges.get(p.id), col = bd.level === 'low' ? '#a3241b' : bd.level === 'check' ? '#9a5b00' : '#1e6b2e', tw = bd.text.length * 5.2 + 8;
+      s += `<rect x="${bb.x + bb.w / 2 - tw / 2}" y="${ty - 8}" width="${tw}" height="11" rx="2" fill="#ffffff" stroke="${col}" stroke-width=".8" pointer-events="none"/><text x="${bb.x + bb.w / 2}" y="${ty}" font-size="8.5" font-weight="600" text-anchor="middle" fill="${col}" font-family="${MONO}" pointer-events="none">${esc(bd.text)}</text>`;
+    }
     return s;
   }
 
@@ -965,7 +980,10 @@
     return (mode === 'code' ? wireCode(doc, w) : [w.name, wireCode(doc, w), w.gauge ? w.gauge + 'mm²' : ''].filter(Boolean).join(' ')) + (cab ? ` [${cab}]` : '');
   }
   function wireLabelSVG(doc, w, o) {
-    const mode = (doc.settings && doc.settings.labels) || 'full';
+    let mode = (doc.settings && doc.settings.labels) || 'full';
+    // A black-and-white drawing has no colours to tell wires apart, so it
+    // always shows at least the colour code.
+    if (mode === 'none' && o && o.bw) mode = 'code';
     if (mode === 'none') return '';
     const q = wireLabelPos(doc, w);
     if (!q) return '';
@@ -1038,6 +1056,60 @@
   }
   function usedColourCombos(doc) { return colourUsage(doc).map((e) => [e.code, e.sample, e.uses]); }
 
+  /* ---- Disclaimer. LoomWright is a basic tool: its checks are guidance, not certification. ---- */
+  const DISCLAIMER = {
+    title: 'Disclaimer',
+    general: 'Drawn with LoomWright, a basic planning tool. Its checks are guidance only: check your work against the makers\' data and get a qualified person to check anything you are not sure of. No responsibility is accepted for its use.',
+    mains: 'LoomWright is a basic planning tool. Its checks are guidance only, not proof that work meets BS 7671, BS EN 60204-1 or any other code, and it does not replace a qualified electrician or engineer. No responsibility is accepted for its use.',
+    full: [
+      'LoomWright is a free, basic tool for drawing and planning wiring. It is not a design service, and it does not replace training, the standards themselves or a qualified person.',
+      'Every check, warning, hint, calculation and suggestion it gives (cable sizes, voltage drop, fault loop impedance, protective devices, derating, compressed air sizing and the rest) is guidance only. It uses simplified models and the data you enter, and it can be wrong or incomplete. A clean report does not mean a design is safe, or that it meets BS 7671, BS EN 60204-1, the Building Regulations (including Part P), the Electricity at Work Regulations 1989, the Pressure Systems Safety Regulations 2000 or any other standard, regulation or code.',
+      'Mains wiring in homes and workplaces, machine control panels and compressed air systems can kill or injure people and start fires. That work must be designed, installed, inspected, tested and certified by a competent, qualified person, such as a registered electrician, working to the current edition of the relevant standards and the makers\' instructions. Some household electrical work must be notified to building control.',
+      'Vehicle wiring has its own risks: fire from overloaded or unprotected cables, and faults that affect lights, brakes or safety systems. Check your work against the vehicle and component makers\' data.',
+      'LoomWright is free software under the GNU Affero General Public License, version 3 or later. It is provided "as is", without any warranty, not even the implied warranty of merchantability or fitness for a particular purpose. As far as the law allows, its authors and contributors accept no responsibility or liability for any loss, damage, injury or death arising from its use, or from relying on anything it shows or produces.',
+    ],
+  };
+  const MAINS_TYPES = ['household', 'factory', 'mixed'];
+  /* What a project is for. It picks the starter circuits and library sections shown first, and which checks run. */
+  const PROJECT_TYPES = [
+    { id: 'vehicle', name: 'Vehicle (12/24 V)' },
+    { id: 'household', name: 'Household (UK mains)' },
+    { id: 'factory', name: 'Factory, workshop and control panels' },
+    { id: 'electronics', name: 'Electronics project' },
+    { id: 'mixed', name: 'Mixed (show everything)' },
+  ];
+  function applyProjectType(project, type) {
+    if (!PROJECT_TYPES.some((x) => x.id === type)) type = 'vehicle';
+    project.settings = project.settings || {};
+    project.settings.projectType = type;
+    projectTypeHooks.forEach((f) => f(project, type));
+    return project;
+  }
+  const projectTypeHooks = [];
+  /* Which disclaimer a project needs: the strong one for mains and compressed air work. */
+  function disclaimerFor(d) {
+    const project = d && d.project ? d.project : d, st = (project && project.settings) || {};
+    const mains = MAINS_TYPES.includes(st.projectType) || !!(project && Array.isArray(project.air) && project.air.length);
+    return { mains, short: mains ? DISCLAIMER.mains : DISCLAIMER.general, full: DISCLAIMER.full, title: DISCLAIMER.title };
+  }
+  /* Break a sentence into lines of at most n characters. */
+  function wrapText(text, n) {
+    const out = [];
+    let line = '';
+    String(text).split(/\s+/).forEach((w) => { if (line && (line + ' ' + w).length > n) { out.push(line); line = w; } else line = line ? line + ' ' + w : w; });
+    if (line) out.push(line);
+    return out;
+  }
+  /* The disclaimer printed on mains drawings, bottom left, in up to two lines. */
+  function disclaimerSVG(doc, x, yBottom, width) {
+    const dc = disclaimerFor(doc);
+    if (!dc.mains || ((doc.settings || {}).disclaimerOnSheets === false)) return '';
+    let size = 7, lines = wrapText(dc.short, Math.floor(width / (size * 0.6)));
+    if (lines.length > 2) { size = Math.max(4.5, (width * 2) / (dc.short.length * 0.6 * 1.08)); lines = wrapText(dc.short, Math.floor(width / (size * 0.6))).slice(0, 2); }
+    return lines.map((l, i) => `<text x="${x}" y="${yBottom - (lines.length - 1 - i) * (size + 2)}" font-size="${num1(size)}" fill="#5b625e" font-family="${MONO}">${esc(l)}</text>`).join('');
+  }
+  const num1 = (v) => Math.round(v * 10) / 10;
+
   /* ---- Sheet furniture: colour key, revision table, title block ---- */
   function keySVG(doc, kx, ky, maxRows, o) {
     const combos = usedColourCombos(doc);
@@ -1048,7 +1120,7 @@
       const yy = ky + 18 + i * 18, main = o.bw ? { hex: '#3a403c' } : colourById(doc, w.colour) || { hex: '#888' };
       out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="#262b28" stroke-width="6.5"/><line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${main.hex}" stroke-width="5"/>`;
       if (!o.bw) [w.tracer, w.tracer2].filter(Boolean).forEach((id, j) => { const t = colourById(doc, id); if (t) out += `<line x1="${kx}" y1="${yy - 4}" x2="${kx + 40}" y2="${yy - 4}" stroke="${t.hex}" stroke-width="3" stroke-dasharray="${w.tracer2 ? '4 8' : '6 6'}" stroke-dashoffset="${j * 6}"/>`; });
-      const what = uses.map((u) => u.circuit).filter(Boolean);
+      const what = [...new Set(uses.map((u) => u.circuit).filter(Boolean))];
       out += `<text x="${kx + 48}" y="${yy}" font-size="9" fill="${INK}"><tspan font-weight="700">${esc(code)}</tspan> ${esc(wireColourName(doc, w))}${what.length ? `<tspan fill="#5b625e"> · ${esc(what.join(', ').slice(0, 60))}</tspan>` : ''}</text>`;
     });
     if (shown.length < combos.length) out += `<text x="${kx}" y="${ky + 18 + shown.length * 18}" font-size="9" fill="#5b625e">+ ${combos.length - shown.length} more in the colour usage list</text>`;
@@ -1098,6 +1170,7 @@
       const tx = pg.W - inner - TB_W, ty = pg.H - inner - TB_H;
       out += revTableSVG(doc, tx, ty, TB_W).svg + titleBlockSVG(doc, tx, ty);
     }
+    out += disclaimerSVG(doc, pg.m, pg.H - pg.m / 2 + 4, pg.W - 2 * pg.m);
     return out + '</g>';
   }
 
@@ -1126,13 +1199,14 @@
       const tx = X + W - TB_W - 8, ty = Y + H - TB_H - 8;
       out += revTableSVG(doc, tx, ty, TB_W).svg + titleBlockSVG(doc, tx, ty);
     }
+    out += disclaimerSVG(doc, X + 18, Y + H - 16, Math.max(200, W - 36 - (tbH ? TB_W + 16 : 0)));
     return out + '</svg>';
   }
 
   /* ------------------------------------------------------------------ */
   /* Revisions: issue, compare, restore                                  */
   /* ------------------------------------------------------------------ */
-  const STATE_KEYS = ['title', 'meta', 'settings', 'harnesses', 'cables', 'customColours', 'customParts', 'harnessLayouts', 'sheets'];
+  const STATE_KEYS = ['title', 'meta', 'settings', 'harnesses', 'cables', 'customColours', 'customParts', 'harnessLayouts', 'sheets', 'air'];
   function revisionState(project) { const o = {}; STATE_KEYS.forEach((k) => { if (project[k] !== undefined) o[k] = JSON.parse(JSON.stringify(project[k])); }); return o; }
   function nextRevision(rev) {
     const r = String(rev || '').trim();
@@ -1161,7 +1235,7 @@
   }
   function revisionById(project, id) { return (project.revisions || []).find((r) => r.id === id || r.rev === id) || null; }
   const PART_FIELDS = ['type', 'label', 'props', 'mpn', 'supplier', 'cost', 'location', 'rot', 'flip'];
-  const WIRE_FIELDS = ['name', 'from', 'to', 'colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'notes', 'ends', 'insulation', 'cable', 'route'];
+  const WIRE_FIELDS = ['name', 'from', 'to', 'colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'notes', 'ends', 'insulation', 'cable', 'route', 'signal'];
   const same = (a, b) => JSON.stringify(a == null || a === '' ? null : a) === JSON.stringify(b == null || b === '' ? null : b);
   /* What changed between two project states (older a, newer b). */
   function diffStates(a, b) {
@@ -1242,7 +1316,7 @@
       s.parts.changed.forEach((p) => lines.push(at + `${p.label}: ` + [...p.fields.map((f) => f === 'props' ? Object.keys({ ...p.from.props, ...p.to.props }).filter((k) => !same((p.from.props || {})[k], (p.to.props || {})[k])).map((k) => `${k} ${(p.from.props || {})[k] ?? ''} → ${(p.to.props || {})[k] ?? ''}`).join(', ') : f === 'label' ? `renamed from ${p.from.label}` : ['mpn', 'supplier', 'cost', 'location'].includes(f) ? `${f === 'mpn' ? 'part no.' : f} ${p.from[f] ?? '—'} → ${p.to[f] ?? '—'}` : `${f} changed`), p.moved ? 'moved' : ''].filter(Boolean).join('; ')));
       s.wires.added.forEach((w) => lines.push(at + `added wire ${w.label}`));
       s.wires.removed.forEach((w) => lines.push(at + `removed wire ${w.label}`));
-      s.wires.changed.forEach((w) => lines.push(at + `wire ${w.label}: ` + [...w.fields.map((f) => (['from', 'to'].includes(f) ? `${f} end moved` : ['colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'name', 'insulation'].includes(f) ? `${f} ${w.from[f] || '—'} → ${w.to[f] || '—'}` : `${f} changed`)), w.rerouted ? 'rerouted' : ''].filter(Boolean).join('; ')));
+      s.wires.changed.forEach((w) => lines.push(at + `wire ${w.label}: ` + [...w.fields.map((f) => (['from', 'to'].includes(f) ? `${f} end moved` : ['colour', 'tracer', 'tracer2', 'gauge', 'length', 'current', 'circuit', 'harness', 'name', 'insulation', 'signal'].includes(f) ? `${f} ${w.from[f] || '—'} → ${w.to[f] || '—'}` : `${f} changed`)), w.rerouted ? 'rerouted' : ''].filter(Boolean).join('; ')));
     });
     return lines;
   }
@@ -1251,7 +1325,11 @@
     const r = revisionById(project, id);
     if (!r || !r.snapshot) throw new Error('No such revision');
     const snap = JSON.parse(JSON.stringify(r.snapshot));
+    // build and test progress belongs to the loom on the bench, not the drawing: keep it
+    const built = new Map();
+    (project.sheets || []).forEach((s) => s.wires.forEach((w) => { if (w.build) built.set(w.id, w.build); }));
     STATE_KEYS.forEach((k) => { if (snap[k] !== undefined) project[k] = snap[k]; });
+    (project.sheets || []).forEach((s) => s.wires.forEach((w) => { if (built.has(w.id)) w.build = built.get(w.id); else delete w.build; }));
     project.settings.clouds = '';
     return project;
   }
@@ -1266,7 +1344,7 @@
     return doc.wires.map((w) => {
       const g = gaugeInfo(w.gauge), vd = voltageDrop(w);
       const ends = w.ends || {}, ef = ends.from || {}, et = ends.to || {};
-      return { id: w.id, sheet: doc.sheet ? doc.sheet.name : '', sheetId: doc.sheet ? doc.sheet.id : '', name: w.name, from: pinName(doc, w.from), to: pinName(doc, w.to), code: wireCode(doc, w), colour: wireColourName(doc, w), gauge: w.gauge, awg: g ? g.awg : '', length: w.length, current: w.current, drop: vd == null ? '' : vd.toFixed(2), circuit: w.circuit || '', harness: w.harness || '', notes: w.notes || '', insulation: w.insulation || '', cable: w.cable || '', termFrom: ef.term || '', termTo: et.term || '' };
+      return { id: w.id, sheet: doc.sheet ? doc.sheet.name : '', sheetId: doc.sheet ? doc.sheet.id : '', name: w.name, from: pinName(doc, w.from), to: pinName(doc, w.to), code: wireCode(doc, w), colour: wireColourName(doc, w), gauge: w.gauge, awg: g ? g.awg : '', length: w.length, current: w.current, drop: vd == null ? '' : vd.toFixed(2), circuit: w.circuit || '', harness: w.harness || '', notes: w.notes || '', insulation: w.insulation || '', cable: w.cable || '', termFrom: ef.term || '', termTo: et.term || '', signal: w.signal || '' };
     });
   }
   function bom(d) {
@@ -1318,9 +1396,11 @@
       const r = resolved(doc, p), d = r.def;
       if (!d) { out.push({ level: 'error', part: p.id, text: `${p.label || p.type}: component type "${p.type}" is missing from the library.` }); return; }
       if (d.cat === 'Annotation') return;
-      const free = r.pins.filter((pn) => !conn.get(p.id + '|' + pn.id));
-      if (free.length && free.length === r.pins.length && r.pins.length) out.push({ level: 'info', part: p.id, text: `${p.label || d.name} has no wires connected.` });
-      else if (free.length && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
+      // optionalPins: spare contacts and the like, often left unwired on purpose
+      // parts with many pins, such as boards, are rarely fully wired: d.partial skips this note
+      const allFree = r.pins.filter((pn) => !conn.get(p.id + '|' + pn.id)), free = allFree.filter((pn) => !(d.optionalPins || []).includes(pn.id));
+      if (allFree.length && allFree.length === r.pins.length && r.pins.length) out.push({ level: 'info', part: p.id, text: `${p.label || d.name} has no wires connected.` });
+      else if (free.length && !d.partial && !['fuse_box', 'busbar', 'terminal_block', 'connector', 'plug', 'conn', 'module', 'ic', 'switch_rotary', 'offpage', 'net_label', 'contura', 'dcdc', 'fuse_box_lucas', 'pdm'].includes(p.type)) out.push({ level: 'info', part: p.id, text: `${p.label || d.name}: pin ${free.map((q) => q.id).join(', ')} not connected.` });
       // Fuse rating against the wire it protects
       if (['fuse', 'fuse_maxi', 'breaker', 'fusible_link'].includes(p.type) || p.type === 'fuse_box') {
         const ratings = p.type === 'fuse_box' ? String(r.props.ratings || '').split(',').map(parseAmps) : null;
@@ -1384,6 +1464,7 @@
     allColours, colourById, colourCode, wireCode, wireColourName, gaugeInfo, gaugeWidth, voltageDrop,
     renderDiagram, exportSVG, bounds, sheetBounds, wireList, bom, cableTotals, validate, autoLayout, libraryList, eachView,
     PAGES, pageOf, zoneOf, frameSVG, sheetFurnitureSVG, xrefs, renderOptions, wireLabelPos, wireLabelText, cloudPath,
+    DISCLAIMER, MAINS_TYPES, PROJECT_TYPES, applyProjectType, projectTypeHooks, disclaimerFor, wrapText,
     DEFAULT_SETTINGS, revisionState, nextRevision, issueRevision, revisionById, diffStates, compareRevisions, cloudsFor, describeDiff, restoreRevision,
   };
 });

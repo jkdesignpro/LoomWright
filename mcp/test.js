@@ -104,6 +104,44 @@ const { StdioClientTransport } = require('@modelcontextprotocol/sdk/client/stdio
   console.log(await call('import', { path: 'test-horns', format: 'wireviz', file: 'test-horns.yml', sheet: 'From WireViz' }));
   console.log(await call('import', { path: 'test-horns', format: 'lengths', text: 'Wire,Length\nW1,1200\n' }));
   expect(await call('get_diagram', { path: 'test-horns' }), /Imported/, 'imported sheet');
+  // 0.4 tools: volts and amps, fault finding, colours, stock, build, starter circuits, PDF, household and factory
+  console.log(expect(await call('solve_circuit', { path: 'test-horns', set: { S1: 1 } }), /K1: [\d.]+ V/, 'volts at the relay coil'));
+  console.log(expect(await call('fault_find', { path: 'test-horns', part: 'B1', symptom: 'dead', out: 'horn-fault.html' }), /FAULT FINDING/, 'fault sheet').split('\n').slice(0, 6).join('\n'));
+  console.log(expect(await call('suggest_colours', { path: 'test-horns', from: 'F1:2', to: 'B1:1', gauge: 1.5 }), /^1\. /, 'colour suggestions'));
+  fs.writeFileSync(path.join(dir, 'library.json'), JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8')), blocks: [{ id: 'blk1', name: 'Kept', parts: [], wires: [] }] }));
+  console.log(await call('stock', { cable: [{ gauge: 1.5, colour: 'brown/red', metres: 20 }], items: [{ name: 'Relay', qty: 2 }] }));
+  if (!JSON.parse(fs.readFileSync(path.join(dir, 'library.json'), 'utf8')).blocks) throw new Error('saving the library dropped the blocks');
+  console.log(expect(await call('shopping_list', { path: 'test-horns' }), /Cable \(need/, 'shopping list').split('\n').slice(0, 4).join('\n'));
+  console.log(expect(await call('build_progress', { path: 'test-horns', set: [{ wire: 'W1', cut: true, ends: true }, { wire: 'W2', test: 'fail', note: 'open circuit' }] }), /FAILED/, 'build progress'));
+  expect(await call('add_starter_circuit', { path: 'test-horns' }), /cu-rcbo/, 'starter list');
+  console.log(await call('add_starter_circuit', { path: 'test-horns', sheet: 'Spots', template: 'spots' }));
+  console.log(await call('tidy_wires', { path: 'test-horns', sheet: 'Spots' }));
+  console.log(await call('export', { path: 'test-horns', format: 'pdf', tables: ['wires', 'bom'] }));
+  if (fs.readFileSync(path.join(dir, 'test-horns.pdf')).subarray(0, 5).toString() !== '%PDF-') throw new Error('no PDF');
+  // household
+  console.log(await call('create_diagram', { path: 'house', title: 'House' }));
+  console.log((await call('project_settings', { path: 'house', projectType: 'household', mains: { building: 'dwelling', country: 'wales' } })).split('\n').slice(0, 3).join('\n'));
+  console.log(await call('add_starter_circuit', { path: 'house', template: 'cu-rcbo' }));
+  console.log(await call('update_wire', { path: 'house', wire: 'W11', method: '103', insul: '100' }));
+  const hc = expect(await call('check_diagram', { path: 'house', includeInfo: true }), /qualified electrician/, 'mains disclaimer with the checks');
+  console.log(hc);
+  expect(await call('report', { path: 'house', kind: 'circuits' }), /ring/, 'circuit schedule');
+  // factory
+  console.log(await call('create_diagram', { path: 'panel', title: 'Panel' }));
+  await call('project_settings', { path: 'panel', projectType: 'factory' });
+  console.log(await call('add_starter_circuit', { path: 'panel', template: 'dol-starter' }));
+  expect(await call('test_circuit', { path: 'panel', set: { S3: 'Pressed' } }), /Relays pulled in: K1/, 'start button pulls in the contactor');
+  expect(await call('test_circuit', { path: 'panel', set: { S3: 'Pressed' }, then: [{ S3: 'Released' }] }), /Relays pulled in: K1/, 'hold-in contact keeps the contactor in');
+  expect(await call('test_circuit', { path: 'panel', set: { S3: 'Pressed' }, then: [{ S3: 'Released' }, { S2: 'Pressed' }] }), /Relays pulled in: none/, 'stop drops the contactor out');
+  console.log(await call('number_wires_by_potential', { path: 'panel' }));
+  expect(await call('report', { path: 'panel', kind: 'motors' }), /M1/, 'motor list');
+  // compressed air
+  expect(await call('compressed_air_report', { path: 'panel' }).then(() => '', (e) => e.message), /no compressed air systems/, 'no air systems yet');
+  expect(await call('list_compressed_air_parts', {}), /impact-12/, 'air parts');
+  console.log((await call('set_compressed_air_system', { path: 'panel', example: 'workshop' })).split('\n').slice(0, 4).join('\n'));
+  const air = expect(await call('set_compressed_air_system', { path: 'panel', system: { name: 'Shed', settings: { use: 'home' }, compressors: [{ kind: 'piston', fad: 200 }], receivers: [{ litres: 50 }], pipes: [{ id: 'p1', name: 'Main', material: 'pvc', size: '20', length: 8 }], drops: [{ pipe: 'p1', name: 'Bench', tools: [{ kind: 'impact-12' }] }] } }), /D1-PVC/, 'PVC pipe is an error');
+  expect(air, /Planning estimates only/, 'air disclaimer');
+  expect(await call('compressed_air_report', { path: 'panel', system: 'Workshop air' }), /D3-PSSR/, 'PSSR note for a receiver at work');
   await c.close();
   console.log('MCP smoke test passed');
 })().catch((e) => { console.error(e); process.exit(1); });

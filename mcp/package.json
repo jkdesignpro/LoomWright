@@ -1,8 +1,8 @@
 {
   "name": "loomwright-mcp",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Optional Claude add-on (MCP server) for LoomWright: create, check and edit wiring diagrams from plain-English descriptions",
-  "license": "GPL-3.0-or-later",
+  "license": "AGPL-3.0-or-later",
   "type": "commonjs",
   "bin": { "loomwright-mcp": "server.js" },
   "main": "server.js",

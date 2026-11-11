@@ -1,20 +1,52 @@
 # LoomWright
 
-Free, open-source wiring diagram software for vehicle builds and electronics projects.
+Free, open-source wiring diagram software, mainly for vehicle builds, and also for household
+wiring, workshop and factory control panels, and electronics projects.
 Draw a loom the way you will build it: real components, real wire colours with tracers,
 real cable sizes, and a wire list you can take to the bench.
 
 LoomWright was started for a fully custom Land Rover Defender build, so it speaks 12 V
 automotive: DIN relay terminals (30, 85, 86, 87, 87a), blade and MIDI fuses, fuse boxes,
 split charge, winches, and Land Rover style colour codes such as `NR` (brown with red tracer).
-It works just as well for general electronics.
+It also draws household circuits, control panels and electronics projects, and plans
+compressed air systems.
 
 ![LoomWright](docs/screenshot.png)
 
+LoomWright is a planning and drawing tool. Its checks are guidance only and it does not replace a
+qualified electrician or engineer: please read the [Disclaimer](#disclaimer).
+
+## Quick start
+
+1. **Get the app.** Download the installer for your computer from the Releases page
+   (see [Getting the app](#getting-the-app)), or run it in a browser from the source with `npm run serve`.
+2. **Look round the example.** The first time it starts, LoomWright opens an example project: the
+   auxiliary electrics of a Land Rover Defender 110 on three sheets. Click a wire to see its details,
+   or press <kbd>Alt</kbd> and click a wire to trace its circuit.
+3. **Start your own.** Choose *File → New project*. Drag parts from the *Parts* pane onto the sheet,
+   then click one pin and then another to draw a wire.
+4. **Fill in the wires.** Select a wire and set its colour, size, length, circuit and harness in
+   *Properties*. The *Wire list* at the bottom fills in as you go.
+5. **Save** with <kbd>Ctrl</kbd>+<kbd>S</kbd>. Projects are `.loom` files.
+6. **Get help.** The user manual is built in: press <kbd>F1</kbd> or use the *Help* menu.
+
+## Documentation
+
+- **[User manual](docs/manual/01-getting-started.md)**: every feature, step by step. The same manual
+  is built into the app.
+- **[Documentation index](docs/README.md)**: the manual's chapters and the guides below.
+- [Disclaimer](docs/manual/28-disclaimer.md): what LoomWright can and cannot tell you.
+- [The Claude add-on](docs/claude-addon.md): setting up the optional add-on.
+- [Building LoomWright](docs/building.md): running from the source, tests, the desktop app and releases.
+- [The .loom file format](docs/file-format.md) and [Components](docs/components.md): for reading
+  and writing projects and symbols from other programs.
+- [Contributing](CONTRIBUTING.md).
+
 ## Features
 
-- **88 built-in components** across power and charging, protection, switches, relays,
-  lighting, motors and loads, gauges and sensors, connectors and electronics.
+- **138 built-in components** across power and charging, protection, switches, relays,
+  lighting, motors and loads, gauges and sensors, connectors, electronics, household wiring
+  and control panels, plus starter circuits that drop in ready drawn.
   Parametric parts (fuse boxes, connectors, busbars, terminal strips, modules, ICs) take any number of pins.
 - **Real connectors.** Deutsch DT/DTM/DTP, Superseal, Econoseal, Metri-Pack, Lucar, bullets and Anderson,
   with ways, plug or receptacle side, housing and wedge-lock part numbers, terminals and cavity plugs.
@@ -40,7 +72,10 @@ It works just as well for general electronics.
 - **Proper sheets.** A4 to A1, landscape or portrait, with a frame, zone grid, and cross-references that
   say which sheet and zone an off-sheet link continues on. Black-and-white mode writes the colour codes.
 - **Trace and test.** Click a wire to light up the whole circuit across sheets. The live test flicks
-  switches and blows fuses to show what runs (connections only, not voltages).
+  switches and blows fuses to show what runs, with the volts and amps at each load worked out from
+  wire sizes and lengths.
+- **Fault finding.** A step-by-step test sheet for a load that does not work, will not switch off,
+  keeps blowing its fuse, or is dim, with the readings to expect at each point.
 - **Design checks.** Fuse rating against cable size, current, voltage drop over 3 %, unconnected pins,
   duplicate references, loads with no fuse or no earth, supplies shorted to earth, terminals that do not
   suit the wire, mixed colours on one net.
@@ -51,7 +86,25 @@ It works just as well for general electronics.
 - **Harness formboard.** Lay out each harness as branches with lengths and sleeving, see bundle sizes,
   export it 1:1 as DXF, and copy the routed lengths back onto the wires.
 - **Component locations** on a photo or outline of the vehicle.
-- **Import and export.** SVG, PNG, DXF, PDF, CSV for every list, WireViz YAML both ways, KiCad netlists,
+- **Stock and build progress.** Keep a list of the cable and parts you have, get a shopping list
+  of what to buy, and tick off each wire as it is cut, terminated, fitted and tested, also from a phone.
+- **Household wiring (UK).** Consumer units, sockets, lights, showers, cookers, EV chargers and solar,
+  with a circuit schedule and guidance checks drawn from selected BS 7671 rules: cable rating, rings,
+  RCDs, earth loop impedance, voltage drop and maximum demand. Guidance only: see the
+  [Disclaimer](#disclaimer).
+- **Factory and control panels.** Isolators, motor breakers, contactors, overloads, motors, e-stops,
+  PLC cards and drives, with guidance checks from selected BS EN 60204-1 recommendations, motor,
+  terminal and PLC I/O lists, and wire numbering by potential.
+- **Electronics projects.** Arduino, Raspberry Pi and ESP32 boards with pinouts from the makers'
+  documents, supplies and modules, electronics connector series, a signal on each wire, checks for
+  common mistakes between boards (5 V on 3.3 V pins, TX to TX, missing grounds) and a power budget
+  for each supply rail. For wiring between boards, not for designing circuit boards.
+- **Loads library.** Machines, household appliances and solar parts with typical ratings.
+- **Compressed air planner.** Plan a workshop or garage air system: compressor, receiver, air
+  treatment, pipe runs, drops and tools. It estimates demand, pipe pressure drop and air speed,
+  pressure at each tool, receiver size, running and leak costs and water to drain, with plain-English
+  checks. Planning estimates only: see the [Disclaimer](#disclaimer).
+- **Import and export.** SVG, PNG, DXF, PDF with bookmarks and clickable cross-references, CSV for every list, WireViz YAML both ways, KiCad netlists,
   spreadsheet wire lists, measured lengths, and a read-only web page anyone can open.
 - **Comforts.** Several projects open in tabs, reusable circuit blocks, align and distribute with guide
   lines, find and replace, renumbering, and the interface in English, German, French, Spanish or Dutch
@@ -60,7 +113,8 @@ It works just as well for general electronics.
   A portable Windows copy runs from a folder or USB stick.
 - **Optional Claude add-on.** An MCP server that lets Claude draw and edit projects from a
   plain-English description, turn a picture of a component's pinout into a custom component
-  in your library, issue and compare revisions, trace and test circuits, and produce the build lists.
+  in your library, issue and compare revisions, trace, test and solve circuits, write fault-finding
+  sheets, plan compressed air systems, and produce the build lists.
   See [docs/claude-addon.md](docs/claude-addon.md).
 
 Projects are saved as `.loom` files, which are plain JSON, so they work well with Git.
@@ -95,10 +149,12 @@ npm install
 npm run dev      # run the desktop app with live reload
 npm run build    # build an installer for this computer
 npm test         # check the component library and example
+npm run manual   # rebuild the in-app manual after editing docs/manual
 ```
 
-To build the Windows and Mac installers in the cloud, push a tag like `v0.3.0` or run the
+To build the Windows and Mac installers in the cloud, push a tag like `v0.4.0` or run the
 *Desktop builds* workflow by hand. The installers land on a draft release.
+[docs/building.md](docs/building.md) has the details.
 
 ## Project layout
 
@@ -110,27 +166,50 @@ To build the Windows and Mac installers in the cloud, push a tag like `v0.3.0` o
 | `app/core/loom-nets.js` | Nets, circuit trace, live test, fuse and load schedule, project checks |
 | `app/core/loom-reports.js` | Cut lists, connector tables, labels, costed parts list, formboards, build pack, CSV tables |
 | `app/core/loom-io.js` | Import and export: CSV wire lists, WireViz, KiCad, DXF, read-only web page |
+| `app/core/loom-air.js` | Compressed air planning: demand, pipe pressure drop, receiver size, costs and checks |
 | `app/core/loom.js` | Loads all of the core in Node, for the Claude add-on and the tests |
 | `app/editor.js`, `app/views.js` | The editor, and the formboard and vehicle views |
+| `app/air-view.js` | The compressed air planner |
 | `app/i18n.js` | Interface languages |
 | `app/builder.js` | Component builder |
+| `app/manual-viewer.js`, `app/manual.css` | The built-in user manual viewer |
+| `app/manual.js` | The user manual, built from `docs/manual/` by `scripts/build-manual.js` (do not edit by hand) |
 | `src-tauri/` | Desktop app shell (Rust, Tauri 2): native open/save dialogs and live reload of edited files |
 | `mcp/` | Optional Claude add-on (MCP server) |
-| `docs/` | Guides |
+| `docs/` | The user manual (`docs/manual/`) and guides |
 
 ## Contributing
 
-Issues and pull requests are welcome, especially new component symbols. A built-in component is
-a short entry in `app/core/loom-core.js` (or `loom-data.js` for connector-type parts): a name, category, size (multiples of 20), pins (on a
-10-unit grid) and a list of shapes. Run `npm test` before sending a change.
+Issues and pull requests are welcome, especially new component symbols and corrections to the
+translations. A built-in component is a short entry in `app/core/loom-core.js` (or `loom-data.js`
+for connector-type parts): a name, category, size (multiples of 20), pins (on a 10-unit grid) and a
+list of shapes; see [docs/components.md](docs/components.md). Run `npm test` before sending a change.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
+
+## Disclaimer
+
+LoomWright is a basic tool for planning and drawing wiring.
+
+- Its design checks, load figures, wire size guide figures and other hints are **guidance only**. They are rules
+  of thumb and do not show that a design or an installation meets BS 7671, BS EN 60204-1, the Building
+  Regulations or any other standard, regulation or code. The wire size figures assume single PVC
+  automotive cable. Check wire sizes, fuse ratings and part numbers against the cable, fuse and
+  component makers' data.
+- It does **not replace a qualified electrician or engineer**.
+- Work on **mains electricity or compressed air** systems must be designed, installed, inspected and
+  tested by a competent person.
+- LoomWright is free software under the GNU AGPL and comes with **no warranty**, as far as the law allows.
+  The authors and contributors accept no responsibility for any loss, damage, injury or death arising
+  from its use.
 
 ## Licence
 
 LoomWright is free software: you can redistribute it and/or modify it under the terms of the
-GNU General Public License version 3, or (at your option) any later version. See [LICENSE](LICENSE).
+GNU Affero General Public License as published by the Free Software Foundation, version 3, or
+(at your option) any later version. See [LICENSE](LICENSE). Copyright (C) 2026 LoomWright contributors.
+
+If you change LoomWright and let people use your changed version over a network, the licence asks
+you to offer them its source code too.
 
 The bundled IBM Plex fonts are under the SIL Open Font License (`app/fonts/OFL.txt`).
 The bundled js-yaml (`app/vendor/js-yaml.min.js`, used for WireViz files) is under the MIT License (`app/vendor/js-yaml.LICENSE`).
-
-Design checks are a rule of thumb for single PVC automotive cable. Always check your cable maker's
-ratings and fuse to protect the wire.

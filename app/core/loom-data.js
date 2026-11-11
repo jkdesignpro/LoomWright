@@ -5,7 +5,7 @@
  * Part numbers are given where they are well established. Always check them
  * against the maker's current catalogue before ordering.
  *
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./loom-core.js'));
@@ -143,11 +143,13 @@
     const h = n * 20 + 20, shapes = [], pins = [];
     // receptacle (pins) drawn square; plug (sockets) drawn with a rounded nose
     shapes.push(rec ? R(8, 4, 30, h - 8, { sw: 1.8 }) : P(`M8 4 H30 a8 8 0 0 1 8 8 V${h - 12} a8 8 0 0 1 -8 8 H8 Z`, { fill: 'paper', w: 1.8 }));
+    // a series can name its cavities (s.cavities(n) gives [{ id, name }]), e.g. M8 3-pin uses 1, 3 and 4
+    const cav = s.cavities ? s.cavities(n) : null;
     for (let i = 0; i < n; i++) {
-      const y = 20 + i * 20;
-      shapes.push(L(0, y, 8, y), T(14, y + 3, i + 1, { size: 7, anchor: 'start' }));
+      const y = 20 + i * 20, c = cav && cav[i];
+      shapes.push(L(0, y, 8, y), T(14, y + 3, c ? c.id : i + 1, { size: c && c.id.length > 3 ? 5 : 7, anchor: 'start' }));
       shapes.push(rec ? L(26, y, 34, y, { w: 2.4 }) : C(30, y, 3, { fill: 'none', w: 1.4 }));
-      pins.push(pin(i + 1, 0, y, `Cavity ${i + 1}`));
+      pins.push(c ? pin(c.id, 0, y, c.name) : pin(i + 1, 0, y, `Cavity ${i + 1}`));
     }
     return { w: 40, h, pins, shapes };
   }
@@ -167,6 +169,13 @@
       return { ways: n, seriesName: s.id === 'generic' ? '' : s.name.replace(/^(TE|Aptiv|Anderson) /, ''), mpnShown: p.mpn || (s.housing ? s.housing(n, p.gender) || '' : '') };
     },
   };
+  /* Add connector series from another module; they join the Series list of the connector part. */
+  function addSeries(list) {
+    (list || []).forEach((s) => { if (s && s.id && !SERIES.some((x) => x.id === s.id)) SERIES.push(s); });
+    const pr = lib.conn.props.find((x) => x.k === 'series');
+    pr.options = SERIES.map((s) => [s.id, s.name]);
+    return SERIES;
+  }
   lib.contura = {
     id: 'contura', name: 'Rocker switch, 8 pin (Contura style)', cat: 'Switches', prefix: 'S', w: 80, h: 100, tags: 'carling contura rocker',
     props: [{ k: 'legend', l: 'Legend', d: 'WORK LIGHTS' }, { k: 'action', l: 'Action', d: 'ON-OFF' }], sub: '{legend}',
@@ -194,6 +203,43 @@
     props: [{ k: 'ratings', l: 'Ratings, top to bottom', d: '35A,35A,25A,25A' }], sub: '{ratings}',
     pins: [1, 3, 5, 7].map((n, i) => pin(n, 0, 20 + i * 20, `${n} supply side, fuse ${i + 1}`)).concat([2, 4, 6, 8].map((n, i) => pin(n, 80, 20 + i * 20, `${n} load side, fuse ${i + 1}`))),
     shapes: [R(8, 4, 64, 92, { rx: 3 }), ...[0, 1, 2, 3].flatMap((i) => { const y = 20 + i * 20; return [L(0, y, 20, y), L(60, y, 80, y), R(20, y - 4, 40, 8, { sw: 1.2, rx: 4 }), L(22, y, 58, y, { w: 1 }), T(14, y - 4, String(i * 2 + 1), { size: 6 }), T(66, y - 4, String(i * 2 + 2), { size: 6 })]; })],
+  };
+
+  /* Electronic power distribution module (PDM): outputs switched by inputs, each with its own current limit.
+     Generic: set the channel limits and which input switches each output from the maker's configuration. */
+  lib.pdm = {
+    id: 'pdm', name: 'Power distribution module (electronic)', cat: 'Protection', prefix: 'PDM', tags: 'pdm solid state fuse box programmable can keypad power module',
+    props: [
+      { k: 'outputs', l: 'Outputs', d: 8, type: 'int', min: 1, max: 32 },
+      { k: 'inputs', l: 'Inputs', d: 4, type: 'int', min: 0, max: 16 },
+      { k: 'limits', l: 'Output limits, amps (comma list)', d: '15,15,15,15,10,10,5,5' },
+      { k: 'control', l: 'What switches each output (IN1, IN2… or ALWAYS)', d: 'IN1,IN2,IN3,IN4,ALWAYS,ALWAYS,IN1,IN2' },
+      { k: 'active', l: 'Inputs switch on when', d: 'high', type: 'select', options: [['high', 'fed with + (active high)'], ['low', 'earthed (active low)']] },
+      { k: 'can', l: 'CAN bus pins', d: 'yes', type: 'select', options: [['yes', 'Yes'], ['no', 'No']] },
+    ],
+    sub: '{outputs} outputs',
+    gen(p) {
+      const no = Math.max(1, parseInt(p.outputs, 10) || 1), ni = Math.max(0, parseInt(p.inputs, 10) || 0), can = p.can !== 'no';
+      const limits = String(p.limits || '').split(',').map((x) => x.trim()), ctl = String(p.control || '').split(',').map((x) => x.trim().toUpperCase());
+      const left = [['BAT', 'Battery + (main feed)'], ['GND', 'Ground']].concat(seq(ni, (i) => ['IN' + (i + 1), 'Input ' + (i + 1)])).concat(can ? [['CANH', 'CAN high'], ['CANL', 'CAN low']] : []);
+      const n = Math.max(left.length, no), h = n * 20 + 20, w = 140;
+      const shapes = [R(10, 0, 120, h, { rx: 4 }), T(70, 14, 'PDM', { size: 9, weight: 700 })];
+      const pins = [];
+      left.forEach(([id, nm], i) => { const y = 20 + i * 20; shapes.push(L(0, y, 10, y, { w: id === 'BAT' ? 3 : 2 }), T(14, y + 3, id, { size: 7, anchor: 'start' })); pins.push(pin(id, 0, y, nm)); });
+      for (let i = 0; i < no; i++) {
+        const y = 20 + i * 20, id = 'OUT' + (i + 1), lim = limits[i] ? limits[i].replace(/a$/i, '') + 'A' : '', c = ctl[i] || 'ALWAYS';
+        shapes.push(L(130, y, 140, y), T(126, y + 3, `${id}${lim ? ' ' + lim : ''}`, { size: 7, anchor: 'end' }), T(72, y + 3, c === 'ALWAYS' ? '' : c, { size: 6, anchor: 'middle', color: '#5b625e' }));
+        pins.push(pin(id, w, y, `Output ${i + 1}${lim ? ' (' + lim + ')' : ''}, ${c === 'ALWAYS' ? 'always on' : 'switched by ' + c}`));
+      }
+      return { w, h, pins, shapes };
+    },
+  };
+  /* CAN bus terminating resistor (one at each end of the bus). */
+  lib.can_term = {
+    id: 'can_term', name: 'CAN bus terminator (120 Ω)', cat: 'Electronics', prefix: 'RT', w: 60, h: 40, tags: 'can bus termination resistor 120 ohm',
+    props: [{ k: 'value', l: 'Value', d: '120Ω' }], sub: '{value}',
+    pins: [pin('CANH', 0, 10, 'CAN high'), pin('CANL', 0, 30, 'CAN low')],
+    shapes: [R(14, 4, 40, 32, { rx: 3 }), L(0, 10, 14, 10), L(0, 30, 14, 30), L(24, 10, 34, 10, { w: 1.2 }), L(24, 30, 34, 30, { w: 1.2 }), L(34, 6, 34, 34, { w: 1.2 }), R(30, 14, 8, 12, { sw: 1.2 }), T(46, 23, 'T', { size: 8, weight: 600 })],
   };
 
   /* ---------------- Behaviour of parts in a circuit ---------------- */
@@ -237,6 +283,14 @@
     if (t === 'vsr') { B.kind = 'switch'; B.states = ['Open', 'Combined']; B.switched = (s) => (s ? [['A', 'B']] : []); B.ret = 'GND'; return B; }
     if (t === 'flasher') { B.kind = 'switch'; B.states = ['Off', 'Flashing (on)']; B.def = 1; B.switched = (s) => (s ? [['B', 'L']] : []); return B; }
     if (t === 'diode' || t === 'zener' || t === 'led') { B.kind = t === 'led' ? 'load' : 'diode'; if (t === 'led') { B.power = ['A']; B.earth = ['K']; } B.anode = 'A'; B.cathode = 'K'; return B; }
+    if (t === 'pdm') {
+      const no = Math.max(1, parseInt(pr.outputs, 10) || 1), ni = Math.max(0, parseInt(pr.inputs, 10) || 0);
+      const limits = String(pr.limits || '').split(',').map((x) => parseAmps(x)), ctl = String(pr.control || '').split(',').map((x) => x.trim().toUpperCase());
+      B.kind = 'pdm'; B.input = 'BAT'; B.ret = 'GND'; B.inputs = seq(ni, (i) => 'IN' + (i + 1));
+      B.outputs = seq(no, (i) => ({ pin: 'OUT' + (i + 1), rating: limits[i] || null, control: ctl[i] || 'ALWAYS', active: pr.active === 'low' ? 'low' : 'high' }));
+      return B;
+    }
+    if (t === 'can_term') { B.kind = 'other'; return B; }
     if (t === 'winch_control') { B.kind = 'switch'; B.states = ['Stop', 'Wind in', 'Wind out']; B.switched = (s) => (s ? [['+', 'A']] : []); B.ret = '-'; return B; }
     const def = r.def || {};
     if (def.cat === 'Annotation' || !ids.length) return B;
@@ -254,14 +308,15 @@
     if (B.lamp) {/* handled by switch */}
     return B;
   }
-  function isEarthPin(id) { return /^(-|−|31|31b|E|GND|G|K|85)$/i.test(String(id)) && String(id) !== 'G1'; }
+  // GND.2, G.3 and so on are the second and third ground pins of a board
+  function isEarthPin(id) { return /^(-|−|31|31b|E|GND|G|K|85)(\.\d+)?$/i.test(String(id)) && String(id) !== 'G1'; }
   function isSupplyPin(r, id) { const pn = r.pins.find((x) => x.id === id); const s = (id + ' ' + ((pn && pn.n) || '')).toLowerCase(); return /\+|12v|24v|ign|supply|feed|batt|power|vcc|v\+|in\b|^1$|^l1/.test(s); }
   function parseAmps(s) { const m = /([\d.]+)\s*A?/i.exec(String(s || '')); return m ? parseFloat(m[1]) : null; }
   /* Current a part draws, from its fields (amps, or watts at the system voltage). */
   function partCurrent(doc, p) {
     const pr = Loom.resolved(doc, p).props || {}, v = parseFloat((doc.settings || {}).volts) || 12;
     if (pr.amps && /A/i.test(String(pr.amps)) && !/Ah/i.test(String(pr.amps))) return parseFloat(String(pr.amps)) || 0;
-    if (p.type === 'load' && pr.amps) return parseFloat(pr.amps) || 0;
+    if (['load', 'motor', 'pump', 'compressor', 'fan', 'wiper_motor', 'winch'].includes(p.type) && pr.amps) return parseFloat(pr.amps) || 0;
     if (pr.watts) {
       const s = String(pr.watts), mul = /(\d+)\s*[×x*]\s*([\d.]+)/.exec(s);
       const w = mul ? +mul[1] * parseFloat(mul[2]) : parseFloat(s);
@@ -271,6 +326,6 @@
     return 0;
   }
 
-  Object.assign(Loom, { TERMINALS, SERIES, INSULATION, SLEEVING, seriesById, nearestWays, wireOD, bundleDiameter, suggestSleeve, behaviour, partCurrent, parseAmps, isEarthPin, PROTECT });
+  Object.assign(Loom, { TERMINALS, SERIES, addSeries, INSULATION, SLEEVING, seriesById, nearestWays, wireOD, bundleDiameter, suggestSleeve, behaviour, partCurrent, parseAmps, isEarthPin, PROTECT });
   return Loom;
 });

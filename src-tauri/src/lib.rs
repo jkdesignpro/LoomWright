@@ -1,12 +1,15 @@
 // LoomWright desktop shell: native file dialogs and file access for the editor.
-// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
 
 use base64::Engine;
 use serde::Serialize;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::time::UNIX_EPOCH;
 use tauri::{AppHandle, Manager};
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 
 #[derive(Serialize)]
@@ -171,11 +174,21 @@ fn save_user_library(app: AppHandle, contents: String) -> Result<(), String> {
     write_atomic(&p, contents.as_bytes())
 }
 
-/// A .loom file passed on the command line (Windows and Linux file association).
+/// Files the system has asked LoomWright to open and the editor has not taken yet:
+/// a .loom file passed on the command line (Windows and Linux file association),
+/// or one opened from Finder (macOS, which sends an "opened" event instead).
+#[derive(Default)]
+struct PendingFiles(Mutex<Vec<PathBuf>>);
+
+fn is_diagram(p: &PathBuf) -> bool {
+    matches!(p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref(), Some("loom") | Some("json"))
+}
+
+/// Hands each waiting file to the editor once.
 #[tauri::command]
-fn initial_file() -> Option<Opened> {
-    let arg = std::env::args().skip(1).find(|a| a.ends_with(".loom") || a.ends_with(".json"))?;
-    read_opened(PathBuf::from(arg)).ok()
+fn opened_files(pending: tauri::State<'_, PendingFiles>) -> Vec<Opened> {
+    let list = pending.0.lock().map(|mut v| std::mem::take(&mut *v)).unwrap_or_default();
+    list.into_iter().filter_map(|p| read_opened(p).ok()).collect()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -188,7 +201,9 @@ pub fn run() {
             std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", web);
         }
     }
-    tauri::Builder::default()
+    let from_args: Vec<PathBuf> = std::env::args().skip(1).map(PathBuf::from).filter(is_diagram).collect();
+    let app = tauri::Builder::default()
+        .manage(PendingFiles(Mutex::new(from_args)))
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             open_diagram,
@@ -199,9 +214,25 @@ pub fn run() {
             export_file,
             load_user_library,
             save_user_library,
-            initial_file,
+            opened_files,
             app_info
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running LoomWright");
+        .build(tauri::generate_context!())
+        .expect("error while starting LoomWright");
+    app.run(|handle, event| {
+        // macOS: double-clicking a .loom file, or dropping it on the Dock icon.
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if let tauri::RunEvent::Opened { urls } = &event {
+            let files: Vec<PathBuf> = urls.iter().filter_map(|u| u.to_file_path().ok()).filter(is_diagram).collect();
+            if !files.is_empty() {
+                if let Ok(mut v) = handle.state::<PendingFiles>().0.lock() {
+                    v.extend(files);
+                }
+                // If the editor is already running it collects them now; if not,
+                // it collects them when it starts.
+                let _ = handle.emit("files-waiting", ());
+            }
+        }
+        let _ = (handle, event);
+    });
 }
