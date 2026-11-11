@@ -51,6 +51,11 @@ jobs:
       - run: npm ci
       - name: Build the desktop app
         run: npx tauri build
+      # An Apple Silicon app with a missing or broken signature opens as "damaged",
+      # so check the bundle carries a valid (ad-hoc) signature.
+      - name: Check the Mac app signature
+        if: matrix.platform == 'macos-latest'
+        run: codesign --verify --deep --strict --verbose=2 src-tauri/target/release/bundle/macos/LoomWright.app
       - uses: actions/upload-artifact@v4
         with:
           name: loomwright-${{ matrix.platform }}

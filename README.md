@@ -134,7 +134,9 @@ LoomWright keeps its settings, autosave and *My components* in a `LoomWright-dat
 program. It needs the Microsoft Edge WebView2 runtime, which Windows 10 and 11 already have.
 
 The builds are not code-signed yet. On Windows choose *More info → Run anyway*. On a Mac,
-right-click the app and choose *Open* the first time.
+right-click the app and choose *Open* the first time; on macOS 15 (Sequoia) and later, try to open it
+once, then go to *System Settings → Privacy & Security* and click *Open Anyway*. If a Mac says the
+0.4.0 app "is damaged", download 0.4.1 or later, or see the manual's *Getting started* chapter.
 
 You can also run the editor without installing anything: open `app/index.html` in a browser,
 or run `npm run serve` and visit http://localhost:5173.
