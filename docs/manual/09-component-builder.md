@@ -38,6 +38,8 @@ Pick a tool, then draw in the middle:
 - <kbd>Delete</kbd> removes the selected shape or pin.
 - <kbd>Ctrl</kbd>+<kbd>Z</kbd>, or **Undo**, undoes the last change in the builder.
 
+A line or path can be drawn as a coloured wire: choose a colour under **Draw as a wire, in colour**, and it is drawn like a wire on the sheet, in that colour with a thin dark edge. Use this for the prewired leads inside a part, such as the red feeds and yellow relay outputs of a relay and fuse box.
+
 Select a shape to change it exactly on the right: its position and size, line width, whether it is dashed, its fill (none, white or black), and for text its words, size and alignment. **Duplicate** copies it and **Delete shape** removes it.
 
 ## Pins
@@ -45,6 +47,8 @@ Select a shape to change it exactly on the right: its position and size, line wi
 Every pin needs an id that is different from the others on the component. The builder numbers them 1, 2, 3… as you place them. Select a pin to change its **Pin number / id**, such as `30`, `87` or `GND`, and its **Description**, such as `Switched feed`. Both appear in the Properties pane when the component is used, and the id is what the wire list shows, as in `K5:87`.
 
 Choose ids with care: LoomWright treats pins with ids such as `-`, `31`, `E`, `GND` or `85` as earth pins when it checks circuits for an earth return.
+
+A pin can have a **Lead colour**, for a part that comes with its own wires (pigtails). A wire you draw from that pin starts in the lead's colour, so it matches the part. You can still change it afterwards.
 
 The **Pins** list on the right shows them all; click one to select it.
 

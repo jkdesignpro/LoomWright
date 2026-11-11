@@ -402,6 +402,9 @@
     if (project.settings.autoColour && L.suggestColours) {
       try { const sg = L.suggestColours(project, sheetId, w, { inventory: userLib.inventory, limit: 1 }).suggestions[0]; if (sg) { w.colour = sg.colour; if (sg.tracer) w.tracer = sg.tracer; else delete w.tracer; } } catch (e) { console.warn(e); }
     }
+    // a pin with a lead colour (the pigtail of a prewired box) gives a new wire its colour
+    const lead = [draft.from, end].map((e) => { const p = doc.parts.find((x) => x.id === e.part); const pn = p && L.resolved(doc, p).pins.find((q) => String(q.id) === String(e.pin)); return pn && pn.c && L.colourById(doc, pn.c) ? pn : null; }).find(Boolean);
+    if (lead) { w.colour = lead.c; if (lead.tr && L.colourById(doc, lead.tr)) w.tracer = lead.tr; else delete w.tracer; }
     draft = null;
     svg.classList.remove('wiring');
     select([], [w.id]);
@@ -838,7 +841,7 @@
 
   /* ---------------- Library pane ---------------- */
   function iconSVG(type) {
-    const d = defOf(type);
+    const d = userLib.parts.find((p) => p.id === type) || defOf(type);
     if (!d) return '';
     const fake = { customParts: d.custom ? [d] : [] };
     const r = L.resolved(fake, { type, props: {} });
@@ -900,7 +903,7 @@
     const db = e.target.closest('[data-del-block]');
     if (db) { e.stopPropagation(); const b = userLib.blocks.find((x) => x.id === db.dataset.delBlock); userLib.blocks = userLib.blocks.filter((x) => x !== b); PF.saveUserLibrary(userLib); buildLibrary(); toast(`${t('Deleted')} ${b.name}`, { label: t('Undo'), run: () => { userLib.blocks.push(b); PF.saveUserLibrary(userLib); buildLibrary(); } }); return; }
     const ed = e.target.closest('[data-edit]');
-    if (ed) { e.stopPropagation(); window.LoomBuilder.open(defOf(ed.dataset.edit)); return; }
+    if (ed) { e.stopPropagation(); window.LoomBuilder.open(userLib.parts.find((p) => p.id === ed.dataset.edit) || defOf(ed.dataset.edit)); return; }
     const bl = e.target.closest('[data-block]');
     if (bl) { const b = blockById(bl.dataset.block); if (b) insertBlock(b, 0, centreWorld()); return; }
     const it = e.target.closest('.lib-item');
@@ -2417,7 +2420,16 @@
       (data.colours || []).forEach((c) => { if (!userLib.colours.some((x) => x.id === c.id)) userLib.colours.push({ ...c, custom: true }); });
       userLib.blocks = userLib.blocks || [];
       (data.blocks || []).forEach((b) => { if (b && b.id && Array.isArray(b.parts)) { const i = userLib.blocks.findIndex((x) => x.id === b.id); if (i >= 0) userLib.blocks[i] = b; else userLib.blocks.push(b); nb++; } });
-      await PF.saveUserLibrary(userLib); buildLibrary();
+      await PF.saveUserLibrary(userLib);
+      // the open project keeps its own copy of each component it uses: bring those up to date too,
+      // so boxes already on the sheet change to the imported design (wires on renamed pins follow)
+      const inUse = parts.filter((p) => project.customParts.some((c) => c.id === p.id));
+      if (inUse.length) {
+        pushHistory();
+        inUse.forEach((p) => { L.updateCustomPart(project, p); });
+        commit();
+      }
+      buildLibrary();
       toast(`${t('Imported')} ${plural(n, t('component'))}${nb ? ', ' + plural(nb, t('block')) : ''}`);
     } catch (e) { showMessage(t('Could not import'), `<p>${esc(e.message)}</p>`); }
   }
@@ -2433,8 +2445,10 @@
      window theme. Only the screen changes: exports, prints and PDFs stay black on white. */
   const WORK = 'loomwright.workarea';
   function isWorkDark() { return document.documentElement.classList.contains('work-dark'); }
-  function setWorkDark(on) { document.documentElement.classList.toggle('work-dark', on); try { localStorage.setItem(WORK, on ? 'dark' : 'light'); } catch (e) { /* ignore */ } }
+  function setWorkDark(on) { document.documentElement.classList.toggle('work-dark', on); showWorkDark(); try { localStorage.setItem(WORK, on ? 'dark' : 'light'); } catch (e) { /* ignore */ } }
+  function showWorkDark() { const b = document.querySelector('#titlebar [data-cmd="workdark"]'); if (b) { b.setAttribute('aria-pressed', String(isWorkDark())); b.classList.toggle('on', isWorkDark()); } }
   try { if (localStorage.getItem(WORK) === 'dark') document.documentElement.classList.add('work-dark'); } catch (e) { /* ignore */ }
+  showWorkDark();
 
   /* ---------------- Views: formboard and vehicle ---------------- */
   function harnessesInUse() { return [...new Set(project.harnesses.concat(project.sheets.flatMap((s) => s.wires.map((w) => w.harness))).filter(Boolean))]; }
@@ -2706,7 +2720,12 @@
     },
     async deleteComponent(id) {
       userLib.parts = userLib.parts.filter((p) => p.id !== id);
-      await PF.saveUserLibrary(userLib); buildLibrary();
+      await PF.saveUserLibrary(userLib);
+      // the open project's own copy goes too, unless a part on one of its sheets still uses it
+      const used = project.sheets.some((sh) => sh.parts.some((p) => p.type === id));
+      if (!used) { const i = project.customParts.findIndex((c) => c.id === id); if (i >= 0) { pushHistory(); project.customParts.splice(i, 1); commit(); } }
+      else setTimeout(() => toast(t('Removed from your library. This project still uses it, so it stays listed here until those parts are deleted.')), 2700);
+      buildLibrary();
     },
     place(type) { addPartAt(type); },
     toast, t, esc,

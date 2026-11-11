@@ -14,7 +14,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '0.4.1';
+  const VERSION = '0.4.2';
   const FORMAT = 'loomwright';
   const GRID = 10;
   const INK = '#1d2320';
@@ -41,6 +41,8 @@
     const stroke = s.stroke ? fillOf(s.stroke, ink) : ink;
     const dash = s.dash ? ` stroke-dasharray="${s.dash}"` : '';
     const st = `stroke="${sw ? stroke : 'none'}" stroke-width="${sw}"${dash}`;
+    // a line drawn as a wire (s.wire): the colour over a dark edge, like wires on the sheet
+    if (s.wire && (s.t === 'line' || s.t === 'path') && !s._core) return shapeSVG({ ...s, stroke: '#262b28', w: sw + 1.4, _core: true, dash: undefined }, props, ink).replace(/^<(line|path) /, '<$1 data-edge="1" ') + shapeSVG({ ...s, _core: true }, props, ink);
     switch (s.t) {
       case 'line':
         return `<line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" ${st} stroke-linecap="round"/>`;

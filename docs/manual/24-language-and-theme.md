@@ -31,7 +31,7 @@ The drawing sheet stays white in both themes, so wire colours look the same as t
 
 ## Dark work area
 
-The work area has its own setting, separate from the window theme. Choose **View › Dark work area** to draw on a dark sheet, with either window theme. The component builder's drawing follows the same setting. LoomWright remembers your choice.
+The work area has its own setting, separate from the window theme. Click the sheet button next to the moon button at the right-hand end of the title bar, or choose **View › Dark work area**, to draw on a dark sheet with either window theme. The button is highlighted while the work area is dark. The component builder's drawing follows the same setting. LoomWright remembers your choice.
 
 - Symbols, text and the grid turn light on the dark sheet.
 - Wire colours are not changed. Each wire's thin dark edge turns light instead, so black wires still show.
