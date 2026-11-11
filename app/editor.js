@@ -841,7 +841,7 @@
 
   /* ---------------- Library pane ---------------- */
   function iconSVG(type) {
-    const d = defOf(type);
+    const d = userLib.parts.find((p) => p.id === type) || defOf(type);
     if (!d) return '';
     const fake = { customParts: d.custom ? [d] : [] };
     const r = L.resolved(fake, { type, props: {} });
@@ -903,7 +903,7 @@
     const db = e.target.closest('[data-del-block]');
     if (db) { e.stopPropagation(); const b = userLib.blocks.find((x) => x.id === db.dataset.delBlock); userLib.blocks = userLib.blocks.filter((x) => x !== b); PF.saveUserLibrary(userLib); buildLibrary(); toast(`${t('Deleted')} ${b.name}`, { label: t('Undo'), run: () => { userLib.blocks.push(b); PF.saveUserLibrary(userLib); buildLibrary(); } }); return; }
     const ed = e.target.closest('[data-edit]');
-    if (ed) { e.stopPropagation(); window.LoomBuilder.open(defOf(ed.dataset.edit)); return; }
+    if (ed) { e.stopPropagation(); window.LoomBuilder.open(userLib.parts.find((p) => p.id === ed.dataset.edit) || defOf(ed.dataset.edit)); return; }
     const bl = e.target.closest('[data-block]');
     if (bl) { const b = blockById(bl.dataset.block); if (b) insertBlock(b, 0, centreWorld()); return; }
     const it = e.target.closest('.lib-item');
@@ -2420,7 +2420,16 @@
       (data.colours || []).forEach((c) => { if (!userLib.colours.some((x) => x.id === c.id)) userLib.colours.push({ ...c, custom: true }); });
       userLib.blocks = userLib.blocks || [];
       (data.blocks || []).forEach((b) => { if (b && b.id && Array.isArray(b.parts)) { const i = userLib.blocks.findIndex((x) => x.id === b.id); if (i >= 0) userLib.blocks[i] = b; else userLib.blocks.push(b); nb++; } });
-      await PF.saveUserLibrary(userLib); buildLibrary();
+      await PF.saveUserLibrary(userLib);
+      // the open project keeps its own copy of each component it uses: bring those up to date too,
+      // so boxes already on the sheet change to the imported design (wires on renamed pins follow)
+      const inUse = parts.filter((p) => project.customParts.some((c) => c.id === p.id));
+      if (inUse.length) {
+        pushHistory();
+        inUse.forEach((p) => { L.updateCustomPart(project, p); });
+        commit();
+      }
+      buildLibrary();
       toast(`${t('Imported')} ${plural(n, t('component'))}${nb ? ', ' + plural(nb, t('block')) : ''}`);
     } catch (e) { showMessage(t('Could not import'), `<p>${esc(e.message)}</p>`); }
   }
@@ -2711,7 +2720,12 @@
     },
     async deleteComponent(id) {
       userLib.parts = userLib.parts.filter((p) => p.id !== id);
-      await PF.saveUserLibrary(userLib); buildLibrary();
+      await PF.saveUserLibrary(userLib);
+      // the open project's own copy goes too, unless a part on one of its sheets still uses it
+      const used = project.sheets.some((sh) => sh.parts.some((p) => p.type === id));
+      if (!used) { const i = project.customParts.findIndex((c) => c.id === id); if (i >= 0) { pushHistory(); project.customParts.splice(i, 1); commit(); } }
+      else setTimeout(() => toast(t('Removed from your library. This project still uses it, so it stays listed here until those parts are deleted.')), 2700);
+      buildLibrary();
     },
     place(type) { addPartAt(type); },
     toast, t, esc,
