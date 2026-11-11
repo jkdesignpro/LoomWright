@@ -8,6 +8,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Free, open-source wiring diagram editor for vehicles and electronics.">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="manual.css">
 <link rel="icon" href="icon.png">
 </head>
 <body>
@@ -68,7 +69,7 @@
     <div class="sep"></div>
     <button class="rb" data-cmd="tables" title="Lists and reports"><svg class="i"><use href="#i-table"/></svg><span data-t>Lists</span></button>
     <button class="rb" data-cmd="print-pack" title="Build pack (PDF)…"><svg class="i"><use href="#i-pack"/></svg><span data-t>Pack</span></button>
-    <button class="rb" data-cmd="print" id="rb-print" title="Print or save PDF (all sheets)"><svg class="i"><use href="#i-pdf"/></svg><span>PDF</span></button>
+    <button class="rb" data-cmd="export-pdf" id="rb-print" title="Export PDF with bookmarks and links"><svg class="i"><use href="#i-pdf"/></svg><span>PDF</span></button>
     <div class="grow"></div>
     <button class="rb" data-cmd="claude" title="Use with Claude…"><svg class="i"><use href="#i-claude"/></svg><span>Claude</span></button>
   </nav>
@@ -120,7 +121,14 @@
         <button role="tab" class="tab" data-tab="fuses"><span data-t>Fuses & loads</span></button>
         <button role="tab" class="tab" data-tab="connectors"><span data-t>Connectors</span></button>
         <button role="tab" class="tab" data-tab="cut"><span data-t>Cut list</span></button>
+        <button role="tab" class="tab" data-tab="build"><span data-t>Build</span></button>
+        <button role="tab" class="tab" data-tab="shop"><span data-t>Shopping</span></button>
         <button role="tab" class="tab" data-tab="nets"><span data-t>Circuits</span></button>
+        <button role="tab" class="tab" data-tab="schedule" hidden><span data-t>Circuit schedule</span></button>
+        <button role="tab" class="tab" data-tab="motors" hidden><span data-t>Motors</span></button>
+        <button role="tab" class="tab" data-tab="terminals" hidden><span data-t>Terminal plan</span></button>
+        <button role="tab" class="tab" data-tab="plcio" hidden><span data-t>PLC I/O</span></button>
+        <button role="tab" class="tab" data-tab="power" hidden><span data-t>Power rails</span></button>
         <button role="tab" class="tab" data-tab="checks"><span data-t>Checks</span> <span class="count" id="c-checks"></span></button>
         <div class="grow"></div>
         <div class="tabs-end">
@@ -171,11 +179,22 @@
 <script src="core/loom-nets.js"></script>
 <script src="core/loom-reports.js"></script>
 <script src="core/loom-io.js"></script>
+<script src="core/loom-circuit.js"></script>
+<script src="core/loom-plan.js"></script>
+<script src="core/loom-templates.js"></script>
+<script src="core/loom-route.js"></script>
+<script src="core/loom-pdf.js"></script>
+<script src="core/loom-mains.js"></script>
+<script src="core/loom-air.js"></script>
+<script src="core/loom-electronics.js"></script>
 <script src="i18n.js"></script>
 <script src="sample.js"></script>
 <script src="platform.js"></script>
 <script src="editor.js"></script>
 <script src="builder.js"></script>
 <script src="views.js"></script>
+<script src="air-view.js"></script>
+<script src="manual.js"></script>
+<script src="manual-viewer.js"></script>
 </body>
 </html>

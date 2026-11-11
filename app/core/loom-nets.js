@@ -3,7 +3,7 @@
  * fuse and relay schedule with load budget, and project-level design checks.
  * Extends window.Loom; needs loom-core.js and loom-data.js first.
  *
- * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+ * Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) { require('./loom-data.js'); module.exports = factory(require('./loom-core.js')); }
@@ -30,34 +30,45 @@
   }
 
   /* Union-find over pins. opts: switches ('open' | 'closed' | state map), protect (true = fuses conduct),
-     relays ('open' | 'closed' | Set of energised part keys). */
+     relays ('open' | 'closed' | Set of energised part keys), pdm (Set of live power module outputs),
+     edges (true = also list every join, for following a circuit step by step). */
   function build(project, opts = {}) {
-    const uf = new UF(), inv = inventory(project), byLabel = new Map();
+    const uf = new UF(), inv = inventory(project), byLabel = new Map(), edges = opts.edges ? [] : null;
+    const join = (a, b, e) => { uf.union(a, b); if (edges) edges.push({ a, b, ...e }); };
     const state = (it) => (opts.state && opts.state[partKey(it.p)] != null ? opts.state[partKey(it.p)] : it.b.def || 0);
     inv.forEach((it) => {
-      const { sheet, p, b } = it, k = (pin) => key(sheet, p.id, pin);
+      const { sheet, p, b } = it, k = (pin) => key(sheet, p.id, pin), at = { it };
       const r = Loom.resolved(it.v, p);
       r.pins.forEach((pn) => uf.find(k(pn.id)));
-      b.links.forEach(([a, c]) => uf.union(k(a), k(c)));
-      if (b.kind === 'earth') r.pins.forEach((pn) => uf.union(k(pn.id), EARTH));
-      if (p.type === 'net_label' && p.props.text) uf.union(k('L'), 'NET:' + String(p.props.text).trim().toUpperCase());
-      if (p.type === 'offpage' && p.props.link) uf.union(k('L'), 'NET:' + String(p.props.link).trim().toUpperCase());
+      b.links.forEach(([a, c]) => join(k(a), k(c), { kind: 'link', ...at }));
+      if (b.kind === 'earth') r.pins.forEach((pn) => join(k(pn.id), EARTH, { kind: 'earth', ...at }));
+      if (b.earthPins) b.earthPins.forEach((pn) => join(k(pn), EARTH, { kind: 'earth', ...at }));
+      // b.zero: pins that are a supply's own 0 V reference, such as the − of a bench or USB supply
+      if (b.zero) b.zero.forEach((pin) => join(k(pin), EARTH, { kind: 'earth', ...at }));
+      if (p.type === 'net_label' && p.props.text) join(k('L'), 'NET:' + String(p.props.text).trim().toUpperCase(), { kind: 'net', ...at });
+      if (p.type === 'offpage' && p.props.link) join(k('L'), 'NET:' + String(p.props.link).trim().toUpperCase(), { kind: 'net', ...at });
       if (b.kind === 'protect' && opts.protect !== false) {
-        const s = state(it); (b.switched ? b.switched(opts.blown && opts.blown.has(partKey(p)) ? 1 : s === 1 && b.states ? 1 : 0) : []).forEach(([a, c]) => uf.union(k(a), k(c)));
+        const s = state(it); (b.switched ? b.switched(opts.blown && opts.blown.has(partKey(p)) ? 1 : s === 1 && b.states ? 1 : 0) : []).forEach(([a, c]) => join(k(a), k(c), { kind: 'fuse', ...at }));
+      }
+      if (b.kind === 'pdm' && opts.protect !== false) {
+        b.outputs.forEach((o) => { if (opts.relays === 'closed' || (opts.pdm instanceof Set && opts.pdm.has(partKey(p) + '#' + o.pin))) join(k(b.input), k(o.pin), { kind: 'pdm', ...at }); });
       }
       if (b.kind === 'switch') {
-        const pairs = opts.switches === 'closed' ? (b.states || ['', '']).flatMap((_, i) => (b.switched ? b.switched(i) : [])) : opts.switches === 'open' ? [] : (b.switched ? b.switched(state(it)) : []);
-        pairs.forEach(([a, c]) => uf.union(k(a), k(c)));
-        if (b.earthWhen && (opts.switches === 'closed' || (opts.switches !== 'open' && b.earthWhen(state(it))))) uf.union(k('1'), EARTH);
+        // a contact drawn apart from its coil (b.follows) takes the coil's state
+        const st = b.follows && opts.relays instanceof Set ? (coilOn(opts.relays, b.follows) ? 1 : 0) : state(it);
+        const pairs = opts.switches === 'closed' ? (b.states || ['', '']).flatMap((_, i) => (b.switched ? b.switched(i) : [])) : opts.switches === 'open' ? [] : (b.switched ? b.switched(st) : []);
+        pairs.forEach(([a, c]) => join(k(a), k(c), { kind: 'switch', ...at }));
+        if (b.earthWhen && (opts.switches === 'closed' || (opts.switches !== 'open' && b.earthWhen(state(it))))) join(k('1'), EARTH, { kind: 'switch', ...at });
       }
       if (b.kind === 'relay') {
         const on = opts.relays === 'closed' ? null : opts.relays instanceof Set ? opts.relays.has(partKey(p)) : false;
         const pairs = on == null ? [...b.contacts(true), ...b.contacts(false)] : b.contacts(on);
-        pairs.forEach(([a, c]) => uf.union(k(a), k(c)));
+        pairs.forEach(([a, c]) => join(k(a), k(c), { kind: 'relay', ...at }));
       }
-      if (p.label && !(Loom.partDef(it.v, p.type) || {}).noLabel) {
+      const pd = Loom.partDef(it.v, p.type) || {};
+      if (p.label && !pd.noLabel && !(pd.xrefGroup && !pd.coil)) {
         const lk = p.type + '|' + p.label;
-        if (byLabel.has(lk)) { const o = byLabel.get(lk); r.pins.forEach((pn) => uf.union(k(pn.id), key(o.sheet, o.p.id, pn.id))); } else byLabel.set(lk, it);
+        if (byLabel.has(lk)) { const o = byLabel.get(lk); r.pins.forEach((pn) => join(k(pn.id), key(o.sheet, o.p.id, pn.id), { kind: 'same', ...at, other: o })); } else byLabel.set(lk, it);
       }
     });
     // mated connectors: cavity n of one joins cavity n of the other
@@ -65,10 +76,10 @@
       if (it.p.type !== 'conn' || !it.p.props.mate) return;
       const m = inv.find((o) => o.p.type === 'conn' && o.p.label && o.p.label.toLowerCase() === String(it.p.props.mate).trim().toLowerCase());
       if (!m) return;
-      Loom.resolved(it.v, it.p).pins.forEach((pn) => uf.union(key(it.sheet, it.p.id, pn.id), key(m.sheet, m.p.id, pn.id)));
+      Loom.resolved(it.v, it.p).pins.forEach((pn) => join(key(it.sheet, it.p.id, pn.id), key(m.sheet, m.p.id, pn.id), { kind: 'mate', it, other: m }));
     });
-    Loom.views(project).forEach((v) => v.wires.forEach((w) => uf.union(key(v.sheet, w.from.part, w.from.pin), key(v.sheet, w.to.part, w.to.pin))));
-    return { uf, inv, k: key };
+    Loom.views(project).forEach((v) => v.wires.forEach((w) => join(key(v.sheet, w.from.part, w.from.pin), key(v.sheet, w.to.part, w.to.pin), { kind: 'wire', wire: w, v })));
+    return { uf, inv, k: key, edges };
   }
 
   /* The nets of a project: every pin and wire grouped by electrical connection. */
@@ -100,16 +111,28 @@
   }
 
   /* ---------------- Live circuit test ---------------- */
-  function simulate(d, state = {}) {
+  /* opts.relays: the relays pulled in before this change. Starting from them lets a
+     hold-in (self-latching) contact keep its coil on after the start button is released. */
+  /* Is the coil a contact follows pulled in? follows is 'coil|K1' (any relay or contactor
+     with reference K1) or a part key such as 'contactor|K1'. */
+  function coilOn(relays, follows) {
+    if (!relays || !follows) return false;
+    if (relays.has(follows)) return true;
+    if (!follows.startsWith('coil|')) return false;
+    const ref = follows.slice(5);
+    return [...relays].some((k) => k.slice(k.indexOf('|') + 1) === ref);
+  }
+  function simulate(d, state = {}, opts = {}) {
     const project = projectOf(d);
-    let relays = new Set(), result = null;
-    for (let iter = 0; iter < 10; iter++) {
-      const { uf, inv } = build(project, { state, relays, switches: 'state' });
+    let relays = opts.relays instanceof Set ? new Set(opts.relays) : new Set(), pdm = new Set(), result = null;
+    for (let iter = 0; iter < 12; iter++) {
+      const { uf, inv } = build(project, { state, relays, pdm, switches: 'state' });
       const earth = uf.find(EARTH), powered = new Set();
       const rootOf = (it, pin) => uf.find(key(it.sheet, it.p.id, pin));
       inv.forEach((it) => {
         const b = it.b, s = state[partKey(it.p)] != null ? state[partKey(it.p)] : b.def || 0;
         if (b.kind === 'source' && (!b.sourceWhen || b.sourceWhen(s))) powered.add(rootOf(it, b.source));
+        if (b.liveFeed) powered.add(rootOf(it, b.liveFeed));
       });
       // diodes and converters pass power on; repeat until nothing changes
       for (let k = 0; k < 20; k++) {
@@ -127,12 +150,24 @@
       const next = new Set();
       inv.forEach((it) => {
         if (it.b.kind !== 'relay') return;
+        if (it.b.runInput) { const r = rootOf(it, it.b.runInput); if (powered.has(r) && r !== earth) next.add(partKey(it.p)); return; }
         const a = rootOf(it, it.b.coil[0]), c = rootOf(it, it.b.coil[1]);
+        if (it.b.needsJoined && !it.b.needsJoined.every(([x, y]) => rootOf(it, x) === rootOf(it, y))) return;
         if ((powered.has(a) && c === earth) || (powered.has(c) && a === earth)) next.add(partKey(it.p));
       });
-      result = { uf, inv, earth, powered, relays: next };
-      if ([...next].sort().join() === [...relays].sort().join()) break;
-      relays = next;
+      // electronic power modules: an output is on when its control input is
+      const nextPdm = new Set();
+      inv.forEach((it) => {
+        if (it.b.kind !== 'pdm' || !powered.has(rootOf(it, it.b.input))) return;
+        it.b.outputs.forEach((o) => {
+          let on = o.control === 'ALWAYS';
+          if (!on && it.b.inputs.includes(o.control)) { const r = rootOf(it, o.control); on = o.active === 'low' ? r === earth : powered.has(r) && r !== earth; }
+          if (on) nextPdm.add(partKey(it.p) + '#' + o.pin);
+        });
+      });
+      result = { uf, inv, earth, powered, relays: next, pdm: nextPdm };
+      if ([...next].sort().join() === [...relays].sort().join() && [...nextPdm].sort().join() === [...pdm].sort().join()) break;
+      relays = next; pdm = nextPdm;
     }
     const { uf, inv, earth, powered } = result;
     const live = (r) => powered.has(r) && r !== earth;
@@ -143,17 +178,18 @@
       const on = (pw, ea) => pw.some((x) => live(R(x))) && ea.some((x) => R(x) === earth);
       if (b.kind === 'load' && (on(b.power, b.earth) || (b.either && on(b.earth, b.power)))) loads.add(it.p.id);
       if (b.lamp && (on([b.lamp[0]], [b.lamp[1]]) || on([b.lamp[1]], [b.lamp[0]]))) loads.add(it.p.id);
+      if (b.lineLoad && (b.lineLoadAll ? b.lineLoad.every((x) => live(R(x))) : b.lineLoad.some((x) => live(R(x))))) loads.add(it.p.id);
       if (b.kind === 'relay' && result.relays.has(partKey(it.p))) loads.add(it.p.id);
       if (b.kind === 'source' && powered.has(earth) && R(b.source) === earth) shorts.push(it.p.label || it.p.type);
     });
     if (powered.has(earth) && !shorts.length) shorts.push('a supply');
-    return { wires, loads, relays: result.relays, shorts, state };
+    return { wires, loads, relays: result.relays, pdm: result.pdm, shorts, state };
   }
   /* The states a part can be switched between in the live test, or null. */
   function partStates(d, p) {
     const v = d.sheet ? d : Loom.view(projectOf(d), 0);
     const b = Loom.behaviour(v, p);
-    return b.states ? { states: b.states, def: b.def || 0, key: partKey(p) } : null;
+    return b.states ? { states: b.states, def: b.def || 0, key: partKey(p), ...(b.follows ? { follows: b.follows } : {}) } : null;
   }
 
   /* ---------------- Fuse and relay schedule, load budget ---------------- */
@@ -165,10 +201,12 @@
     inv.forEach((it) => {
       const b = it.b;
       const pins = b.kind === 'load' ? (b.either ? [...b.power, ...b.earth] : b.power) : b.kind === 'relay' ? [b.coil[0]] : b.kind === 'converter' ? [b.input] : b.lamp ? [b.lamp[0]] : [];
-      const amps = b.kind === 'converter' ? (parseFloat(Loom.resolved(it.v, it.p).props.amps) || 0) * 1.1 : b.kind === 'relay' ? 0.2 : Loom.partCurrent(it.v, it.p);
+      // a converter with a set output voltage (b.vout) draws its output power from the supply at about 85% efficiency
+      const conv = b.kind === 'converter' ? (parseFloat(Loom.resolved(it.v, it.p).props.amps) || 0) * (b.vout > 0 ? b.vout / (volts * 0.85) : 1.1) : 0;
+      const amps = b.kind === 'converter' ? +conv.toFixed(2) : b.kind === 'relay' ? 0.2 : Loom.partCurrent(it.v, it.p);
       const roots = new Set(pins.map((x) => R(it, x)));
       roots.forEach((r) => { if (!loadsIn.has(r)) loadsIn.set(r, []); loadsIn.get(r).push({ it, amps }); });
-      if (b.kind === 'protect') outputs(it).forEach((o) => { const r = R(it, o.inPin); if (!protIn.has(r)) protIn.set(r, []); protIn.get(r).push(o); });
+      if (b.kind === 'protect' || b.kind === 'pdm') outputs(it).forEach((o) => { const r = R(it, o.inPin); if (!protIn.has(r)) protIn.set(r, []); protIn.get(r).push(o); });
     });
     const seenLoads = (root, seen = new Set(), acc = new Map()) => {
       if (seen.has(root)) return acc; seen.add(root);
@@ -180,6 +218,7 @@
     function outputs(it) {
       const r = Loom.resolved(it.v, it.p), ratings = String(r.props.ratings || '').split(',').map(Loom.parseAmps);
       if (it.p.type === 'fuse_box') return r.pins.filter((x) => x.id !== 'IN').map((x, i) => ({ way: x.id, rating: ratings[i] || null, root: R(it, x.id), pin: x.id, inPin: 'IN' }));
+      if (it.b.kind === 'pdm') return it.b.outputs.map((o) => ({ way: o.pin, rating: o.rating, root: R(it, o.pin), pin: o.pin, inPin: it.b.input }));
       if (it.p.type === 'fuse_box_lucas') return [0, 1, 2, 3].map((i) => ({ way: String(i + 1), rating: ratings[i] || null, root: R(it, String(i * 2 + 2)), pin: String(i * 2 + 2), inPin: String(i * 2 + 1) }));
       return [{ way: '', rating: Loom.parseAmps(r.props.rating), root: R(it, '2'), pin: '2', inPin: '1' }];
     }
@@ -187,13 +226,13 @@
     // a part drawn on more than one sheet (same reference) is listed once
     const once = () => { const seen = new Set(); return (it) => { const k = it.p.label ? partKey(it.p) : it.p.id + it.sheet.id; if (seen.has(k)) return false; seen.add(k); return true; }; };
     const fuses = [];
-    inv.filter((it) => it.b.kind === 'protect').filter(once()).forEach((it) => outputs(it).forEach((o) => {
+    inv.filter((it) => it.b.kind === 'protect' || it.b.kind === 'pdm').filter(once()).forEach((it) => outputs(it).forEach((o) => {
       const loads = [...seenLoads(o.root).values()], ws = wiresAt(o.root);
       const fromLoads = loads.reduce((a, x) => a + x.amps, 0), fromWires = Math.max(0, ...ws.map((x) => parseFloat(x.w.current) || 0));
       const load = Math.max(fromLoads, fromWires);
       const g = ws.map((x) => parseFloat(x.w.gauge)).filter((x) => x > 0);
       fuses.push({
-        sheet: it.sheet.name, sheetId: it.sheet.id, part: it.p.id, ref: it.p.label + (o.way ? ' way ' + o.way : ''), type: (Loom.partDef(it.v, it.p.type) || {}).name,
+        sheet: it.sheet.name, sheetId: it.sheet.id, part: it.p.id, ref: it.p.label + (o.way ? (it.b.kind === 'pdm' ? ' ' : ' way ') + o.way : ''), type: (Loom.partDef(it.v, it.p.type) || {}).name,
         rating: o.rating, load: +load.toFixed(2), pct: o.rating ? Math.round((load / o.rating) * 100) : null,
         circuits: [...new Set(ws.map((x) => x.w.circuit).filter(Boolean))], wires: ws.map((x) => x.w.name), smallest: g.length ? Math.min(...g) : null,
         loads: loads.map((x) => ({ ref: x.it.p.label || x.it.p.type, amps: +x.amps.toFixed(2) })),
@@ -217,7 +256,7 @@
       if (!root || !firstSupply(it)) return;
       const acc = seenLoads(root), loads = [...acc.values()].filter((x) => x.it.p.id !== it.p.id);
       const load = loads.reduce((a, x) => a + x.amps, 0);
-      supplies.push({ sheet: it.sheet.name, sheetId: it.sheet.id, part: it.p.id, ref: it.p.label, type: (Loom.partDef(it.v, it.p.type) || {}).name, capacity: pr.ah || '', rating, load: +load.toFixed(2), pct: rating ? Math.round((load / rating) * 100) : null, loads: loads.map((x) => ({ ref: x.it.p.label || x.it.p.type, amps: +x.amps.toFixed(2) })), hours: pr.ah && load ? +(parseFloat(pr.ah) * 0.5 / load).toFixed(1) : null });
+      supplies.push({ sheet: it.sheet.name, sheetId: it.sheet.id, part: it.p.id, ref: it.p.label, type: (Loom.partDef(it.v, it.p.type) || {}).name, capacity: pr.ah ? String(parseFloat(pr.ah) || pr.ah) : '', rating, load: +load.toFixed(2), pct: rating ? Math.round((load / rating) * 100) : null, loads: loads.map((x) => ({ ref: x.it.p.label || x.it.p.type, amps: +x.amps.toFixed(2) })), hours: pr.ah && load ? +(parseFloat(pr.ah) * 0.5 / load).toFixed(1) : null });
     });
     return { fuses, relays, supplies, volts };
   }
@@ -231,7 +270,7 @@
     const seen = new Map();
     views.forEach((v) => v.parts.forEach((p) => {
       const def = Loom.partDef(v, p.type) || {};
-      if (!p.label || def.noLabel || def.cat === 'Annotation') return;
+      if (!p.label || def.noLabel || def.cat === 'Annotation' || (def.xrefGroup && !def.coil)) return;
       const k = p.label.toUpperCase();
       if (!seen.has(k)) seen.set(k, []);
       seen.get(k).push({ v, p });
@@ -249,7 +288,8 @@
     st.inv.forEach((it) => { if (it.b.kind === 'source' && it.p.type !== 'alternator' && st.uf.find(key(it.sheet, it.p.id, it.b.source)) === earth) out.push({ level: 'error', part: it.p.id, sheetId: it.sheet.id, text: `${where(it.sheet)}${it.p.label} ${it.b.source} is connected straight to earth. That is a short circuit.` }); });
     // unfused feeds
     const uf = build(project, { switches: 'closed', relays: 'closed', protect: false });
-    uf.inv.filter((it) => it.b.kind === 'source').forEach((src) => {
+    // a current-limited supply (b.limited, such as a USB or bench supply) needs no fuse straight after it
+    uf.inv.filter((it) => it.b.kind === 'source' && !it.b.limited).forEach((src) => {
       const r = uf.uf.find(key(src.sheet, src.p.id, src.b.source));
       const hits = new Set();
       uf.inv.forEach((it) => {
@@ -304,6 +344,6 @@
     return d && d.sheet ? base.concat(extra.filter((c) => !c.sheetId || c.sheetId === d.sheet.id)) : base.concat(extra);
   };
 
-  Object.assign(Loom, { nets, netOf, simulate, partStates, partKey, schedule, projectChecks, EARTH });
+  Object.assign(Loom, { nets, netOf, simulate, coilOn, partStates, partKey, schedule, projectChecks, EARTH, buildNet: build });
   return Loom;
 });

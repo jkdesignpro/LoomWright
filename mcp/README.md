@@ -89,7 +89,7 @@ one). You can fine-tune it afterwards in the app's component builder.
 | `add_part`, `add_wire`, `update_part`, `update_wire`, `remove` | Edit a diagram |
 | `define_component` | Make a custom component, including one traced from a picture, and save it to your library |
 | `auto_layout` | Tidy the layout |
-| `check_diagram` | Fuse vs cable size, current vs cable size, voltage drop, unconnected pins |
+| `check_diagram` | Fuse vs cable size, current vs cable size, voltage drop, unconnected pins; for household and factory projects, guidance checks from selected BS 7671 and BS EN 60204-1 rules |
 | `wire_list` | Wire list, parts list and cable totals |
 | `export_svg` | Export an SVG with title block and colour key |
 | `list_connector_series`, `define_cable` | Connector series, terminals, insulation and sleeving; multicore and screened cables |
@@ -97,10 +97,20 @@ one). You can fine-tune it afterwards in the app's component builder.
 | `trace_circuit` | Follow a wire or pin through every sheet, off-page link and mated connector |
 | `test_circuit` | Live test: switch parts on or off, blow a fuse, and see what runs (connections only, not voltages) |
 | `load_budget` | Fuse and relay schedule, load on each fuse, relay and supply |
-| `report` | Build lists as CSV: wires, parts and costs, cable to buy, colour usage, fuses, connector tables, cut list, labels, locations, nets |
+| `solve_circuit` | Estimated volts at each running load and amps in each fuse, from wire sizes and lengths (a guide, not a measurement) |
+| `fault_find` | A step-by-step meter test sheet for a load that does not work, will not switch off, blows its fuse or runs weak |
+| `suggest_colours` | Ranked colour suggestions for a wire, from the colour standard, the circuit, your stock and the harness |
+| `stock`, `shopping_list` | Your cable and parts stock, and what a project needs to buy |
+| `build_progress` | Tick wires off as cut, ends done, fitted and tested |
+| `add_starter_circuit`, `tidy_wires` | Drop in a ready-drawn circuit (spot lamps, split charge, consumer unit, motor starter and more); re-route wires with square corners |
+| `number_wires_by_potential` | Control panel style wire numbers: one number per potential |
+| `compressed_air_report` | Work out a compressed air system: demand, pipe sizes and losses, pressure at each tool, receiver, running and leak cost, water, checks |
+| `set_compressed_air_system` | Add or change a compressed air system, from JSON or a worked example |
+| `list_compressed_air_parts` | Compressor kinds, air treatment, pipe sizes, hoses, couplings and typical tool air use |
+| `report` | Build lists as CSV: wires, parts and costs, cable to buy, colour usage, fuses, connector tables, cut list, labels, locations, nets, voltage at each load, household circuit schedule, motors, terminal plan, PLC I/O |
 | `harness_formboard` | A harness's branches, lengths and bundle sizes; copy routed lengths to the wires |
-| `project_settings` | Title block, voltage, colour standard, paper size per project or sheet, black and white, revision clouds, currency |
-| `export`, `import` | DXF, WireViz, a read-only web page, the build pack and formboard DXF; import CSV wire lists, WireViz, KiCad netlists and measured lengths |
+| `project_settings` | Project type (vehicle, household, factory, electronics, mixed), mains settings, title block, voltage, colour standard, paper size per project or sheet, black and white, revision clouds, currency |
+| `export`, `import` | PDF with bookmarks and links, DXF, WireViz, a read-only web page, the build pack and formboard DXF; import CSV wire lists, WireViz, KiCad netlists and measured lengths |
 
 `update_part` also sets a part's part number, supplier, cost and fitted location. `update_wire` also sets
 insulation, the cable it runs in, and how each end is finished (terminal, crimp or solder, strip length,

@@ -1,5 +1,89 @@
 # Changelog
 
+## 0.4.0
+
+**Licence.** From this release LoomWright is under the GNU Affero General Public License, version 3
+or later (AGPL-3.0-or-later). It stays free to use, change and share. The difference from the GPL is
+that a changed version offered to people over a network must offer them its source code too.
+
+LoomWright is still mainly for vehicle looms, and now also covers household wiring, factory control
+panels, electronics projects and compressed air. Every mains and compressed air check is planning
+guidance only: see the disclaimer.
+
+**Volts and amps**
+- A circuit solver works out the voltage, current and drop at every load, wire and fuse, with battery,
+  alternator, solar and DC-DC charger models, diodes and contact resistances.
+- The live test shows volts and amps at each running load, fuse currents and supplies.
+- Fault finding: a step-by-step test sheet for a load that does not work, will not switch off, keeps
+  blowing its fuse, or is dim or slow, with the readings to expect.
+- Power distribution modules (PDM) and CAN terminators; CAN bus checks for swapped H/L, terminators,
+  twisted pair and long stubs.
+
+**Colours, stock and the build**
+- Colour helper: suggested colours for a wire from its circuit, the standard's feed and earth
+  conventions, clashes in the same harness, and the cable you stock.
+- My stock (cable and parts, shared by all projects), a Shopping tab with what to buy, and Take from stock.
+- Build progress: tick cut, ends, fitted and test result for each wire, also from a phone checklist
+  whose progress imports back.
+- Wire ratings derated for harness temperature and bundled wires; grommet holes with bundle fill.
+- Starter circuits (spot lamps, split charge, winch, compressor, reversing camera and more) and Tidy
+  wires (Shift+T), which lays wires out on the grid with square corners and few bends.
+- PDF export with every sheet as a vector page, the tables you choose, bookmarks, and
+  cross-references you can click.
+
+**Project types**
+- Vehicle, household, factory, electronics or mixed. The type picks the parts, tabs and checks shown first.
+- Household (UK mains): consumer unit parts, sockets, lights, showers, cookers, EV charge points, solar
+  and batteries. Guidance checks drawn from selected BS 7671 rules: cable rating with derating, ring
+  circuits, RCD and AFDD needs, earth loop impedance, voltage drop, bathrooms, Part P notification and
+  maximum demand. A circuit schedule lists each breaker's figures.
+- Factory and control panels: isolators, motor circuit breakers, contactors with auxiliary contacts that
+  follow their coil, overloads, motors, buttons, emergency stops, PLC cards and drives. Guidance checks
+  from selected BS EN 60204-1 recommendations, motor, terminal plan and PLC I/O lists, and wire numbering
+  by potential.
+- Electronics projects: Arduino UNO R3 and Nano, the Raspberry Pi 40-pin header, ESP32-DevKitC and
+  ESP32-S3-DevKitC-1 with pinouts from the makers' documents, supplies, converters, relay and I2C
+  modules, and JST, Molex, XT, barrel, USB-C, M8, M12 and screw terminal connector series. Each wire
+  can carry a signal (I2C, SPI, UART, CAN and more). Checks for 5 V on 3.3 V pins, TX to TX, SDA to SCL,
+  missing grounds and supplies fighting each other, and a Power rails list of what each supply feeds.
+- A loads library of machines, household appliances and solar parts with typical ratings.
+- Sources and known limits for every rule are listed in docs/standards-sources.md.
+
+**Compressed air planner**
+- Plan a workshop or garage air system: compressors, receivers, air treatment, pipe runs, drops and
+  tools. It estimates air demand, pipe pressure drop and air speed, pressure at each tool, receiver size,
+  compressor duty, running and leak costs and water to drain, with plain-English checks.
+- Leak test and calculators, and CSV, SVG and PDF export.
+
+**Live test**
+- Relays and contactors stay pulled in, so a hold-in contact latches and a stop button drops it out.
+- Household circuits come on from the supply; three-phase motors run from L1, L2 and L3 labels;
+  drives, safety relays and indicator lamps work.
+
+**Help and disclaimers**
+- A built-in user manual (Help, or F1 for the chapter about what is on screen) with search.
+- A disclaimer that must be read before household, factory or compressed air work, and on every
+  mains sheet, report and PDF: LoomWright is a basic planning tool, its checks are not proof that work
+  meets any code, and it does not replace a qualified electrician.
+
+**Claude add-on**
+- New tools for solving circuits, fault finding, colour suggestions, stock and shopping lists, build
+  progress, starter circuits, tidying wires, numbering by potential, PDF export, household and factory
+  projects, and compressed air systems.
+
+**Smaller changes and fixes**
+- Open a .loom file by double-clicking it on a Mac, or by dropping it on the window.
+- The circuit schedule names each circuit in words and gives the 0.8 × maximum Zs a tester should read.
+  Lights after a light switch now count in their circuit's design current.
+- Checks show their rule codes; the build pack can include the household, factory and power lists,
+  and its cover carries the disclaimer.
+- Wires to an unnamed net label say so in the wire list instead of "Net label:R".
+- Black-and-white drawings always show colour codes, even with wire labels turned off.
+- Motors, pumps, compressors, fans and wiper motors have a current draw field.
+- Closing the last tab opens a blank project rather than the example.
+- KiCad import reads an MPN field from any symbol.
+- The component builder and the new screens are translated (first pass).
+
 ## 0.3.0
 
 Everything from the feature review against professional harness tools (items 1 to 19 and the later list).

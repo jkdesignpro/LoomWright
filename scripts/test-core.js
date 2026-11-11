@@ -1,6 +1,6 @@
 // Core library checks: every symbol sits on the grid, projects with sheets work,
 // and the example project is valid.
-// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 LoomWright contributors. SPDX-License-Identifier: AGPL-3.0-or-later
 'use strict';
 const assert = require('assert');
 const L = require('../app/core/loom.js');
@@ -165,6 +165,212 @@ assert.strictEqual(L.wireCode({ settings: { standard: 'sae' } }, { colour: 'brow
   assert.strictEqual(wl.length, 2, 'CSV wire list imports two wires');
   assert.ok(wl.some((x) => x.tracer === 'red' || /NR|Brown/.test(x.code + x.colour)), 'tracer colour parsed');
   assert.ok(r, 'import reports what it did');
+}
+
+// 0.4: circuit solver, fault finding, planning, starter circuits, tidy routing, PDF
+{
+  const p = sample();
+  const sol = L.solveCircuit(p);
+  assert.ok(sol.ok && sol.loads.length > 0, 'the example solves');
+  sol.loads.forEach((x) => assert.ok(x.volts >= 0 && x.volts < 16, `${x.ref}: sensible voltage ${x.volts}`));
+  assert.ok(L.loadVoltages(p).length > 0, 'voltage at each load');
+  const targets = L.faultTargets(p);
+  assert.ok(targets.length > 0, 'fault targets');
+  L.FAULT_SYMPTOMS.forEach((sy) => {
+    const f = L.faultFind(p, targets.find((x) => x.kind === 'load').ref, sy.id);
+    assert.ok(f.steps.length > 0, `fault sheet "${sy.id}" has steps`);
+    assert.ok(L.faultSheetHTML(f, { project: p }).includes('<'), 'fault sheet renders');
+  });
+  const v = L.views(p)[1];
+  assert.ok(L.suggestColours(p, v.sheet.id, v.wires[0]).suggestions.length > 0, 'colour suggestions');
+  const sl = L.shoppingList(p, { cable: [{ gauge: '0.75', colour: 'black', metres: 100 }], items: [] });
+  assert.ok(sl.cable.length > 0 && sl.parts.length > 0, 'shopping list');
+  const w0 = v.wires[0];
+  w0.build = L.setBuild(w0, { cut: true, test: 'pass' });
+  assert.ok(L.buildProgress(p).harnesses.some((h) => h.cut > 0), 'build progress counts a cut wire');
+  // starter circuits draw cleanly on an empty sheet
+  L.templateList().forEach((tp) => {
+    const b = L.templateBlock(tp.id, p);
+    const ids = new Set(b.parts.map((x) => x.id));
+    b.wires.forEach((w) => assert.ok(ids.has(w.from.part) && ids.has(w.to.part), `${tp.id}: wire ends on its own parts`));
+  });
+  // tidy routing keeps every wire connected and square
+  const q = sample(), tv = L.view(q, 1);
+  const routed = L.tidyWires(tv, []);
+  assert.ok(routed > 0, 'tidy routes wires');
+  tv.wires.forEach((w) => {
+    const pts = L.wirePoints(tv, w);
+    assert.ok(pts, `${w.name}: still connected`);
+    for (let i = 1; i < pts.length; i++) assert.ok(pts[i].x === pts[i - 1].x || pts[i].y === pts[i - 1].y, `${w.name}: square corners`);
+  });
+  // PDF: a valid file with bookmarks, links and a correct cross-reference table
+  const pdf = Buffer.from(L.projectPDF(p, { date: '2026-11-10' })).toString('latin1');
+  assert.ok(pdf.startsWith('%PDF-1.4') && pdf.trimEnd().endsWith('%%EOF'), 'PDF header and trailer');
+  assert.ok(pdf.includes('/Outlines') && pdf.includes('/Subtype /Link'), 'PDF has bookmarks and links');
+  const xref = Number(/startxref\n(\d+)/.exec(pdf)[1]);
+  const rows = pdf.slice(xref).split('\n').slice(3).filter((r) => / 00000 n /.test(r));
+  rows.forEach((r, i) => assert.ok(pdf.startsWith(`${i + 1} 0 obj`, Number(r.slice(0, 10))), `PDF object ${i + 1} offset`));
+  assert.strictEqual(pdf.match(/\/Type \/Page /g).length, 3 + 5, 'three sheets and five table pages');
+  // disclaimers
+  assert.strictEqual(L.disclaimerFor(p).mains, false, 'vehicle projects get the general note');
+  p.settings.projectType = 'household';
+  assert.ok(L.disclaimerFor(p).mains && L.exportSVG(L.view(p, 0)).includes('BS 7671'), 'household drawings carry the disclaimer');
+}
+
+// 0.4: household and factory wiring (guidance checks, not certification)
+{
+  const tplProject = (id, type) => { const b = L.templateBlock(id), p = L.newDoc(id); L.applyProjectType(p, type); p.sheets[0].parts = b.parts; p.sheets[0].wires = b.wires; return p; };
+  const rules = (list) => list.map((c) => c.rule).filter(Boolean);
+  // a sensible consumer unit raises no errors or warnings
+  const h = tplProject('cu-rcbo', 'household'), hv = L.view(h, 0);
+  const hc = L.householdChecks(h);
+  assert.strictEqual(hc.circuits.length, 4, 'four circuits found');
+  const ring = hc.circuits.find((c) => c.kind === 'ring');
+  assert.ok(ring && ring.ring, 'the ring is a closed loop');
+  assert.ok(!hc.out.some((c) => c.level !== 'info'), 'the starter consumer unit has no errors: ' + hc.out.filter((c) => c.level !== 'info').map((c) => c.text).join('; '));
+  assert.ok(L.validate(h).every((c) => !/has no earth return|guide figure/.test(c.text)), 'vehicle cable rules are not applied to household projects');
+  assert.strictEqual(L.reportRows(h, 'circuits').length, 5, 'circuit schedule has a row per circuit');
+  // breaking the ring is an error
+  const close = hv.wires.find((w) => w.to.part === ring.dev.p.id && w.to.pin === 'out');
+  hv.wires.splice(hv.wires.indexOf(close), 1);
+  assert.ok(rules(L.householdChecks(h).out).includes('A1-RING-CLOSED'), 'an open ring is found');
+  hv.wires.push(close);
+  // a socket circuit without a 30 mA RCD, a long thin radial, and a TT supply without RCDs
+  const cb = hv.parts.find((p) => p.type === 'rcbo' && p.props.circuit === 'ring');
+  cb.type = 'mcb';
+  assert.ok(rules(L.householdChecks(h).out).includes('A2-RCD-SOCKETS'), 'sockets without RCD protection are found');
+  const lights = hv.parts.find((p) => p.type === 'rcbo' && p.props.circuit === 'lighting');
+  hv.wires.filter((w) => w.circuit === 'Lights').forEach((w) => { w.length = '60'; });
+  lights.props.rating = '32'; lights.props.circuit = '';
+  assert.ok(rules(L.householdChecks(h).out).includes('A3-ZS'), 'a long circuit on a big breaker fails the earth loop check');
+  hv.parts.find((p) => p.type === 'supply_cutout').props.earthing = 'TT';
+  assert.ok(rules(L.householdChecks(h).out).includes('A3-TT-RCD'), 'TT circuits need RCDs');
+  assert.ok(L.disclaimerFor(h).mains && L.exportSVG(hv).includes('BS 7671'), 'household drawings carry the disclaimer');
+  // loads library
+  assert.ok(L.APPLIANCES.length > 10 && L.MACHINES.length > 5, 'loads library');
+  assert.ok(Math.abs(L.motorFLC(2.2, 3) - 5) < 0.2, 'three-phase full-load current estimate');
+  assert.strictEqual(L.rateCable({ gauge: '2.5', method: 'C' }).iz, 27, 'cable rating from the table');
+  assert.ok(L.rateCable({ gauge: '2.5', method: 'C', insul: 'surrounded', length: '2' }).iz < 14, 'insulation halves the rating');
+
+  // factory: the starter works in the live test, and a wrong setting is found
+  const f = tplProject('dol-starter', 'factory'), fv = L.view(f, 0);
+  assert.deepStrictEqual(L.factoryChecks(f).filter((c) => c.level !== 'info').map((c) => c.text), [], 'the starter has no errors');
+  const start = fv.parts.find((p) => p.type === 'pb_start'), k = fv.parts.find((p) => p.type === 'contactor');
+  assert.ok(L.simulate(f, { [L.partKey(start)]: 1 }).relays.has(L.partKey(k)), 'pressing start pulls in the contactor');
+  assert.ok(!L.simulate(f, {}).relays.has(L.partKey(k)), 'the contactor is off at rest');
+  const aux = fv.parts.find((p) => p.type === 'aux_contact');
+  const on = L.buildNet(f, { relays: new Set([L.partKey(k)]), switches: 'state', state: {} });
+  assert.strictEqual(on.uf.find(on.k(fv.sheet, aux.id, '1')), on.uf.find(on.k(fv.sheet, aux.id, '2')), 'the hold-in contact follows its coil');
+  fv.parts.find((p) => p.type === 'mpcb').props.setting = '9';
+  start.props.colour = 'red';
+  fv.wires.find((w) => w.tracer === 'yellow').tracer = '';
+  const fr = rules(L.factoryChecks(f));
+  ['B2-OVERLOAD', 'B1-PB', 'B1-COLOURS'].forEach((r) => assert.ok(fr.includes(r), `factory check ${r}`));
+  assert.ok(L.reportRows(f, 'motors').length === 2 && L.reportRows(f, 'plcio').length === 1, 'motor and PLC lists');
+  // wire numbers by potential: the three wires either side of the hold-in contact share two numbers
+  L.numberByPotential(f);
+  const names = new Set(fv.wires.filter((w) => [w.from.part, w.to.part].includes(aux.id)).map((w) => w.name));
+  assert.strictEqual(names.size, 2, 'wires on one potential share a number');
+  // the hold-in contact keeps the motor running after start is released, and stop drops it out
+  const motor = fv.parts.find((p) => p.type === 'motor3'), stop = fv.parts.find((p) => p.type === 'pb_stop');
+  const pressed = L.simulate(f, { [L.partKey(start)]: 1 });
+  assert.ok(pressed.loads.has(motor.id), 'the motor runs from the L1, L2 and L3 labels');
+  const held = L.simulate(f, {}, { relays: pressed.relays });
+  assert.ok(held.relays.has(L.partKey(k)) && held.loads.has(motor.id), 'the hold-in contact latches');
+  assert.ok(!L.simulate(f, { [L.partKey(stop)]: 1 }, { relays: held.relays }).relays.has(L.partKey(k)), 'stop drops the contactor out');
+  {
+    // household: the light switch turns the lights off but not the smoke alarm
+    const hcu = tplProject('cu-rcbo', 'household'), hv = L.view(hcu, 0);
+    const sw = hv.parts.find((p) => p.type === 'switch_light'), sa = hv.parts.find((p) => p.type === 'smoke_alarm');
+    const lights = hv.parts.filter((p) => p.type === 'light').map((p) => p.id);
+    assert.ok(lights.every((id) => L.simulate(hcu, {}).loads.has(id)), 'lights run with the switch on');
+    const off = L.simulate(hcu, { [L.partKey(sw)]: 1 });
+    assert.ok(lights.every((id) => !off.loads.has(id)) && off.loads.has(sa.id), 'the switch turns off the lights, not the smoke alarm');
+  }
+  const fpdf = Buffer.from(L.projectPDF(f, { tables: ['motors', 'terminals', 'plcio'] })).toString('latin1');
+  assert.ok(fpdf.includes('/Outlines'), 'factory PDF builds');
+}
+
+// ---------------------------------------------------------------------------
+// Electronics: boards, checks between boards, power budget, signals, templates
+// ---------------------------------------------------------------------------
+{
+  const pins = (type) => L.resolved({}, { type, props: {} }).pins;
+  // every header pin is drawn, in the maker's count
+  [['arduino_uno_r3', 32], ['arduino_nano', 30], ['rpi_header', 40], ['esp32_devkitc', 38], ['esp32_s3_devkitc1', 44]].forEach(([t, count]) => {
+    assert.strictEqual(pins(t).length, count, `${t}: ${count} header pins`);
+    assert.ok(/^Pinout from .+ documentation; check against your board's revision\.$/.test(L.LIBRARY[t].note), `${t}: part note`);
+    assert.ok(/^https:\/\//.test(L.LIBRARY[t].src), `${t}: source link`);
+  });
+  // Raspberry Pi: physical pin numbers, odd pins on the left, and GPIO names find the right pin
+  const pi = pins('rpi_header');
+  assert.deepStrictEqual(pi.filter((x) => x.k === 'gnd').map((x) => +x.id).sort((a, c) => a - c), [6, 9, 14, 20, 25, 30, 34, 39], 'Pi ground pins');
+  assert.ok(pi.filter((x) => +x.id % 2).every((x) => x.x === 0), 'Pi odd pins on the left');
+  const e = L.newDoc('elec');
+  L.applyProjectType(e, 'electronics');
+  const v = L.view(e, 0);
+  const uno = L.addPart(v, 'arduino_uno_r3', { x: 0, y: 0, props: { mA: '50' } });
+  const esp = L.addPart(v, 'esp32_devkitc', { x: 400, y: 0 });
+  const rpi = L.addPart(v, 'rpi_header', { x: 800, y: 0 });
+  assert.strictEqual(L.addWire(v, `${rpi.label}:GPIO17`, `${uno.label}:D7`).from.pin, '11', 'GPIO17 is Pi pin 11');
+  v.wires.length = 0;
+  // GND is the board's earth return; 5V and VIN are its supply pins
+  const b = L.behaviour(v, uno);
+  assert.ok(b.kind === 'load' && b.earth.includes('GND') && b.power.includes('VIN') && !b.power.includes('3V3'), 'a board is a load returned on GND');
+  // TX to TX is a crossover mistake; TX to RX is right
+  L.addWire(v, `${uno.label}:TX`, `${esp.label}:TX`, { signal: 'uart_tx' });
+  const tx = L.validate(e).filter((c) => /both TX/.test(c.text));
+  assert.strictEqual(tx.length, 1, 'TX wired to TX is flagged');
+  assert.strictEqual(tx[0].level, 'warn', 'TX to TX is a warning');
+  v.wires[0].to.pin = 'RX';
+  assert.ok(!L.validate(e).some((c) => /both (TX|RX)/.test(c.text)), 'TX to RX is not flagged');
+  assert.ok(L.validate(e).some((c) => /grounds are not joined/.test(c.text)), 'a signal with no ground between the boards is flagged');
+  // 5 V into a 3.3 V board
+  const ps = L.addPart(v, 'dc_supply', { x: -200, y: 0, props: { volts: '5V', amps: '1A' } });
+  L.addWire(v, `${ps.label}:+`, `${rpi.label}:GPIO4`);
+  assert.ok(L.validate(e).some((c) => c.level === 'error' && /3\.3 V pin/.test(c.text) && c.part === rpi.id), '5 V on a Pi GPIO pin is an error');
+  // the checks only run in electronics and mixed projects
+  e.settings.projectType = 'vehicle';
+  assert.ok(!L.validate(e).some((c) => /both TX|3\.3 V pin/.test(c.text)), 'vehicle projects skip the electronics checks');
+  e.settings.projectType = 'electronics';
+  // power budget: a 5 V supply feeds the UNO, whose 3V3 output feeds a sensor
+  v.wires.length = 0;
+  const s1 = L.addPart(v, 'module_i2c', { x: 200, y: 400, props: { mA: '2' } });
+  const s2 = L.addPart(v, 'module_i2c', { x: 200, y: 600, props: { mA: '10' } });
+  [[ps, '+', uno, '5V'], [ps, '-', uno, 'GND'], [uno, '5V', s1, 'VCC'], [uno, 'GND', s1, 'GND'], [uno, '3V3', s2, 'VCC'], [uno, 'GND.2', s2, 'GND'], [uno, 'A4', s1, 'SDA'], [uno, 'A5', s1, 'SCL']]
+    .forEach(([a, ap, c, cp]) => L.addWire(v, `${a.label}:${ap}`, `${c.label}:${cp}`));
+  const pw = L.electronicsPower(e);
+  const main = pw.find((x) => x.supply === ps.label), r3 = pw.find((x) => x.supply === uno.label && x.pin === '3V3');
+  assert.strictEqual(main.load, 62, 'the 5 V rail carries the UNO (50 mA + 10 mA from its 3V3) and the sensor (2 mA)');
+  assert.strictEqual(main.rating, 1000, 'the supply rating is its 1A');
+  assert.strictEqual(r3.rating, 50, 'the UNO 3V3 rating is 50 mA');
+  assert.strictEqual(r3.load, 10, 'the 3V3 rail feeds the second sensor');
+  assert.ok(L.REPORTS.includes('power'), 'power is a report');
+  const rows = L.reportRows(e, 'power');
+  assert.strictEqual(rows[0][1], 'Supply', 'power report header');
+  assert.strictEqual(rows.length, 1 + pw.length, 'one row per rail');
+  assert.ok(!L.validate(e).some((c) => c.level !== 'info' && c.part === ps.id), 'a DC supply needs no fuse and its − counts as ground');
+  // the wire list carries the signal in electronics projects only
+  v.wires[6].signal = 'i2c_sda';
+  const wr = L.reportRows(e, 'wires');
+  assert.strictEqual(wr[0][wr[0].indexOf('Circuit') + 1], 'Signal', 'Signal column after Circuit');
+  assert.ok(wr.some((r) => r.includes('I2C SDA')), 'signal name in the wire list');
+  assert.ok(!L.reportRows(sample(), 'wires')[0].includes('Signal'), 'vehicle wire lists have no Signal column');
+  assert.ok(L.SIGNALS.some((x) => x.id === 'can_h') && L.SIGNALS.some((x) => x.id === 'rs485_a'), 'signal list');
+  // connector series for electronics, with their own cavity names where they have them
+  ['jst_xh', 'jst_ph', 'jst_sh', 'kk254', 'microfit3', 'minifit_jr', 'xt60', 'barrel_5521', 'usbc_power', 'm8', 'm12a', 'screw_50'].forEach((id) => assert.ok(L.SERIES.some((x) => x.id === id), `series ${id}`));
+  const m8 = L.addPart(v, 'conn', { x: 0, y: 900, props: { series: 'm8', ways: 3 } });
+  assert.deepStrictEqual(L.resolved(v, m8).pins.map((x) => x.id), ['1', '3', '4'], 'M8 3-pin uses cavities 1, 3 and 4');
+  // the starter circuits come out clean
+  L.templateList('electronics').forEach((tp) => {
+    const q = L.newDoc('t');
+    L.applyProjectType(q, 'electronics');
+    const blk = L.templateBlock(tp.id, q), tv = L.view(q, 0);
+    blk.parts.forEach((x) => { assert.ok(x.x % 10 === 0 && x.y % 10 === 0, `${tp.id}: ${x.label || x.type} on the grid`); tv.parts.push(x); });
+    blk.wires.forEach((x) => tv.wires.push(x));
+    assert.deepStrictEqual(L.validate(q).filter((c) => c.level !== 'info').map((c) => c.text), [], `${tp.id}: no warnings`);
+  });
+  assert.ok(L.templateList('electronics').length >= 2, 'electronics starter circuits');
 }
 
 console.log(`ok: ${n} components, example project with ${s.sheets.length} sheets and ${L.wireList(s).length} wires`);
