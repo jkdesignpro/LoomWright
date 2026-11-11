@@ -413,4 +413,11 @@ assert.strictEqual(L.wireCode({ settings: { standard: 'sae' } }, { colour: 'brow
   assert.strictEqual(v.wires[0].from.pin, '1', 'renames apply once, in order');
 }
 
+// a line drawn as a wire has a dark edge under its colour
+{
+  const svg = L.shapeSVG({ t: 'line', x1: 0, y1: 0, x2: 10, y2: 0, wire: true, stroke: '#d3261c', w: 2.2 });
+  assert.strictEqual((svg.match(/<line /g) || []).length, 2, 'wire line has an edge and a core');
+  assert.ok(svg.includes('stroke="#262b28"') && svg.includes('stroke="#d3261c"'), 'edge then colour');
+}
+
 console.log(`ok: ${n} components, example project with ${s.sheets.length} sheets and ${L.wireList(s).length} wires`);

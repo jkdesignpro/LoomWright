@@ -244,12 +244,17 @@
         h += `<div class="two">${num('Line width', swKey, swVal, 0.5)}`;
         if (s.t !== 'line') h += `<label class="fld"><span>${T('Fill')}</span><select data-s="fill">${[['paper', 'White'], ['none', 'None'], ['ink', 'Black']].map(([v, n]) => `<option value="${v}"${(s.fill || (s.t === 'path' ? 'none' : 'paper')) === v ? ' selected' : ''}>${T(n)}</option>`).join('')}</select></label>`;
         h += `</div><label class="fld check"><input type="checkbox" data-s="dash"${s.dash ? ' checked' : ''}><span>${T('Dashed')}</span></label>`;
+        if (s.t === 'line' || s.t === 'path') {
+          const cur = s.wire ? (L.COLOURS.find((c) => c.hex === s.stroke) || {}).id || '' : '';
+          h += `<label class="fld"><span>${T('Draw as a wire, in colour')}</span><select data-s="wirecol"><option value="">${T('No (plain line)')}</option>${L.COLOURS.map((c) => `<option value="${c.id}"${cur === c.id ? ' selected' : ''}>${T(c.name)}</option>`).join('')}</select></label>`;
+        }
       }
       h += `<div class="row-btns"><button class="btn danger" data-b="del">${T('Delete shape')}</button><button class="btn" data-b="dup">${T('Duplicate')}</button></div></div>`;
     }
     if (selected && selected.kind === 'pin' && comp.pins[selected.i]) {
       const pn = comp.pins[selected.i];
       h += `<div class="fields"><h3>${T('Selected pin')}</h3><div class="two"><label class="fld"><span>${T('Pin number / id')}</span><input id="bp-id" data-p="id" value="${esc(pn.id)}"></label><label class="fld"><span>${T('Description')}</span><input id="bp-n" data-p="n" value="${esc(pn.n || '')}" placeholder="${T('e.g. Ignition +')}"></label></div>
+      <label class="fld"><span>${T('Lead colour (wires drawn from this pin take it)')}</span><select data-p="c"><option value="">${T('None')}</option>${L.COLOURS.map((c) => `<option value="${c.id}"${pn.c === c.id ? ' selected' : ''}>${T(c.name)}</option>`).join('')}</select></label>
         <div class="two"><label class="fld"><span>x</span><input type="number" step="10" data-p="x" value="${pn.x}"></label><label class="fld"><span>y</span><input type="number" step="10" data-p="y" value="${pn.y}"></label></div>
         <div class="row-btns"><button class="btn danger" data-b="del">${T('Delete pin')}</button></div></div>`;
     }
@@ -284,6 +289,7 @@
     }
     if (t.dataset.s && selected && selected.kind === 'shape') {
       const s = comp.shapes[selected.i], k = t.dataset.s;
+      if (k === 'wirecol') { const c = L.COLOURS.find((x) => x.id === t.value); if (c) { s.wire = true; s.stroke = c.hex; if (s.w == null || s.w === 2) s.w = 2.2; } else { delete s.wire; delete s.stroke; } renderCanvas(); return; }
       if (t.type === 'checkbox') { if (t.checked) s.dash = '4 3'; else delete s.dash; }
       else if (t.type === 'number') { const v = parseFloat(t.value); if (!isNaN(v)) s[k] = v; }
       else s[k] = t.value;
@@ -292,6 +298,7 @@
     if (t.dataset.p && selected && selected.kind === 'pin') {
       const pn = comp.pins[selected.i], k = t.dataset.p;
       if (k === 'x' || k === 'y') { const v = parseFloat(t.value); if (!isNaN(v)) pn[k] = Math.max(0, Math.min(k === 'x' ? comp.w : comp.h, S10(v))); }
+      else if (k === 'c') { if (t.value) pn.c = t.value; else delete pn.c; }
       else pn[k] = t.value.trim();
       renderCanvas();
     }
@@ -318,7 +325,7 @@
     return { map, removed: savedPins.filter((id) => !kept.has(id)) };
   }
   function toDef() {
-    const d = { id: comp.id, custom: true, cat: 'My components', name: comp.name || 'Custom component', prefix: (comp.prefix || '').trim(), sub: comp.sub || '', props: comp.props || [], w: comp.w, h: comp.h, pins: comp.pins.map((p) => ({ id: String(p.id), x: p.x, y: p.y, n: p.n || String(p.id) })), shapes: comp.shapes };
+    const d = { id: comp.id, custom: true, cat: 'My components', name: comp.name || 'Custom component', prefix: (comp.prefix || '').trim(), sub: comp.sub || '', props: comp.props || [], w: comp.w, h: comp.h, pins: comp.pins.map((p) => ({ id: String(p.id), x: p.x, y: p.y, n: p.n || String(p.id), ...(p.c ? { c: p.c } : {}), ...(p.tr ? { tr: p.tr } : {}) })), shapes: comp.shapes };
     const { map, removed } = pinChanges(), rev = (comp.rev || 0) + 1;
     d.rev = rev;
     d.renames = (comp.renames || []).slice(-49);

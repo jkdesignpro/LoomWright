@@ -74,6 +74,7 @@ kbd { font: 11.5px var(--sans); color: var(--muted); }
 #cmdbtn span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .iconbtn { display: grid; place-items: center; width: 28px; height: 28px; border: 0; background: none; border-radius: var(--r); cursor: pointer; color: var(--muted); }
 .iconbtn:hover { background: var(--soft); color: var(--ink); }
+.iconbtn.on { color: var(--accent); background: var(--accent2); }
 .iconbtn.sm { width: 24px; height: 24px; }
 .mc { color: var(--muted); white-space: nowrap; padding: 0 10px; border-left: 1px solid var(--line); margin-left: 8px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
 

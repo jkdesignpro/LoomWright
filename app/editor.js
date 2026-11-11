@@ -402,6 +402,9 @@
     if (project.settings.autoColour && L.suggestColours) {
       try { const sg = L.suggestColours(project, sheetId, w, { inventory: userLib.inventory, limit: 1 }).suggestions[0]; if (sg) { w.colour = sg.colour; if (sg.tracer) w.tracer = sg.tracer; else delete w.tracer; } } catch (e) { console.warn(e); }
     }
+    // a pin with a lead colour (the pigtail of a prewired box) gives a new wire its colour
+    const lead = [draft.from, end].map((e) => { const p = doc.parts.find((x) => x.id === e.part); const pn = p && L.resolved(doc, p).pins.find((q) => String(q.id) === String(e.pin)); return pn && pn.c && L.colourById(doc, pn.c) ? pn : null; }).find(Boolean);
+    if (lead) { w.colour = lead.c; if (lead.tr && L.colourById(doc, lead.tr)) w.tracer = lead.tr; else delete w.tracer; }
     draft = null;
     svg.classList.remove('wiring');
     select([], [w.id]);
@@ -2433,8 +2436,10 @@
      window theme. Only the screen changes: exports, prints and PDFs stay black on white. */
   const WORK = 'loomwright.workarea';
   function isWorkDark() { return document.documentElement.classList.contains('work-dark'); }
-  function setWorkDark(on) { document.documentElement.classList.toggle('work-dark', on); try { localStorage.setItem(WORK, on ? 'dark' : 'light'); } catch (e) { /* ignore */ } }
+  function setWorkDark(on) { document.documentElement.classList.toggle('work-dark', on); showWorkDark(); try { localStorage.setItem(WORK, on ? 'dark' : 'light'); } catch (e) { /* ignore */ } }
+  function showWorkDark() { const b = document.querySelector('#titlebar [data-cmd="workdark"]'); if (b) { b.setAttribute('aria-pressed', String(isWorkDark())); b.classList.toggle('on', isWorkDark()); } }
   try { if (localStorage.getItem(WORK) === 'dark') document.documentElement.classList.add('work-dark'); } catch (e) { /* ignore */ }
+  showWorkDark();
 
   /* ---------------- Views: formboard and vehicle ---------------- */
   function harnessesInUse() { return [...new Set(project.harnesses.concat(project.sheets.flatMap((s) => s.wires.map((w) => w.harness))).filter(Boolean))]; }

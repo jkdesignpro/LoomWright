@@ -48,7 +48,7 @@ To draw your own component in the app, use the component builder; see the [user 
 | `sub` | Optional text drawn under the symbol. `{field}` is replaced by that field's value. |
 | `props` | The fields shown in Properties; see below. |
 | `w`, `h` | Size in drawing units, multiples of 20. |
-| `pins` | `id` is what wires connect to and what the lists show; `x`, `y` is the position; `n` is a longer name shown in Properties and the trace. |
+| `pins` | `id` is what wires connect to and what the lists show; `x`, `y` is the position; `n` is a longer name shown in Properties and the trace. `c` (and `tr` for a tracer) is an optional lead colour id, such as `red`: a wire drawn from the pin in the editor starts in that colour. |
 | `shapes` | What is drawn, in order; see below. |
 
 Custom components are stored in the user's library (`library.json` in the desktop app's data folder, or browser storage), and a copy of every custom component used in a project is kept in the project's `customParts`, so the file opens anywhere. See [file-format.md](file-format.md).
@@ -84,7 +84,7 @@ All coordinates are in drawing units, inside the component's box. Colours are `i
 | `path` | `d`, `w`, `fill` | `d` is SVG path data. `fill` defaults to `none`. |
 | `text` | `x`, `y`, `text`, `size`, `anchor`, `weight` | `size` defaults to 9, `anchor` (`start`, `middle`, `end`) to `middle`. `{field}` in `text` is replaced by the field's value. |
 
-Any shape can also carry `tx`, `ty` to move it, and `stroke` to change its line colour. Text can carry `color`.
+Any shape can also carry `tx`, `ty` to move it, and `stroke` to change its line colour. Text can carry `color`. A `line` or `path` with `wire: true` and a `stroke` colour is drawn like a wire on the sheet: the colour over a thin dark edge, so white and yellow leads show on white paper and black ones in the dark work area.
 
 ## Built-in components
 
