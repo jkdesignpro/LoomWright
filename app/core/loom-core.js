@@ -14,7 +14,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const VERSION = '0.4.1';
+  const VERSION = '0.4.2';
   const FORMAT = 'loomwright';
   const GRID = 10;
   const INK = '#1d2320';
