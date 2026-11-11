@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- The Mac app is now signed ad hoc. Apple Silicon Macs said the 0.4.0 app "is damaged and can't be
+  opened" because it had no signature. The 0.4.1 app gets the usual first-run warning instead; the
+  manual's *Getting started* chapter shows how to open it, including on macOS 15 and later.
+- The build checks the Mac app's signature, so this cannot slip through again.
+- Getting started: on a Mac, double-clicking a `.loom` file opens it (added in 0.4.0).
+
 ## 0.4.0
 
 **Licence.** From this release LoomWright is under the GNU Affero General Public License, version 3

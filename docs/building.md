@@ -113,4 +113,6 @@ The *Desktop builds* workflow (`.github/workflows/release.yml`) runs on the tag.
 | macOS | `.dmg` |
 | Linux | `.AppImage`, `.deb` |
 
-Check the draft, then publish it. The installers are not code-signed.
+Check the draft, then publish it.
+
+The installers are not code-signed with a paid certificate. The Mac app is signed ad hoc (`"signingIdentity": "-"` in `tauri.conf.json`): Apple Silicon Macs refuse to run an app with no signature at all and call it "damaged", while an ad-hoc signed app only gets the "cannot be verified" warning, which the user can get past once. The CI desktop job checks the signature with `codesign --verify`.

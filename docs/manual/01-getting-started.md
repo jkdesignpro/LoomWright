@@ -33,9 +33,19 @@ The installers are on the project's GitHub page, under **Releases**. Download th
 The builds are not code-signed yet, so your computer warns you the first time:
 
 - **Windows** shows "Windows protected your PC". Choose **More info**, then **Run anyway**.
-- **Mac** says the app cannot be checked for malicious software. Right-click (or Control-click) LoomWright in Applications and choose **Open**, then **Open** again. You only need to do this once.
+- **Mac** says Apple could not verify that LoomWright is free of malware. You only need to get past this once:
+  - On macOS 14 (Sonoma) and earlier, right-click (or Control-click) LoomWright in Applications and choose **Open**, then **Open** again.
+  - On macOS 15 (Sequoia) and later, double-click LoomWright and close the warning. Then open **System Settings › Privacy & Security**, scroll down to the message about LoomWright, click **Open Anyway** and enter your password.
 
-On Windows and Linux, the installer tells the computer that `.loom` files belong to LoomWright, so double-clicking a project file opens it. On a Mac, open projects with **File › Open** (<kbd>Ctrl</kbd>+<kbd>O</kbd>).
+If the Mac says LoomWright **"is damaged and can't be opened"**, the download is fine: version 0.4.0 was missing its signature, which Apple Silicon Macs need. Download 0.4.1 or later. To keep using a copy you already have, open **Terminal** (in Applications › Utilities) and run:
+
+```
+xattr -cr /Applications/LoomWright.app
+```
+
+then open LoomWright as usual. This removes the "downloaded from the internet" mark from that one app.
+
+The installer tells the computer that `.loom` files belong to LoomWright, so double-clicking a project file opens it. You can also drop a `.loom` file on the window.
 
 ## The portable Windows copy
 
