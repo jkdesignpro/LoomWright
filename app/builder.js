@@ -16,7 +16,7 @@
     ['select', 'Select and move', 'V'], ['line', 'Line', 'L'], ['rect', 'Rectangle', 'B'], ['circle', 'Circle', 'C'], ['text', 'Text', 'T'], ['pin', 'Pin (connection point)', 'P'],
   ];
 
-  let comp, tool = 'select', selected = null, drag = null, temp = null, editingId = null, history = [];
+  let comp, tool = 'select', selected = null, drag = null, temp = null, editingId = null, history = [], savedPins = [], armedSave = '';
 
   function blank() {
     return { id: L.uid('c_'), name: 'New component', prefix: 'U', sub: '', props: [], w: 80, h: 60, pins: [], shapes: [{ t: 'rect', x: 10, y: 0, width: 60, h: 60, rx: 4 }] };
@@ -37,6 +37,9 @@
   function open(def) {
     editingId = def && def.custom ? def.id : null;
     comp = def ? (def.custom ? fromDef(def) : fromLibrary(def.id)) : blank();
+    // remember each pin's id as saved, so a renamed pin keeps its wires (see toDef)
+    if (editingId) comp.pins.forEach((p) => { p._was = String(p.id); });
+    savedPins = editingId ? comp.pins.map((p) => String(p.id)) : [];
     tool = 'select'; selected = null; history = [];
     root.innerHTML = shell();
     root.hidden = false;
@@ -250,6 +253,10 @@
         <div class="two"><label class="fld"><span>x</span><input type="number" step="10" data-p="x" value="${pn.x}"></label><label class="fld"><span>y</span><input type="number" step="10" data-p="y" value="${pn.y}"></label></div>
         <div class="row-btns"><button class="btn danger" data-b="del">${T('Delete pin')}</button></div></div>`;
     }
+    if (comp.inside && (comp.inside.parts || []).length) {
+      const count = {}; comp.inside.parts.forEach((x) => { const nm = T((L.LIBRARY[x.type] || {}).name || x.type); count[nm] = (count[nm] || 0) + 1; });
+      h += `<div class="fields"><h3>${T('Inside this component')}</h3><p class="muted" style="margin:0;font-size:12px">${esc(Object.entries(count).map(([k, v]) => `${v} × ${k}`).join(', '))}. ${T('Trace, live test and fuse loads go through them. They stay linked to their pins when you rename a pin.')}</p></div>`;
+    }
     const dupIds = comp.pins.map((p) => p.id).filter((id, i, a) => a.indexOf(id) !== i);
     h += `<div class="fields"><h3>${T('Pins')} (${comp.pins.length})</h3>${dupIds.length ? `<div class="callout warn">${T('Pin ids must be unique:')} ${esc(dupIds.join(', '))}</div>` : ''}${comp.pins.length ? `<div class="b-list">${comp.pins.map((p, i) => `<button data-pick="pin:${i}" class="${selected && selected.kind === 'pin' && selected.i === i ? 'on' : ''}">${esc(p.id)} · ${esc(p.n || '')} (${p.x}, ${p.y})</button>`).join('')}</div>` : `<p class="muted" style="margin:0;font-size:12px">${T('Use the Pin tool and click on the edge of the symbol where wires should attach.')}</p>`}</div>`;
     h += `<div class="fields"><h3>${T('Shapes')} (${comp.shapes.length})</h3><div class="b-list">${comp.shapes.map((s, i) => `<button data-pick="shape:${i}" class="${selected && selected.kind === 'shape' && selected.i === i ? 'on' : ''}">${T(s.t)}${s.t === 'text' ? ' “' + esc(s.text) + '”' : ''}</button>`).join('')}</div></div>`;
@@ -271,7 +278,7 @@
     if (t.dataset.c) {
       const k = t.dataset.c;
       if (k === 'w' || k === 'h') { const v = Math.max(20, Math.round((parseInt(t.value, 10) || 20) / 20) * 20); if (t.value !== '' && e.type === 'input') comp[k] = v; }
-      else if (k === 'props') comp.props = t.value.split('\n').map((line) => { const i = line.indexOf('='); const key = (i < 0 ? line : line.slice(0, i)).trim().replace(/[^A-Za-z0-9_]/g, '_'); return key ? { k: key, l: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '), d: i < 0 ? '' : line.slice(i + 1).trim() } : null; }).filter(Boolean);
+      else if (k === 'props') { const had = new Map((comp.props || []).map((x) => [x.k, x])); comp.props = t.value.split('\n').map((line) => { const i = line.indexOf('='); const key = (i < 0 ? line : line.slice(0, i)).trim().replace(/[^A-Za-z0-9_]/g, '_'); return key ? { ...(had.get(key) || {}), k: key, l: (had.get(key) || {}).l || key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '), d: i < 0 ? '' : line.slice(i + 1).trim() } : null; }).filter(Boolean); }
       else comp[k] = t.value;
       renderCanvas(); return;
     }
@@ -304,14 +311,49 @@
     selected = null; renderAll();
   }
 
+  /* Pins renamed and pins taken away since the component was last saved. */
+  function pinChanges() {
+    const map = {}, kept = new Set();
+    comp.pins.forEach((p) => { if (p._was == null) return; kept.add(p._was); if (String(p.id) !== p._was) map[p._was] = String(p.id); });
+    return { map, removed: savedPins.filter((id) => !kept.has(id)) };
+  }
   function toDef() {
-    return { id: comp.id, custom: true, cat: 'My components', name: comp.name || 'Custom component', prefix: (comp.prefix || '').trim(), sub: comp.sub || '', props: comp.props || [], w: comp.w, h: comp.h, pins: comp.pins.map((p) => ({ id: String(p.id), x: p.x, y: p.y, n: p.n || String(p.id) })), shapes: comp.shapes };
+    const d = { id: comp.id, custom: true, cat: 'My components', name: comp.name || 'Custom component', prefix: (comp.prefix || '').trim(), sub: comp.sub || '', props: comp.props || [], w: comp.w, h: comp.h, pins: comp.pins.map((p) => ({ id: String(p.id), x: p.x, y: p.y, n: p.n || String(p.id) })), shapes: comp.shapes };
+    const { map, removed } = pinChanges(), rev = (comp.rev || 0) + 1;
+    d.rev = rev;
+    d.renames = (comp.renames || []).slice(-49);
+    if (Object.keys(map).length) d.renames.push({ rev, map });
+    if (!d.renames.length) delete d.renames;
+    // the parts inside a component (fuses, relays) follow its pins: renamed pins keep their links
+    if (comp.inside) {
+      const ins = JSON.parse(JSON.stringify(comp.inside)), gone = new Set(removed);
+      ins.links = (ins.links || []).map((l) => l.map((e) => (map[e] != null ? map[e] : e))).filter((l) => !l.some((e) => gone.has(e)));
+      d.inside = ins;
+    }
+    if (comp.tags) d.tags = comp.tags;
+    if (comp.partial) d.partial = comp.partial;
+    return d;
   }
   async function save(place) {
     const d = toDef();
     const ids = d.pins.map((p) => p.id);
     if (new Set(ids).size !== ids.length) { window.LoomEditor.toast(t('Give every pin a different id before saving.')); return; }
     if (!d.shapes.length) { window.LoomEditor.toast(t('Draw at least one shape first.')); return; }
+    // warn before taking away pins that have wires on them in the open project
+    const use = editingId && window.LoomEditor.pinUse ? window.LoomEditor.pinUse(d.id) : {};
+    const hit = pinChanges().removed.filter((id) => use[id]);
+    const key = hit.join('|');
+    if (hit.length && armedSave !== key) {
+      armedSave = key;
+      const n = hit.reduce((a, id) => a + use[id], 0);
+      const box = $('#b-side'), note = document.createElement('div');
+      note.className = 'callout warn'; note.id = 'b-pinwarn';
+      note.textContent = `${t('Pins removed that have wires on them in this project:')} ${hit.join(', ')} (${n} ${n === 1 ? t('wire') : t('wires')}). ${t('Saving takes those wires off. Put the pin back, or click Save again to go ahead. Ctrl+Z on the drawing undoes it.')}`;
+      const old = $('#b-pinwarn'); if (old) old.remove();
+      box.prepend(note); box.scrollTop = 0;
+      return;
+    }
+    armedSave = '';
     d.pins.forEach((p) => { p.x = Math.max(0, Math.min(d.w, S10(p.x))); p.y = Math.max(0, Math.min(d.h, S10(p.y))); });
     await window.LoomEditor.saveComponent(d);
     close();

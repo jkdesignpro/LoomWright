@@ -252,6 +252,7 @@
     const r = Loom.resolved(doc, p), ids = r.pins.map((x) => x.id), t = p.type;
     const B = { links: [], switched: null, kind: 'other', states: null };
     const pr = r.props || {};
+    if (r.def && r.def.inside) return B; // a custom part built from real parts: those parts carry the behaviour (insideParts)
     if (t === 'splice') return B;
     if (t === 'busbar') { B.links = ids.slice(1).map((id) => [ids[0], id]); B.kind = 'wiring'; return B; }
     if (t === 'terminal_block' || t === 'connector') { B.links = seq(ids.length / 2, (i) => ['A' + (i + 1), 'B' + (i + 1)]); B.kind = 'wiring'; return B; }
@@ -308,6 +309,36 @@
     if (B.lamp) {/* handled by switch */}
     return B;
   }
+  /* A custom component can be made of real parts inside it, such as the fuses and relays of a
+     relay and fuse box. def.inside = { parts: [{ id, type, props }], links: [[a, b], ...] }, where
+     a and b are the component's own pin ids or 'SUBID.PIN' for a pin of a part inside. Field values
+     in braces, such as '{f2}', take the placed component's field. Returns the inside parts as
+     ordinary parts (id 'PARTID::SUBID', reference 'FB1/F2') and the links between pins as
+     [part id, pin id] pairs, or null when the component has no inside. */
+  function insideParts(doc, p) {
+    const r = Loom.resolved(doc, p), ins = r.def && r.def.inside;
+    if (!ins || !Array.isArray(ins.parts) || !ins.parts.length) return null;
+    const fill = (v) => (typeof v === 'string' ? v.replace(/\{(\w+)\}/g, (_, k) => (r.props && r.props[k] != null ? r.props[k] : '')) : v);
+    const subs = new Map(), parts = [];
+    ins.parts.forEach((sp) => {
+      if (!sp || !sp.id || !sp.type || subs.has(String(sp.id))) return;
+      if (!Loom.partDef(doc, sp.type) || (Loom.partDef(doc, sp.type) || {}).inside) return; // only one level deep
+      const props = {}; Object.entries(sp.props || {}).forEach(([k, v]) => { props[k] = fill(v); });
+      const q = { id: p.id + '::' + sp.id, type: sp.type, label: p.label ? p.label + '/' + sp.id : '', x: p.x, y: p.y, props, inside: { part: p.id, sub: String(sp.id) } };
+      subs.set(String(sp.id), q); parts.push(q);
+    });
+    const outer = new Set(r.pins.map((x) => String(x.id)));
+    const end = (s) => {
+      s = String(s);
+      if (outer.has(s)) return [p.id, s];
+      const i = s.indexOf('.'); if (i < 0) return null;
+      const q = subs.get(s.slice(0, i)), pin = s.slice(i + 1);
+      return q && Loom.resolved(doc, q).pins.some((x) => String(x.id) === pin) ? [q.id, pin] : null;
+    };
+    const links = [];
+    (ins.links || []).forEach((l) => { const a = Array.isArray(l) && end(l[0]), b = Array.isArray(l) && end(l[1]); if (a && b) links.push([a, b]); });
+    return { parts, links };
+  }
   // GND.2, G.3 and so on are the second and third ground pins of a board
   function isEarthPin(id) { return /^(-|−|31|31b|E|GND|G|K|85)(\.\d+)?$/i.test(String(id)) && String(id) !== 'G1'; }
   function isSupplyPin(r, id) { const pn = r.pins.find((x) => x.id === id); const s = (id + ' ' + ((pn && pn.n) || '')).toLowerCase(); return /\+|12v|24v|ign|supply|feed|batt|power|vcc|v\+|in\b|^1$|^l1/.test(s); }
@@ -326,6 +357,6 @@
     return 0;
   }
 
-  Object.assign(Loom, { TERMINALS, SERIES, addSeries, INSULATION, SLEEVING, seriesById, nearestWays, wireOD, bundleDiameter, suggestSleeve, behaviour, partCurrent, parseAmps, isEarthPin, PROTECT });
+  Object.assign(Loom, { TERMINALS, SERIES, addSeries, INSULATION, SLEEVING, seriesById, nearestWays, wireOD, bundleDiameter, suggestSleeve, behaviour, insideParts, partCurrent, parseAmps, isEarthPin, PROTECT });
   return Loom;
 });

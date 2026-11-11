@@ -20,12 +20,22 @@
   const projectOf = (d) => (d && d.project) || d;
   const key = (sheet, partId, pinId) => `${sheet.id}|${partId}|${pinId}`;
   /* State key: the same physical part drawn on several sheets shares its state. */
+  /* The part on the sheet: the component itself for a part inside a custom component ('FB::F2'). */
+  const realPart = (id) => String(id).split('::')[0];
   const partKey = (p) => (p.label ? `${p.type}|${p.label}` : p.id);
 
   /* Every part on every sheet, with its sheet view and behaviour. */
   function inventory(project) {
     const out = [];
-    Loom.views(project).forEach((v) => v.parts.forEach((p) => out.push({ v, sheet: v.sheet, p, b: Loom.behaviour(v, p) })));
+    Loom.views(project).forEach((v) => v.parts.forEach((p) => {
+      const it = { v, sheet: v.sheet, p, b: Loom.behaviour(v, p) };
+      out.push(it);
+      // the fuses, relays and links inside a custom component take part like parts on the sheet
+      const ins = Loom.insideParts(v, p);
+      if (!ins) return;
+      it.inner = ins.links.map(([a, c]) => [key(v.sheet, a[0], a[1]), key(v.sheet, c[0], c[1])]);
+      ins.parts.forEach((q) => out.push({ v, sheet: v.sheet, p: q, b: Loom.behaviour(v, q), parent: it }));
+    }));
     return out;
   }
 
@@ -41,6 +51,7 @@
       const r = Loom.resolved(it.v, p);
       r.pins.forEach((pn) => uf.find(k(pn.id)));
       b.links.forEach(([a, c]) => join(k(a), k(c), { kind: 'link', ...at }));
+      if (it.inner) it.inner.forEach(([a, c]) => join(a, c, { kind: 'link', ...at }));
       if (b.kind === 'earth') r.pins.forEach((pn) => join(k(pn.id), EARTH, { kind: 'earth', ...at }));
       if (b.earthPins) b.earthPins.forEach((pn) => join(k(pn), EARTH, { kind: 'earth', ...at }));
       // b.zero: pins that are a supply's own 0 V reference, such as the − of a bench or USB supply
@@ -258,6 +269,7 @@
       const load = loads.reduce((a, x) => a + x.amps, 0);
       supplies.push({ sheet: it.sheet.name, sheetId: it.sheet.id, part: it.p.id, ref: it.p.label, type: (Loom.partDef(it.v, it.p.type) || {}).name, capacity: pr.ah ? String(parseFloat(pr.ah) || pr.ah) : '', rating, load: +load.toFixed(2), pct: rating ? Math.round((load / rating) * 100) : null, loads: loads.map((x) => ({ ref: x.it.p.label || x.it.p.type, amps: +x.amps.toFixed(2) })), hours: pr.ah && load ? +(parseFloat(pr.ah) * 0.5 / load).toFixed(1) : null });
     });
+    [fuses, relays].forEach((l) => l.forEach((x) => { x.part = realPart(x.part); }));
     return { fuses, relays, supplies, volts };
   }
 
@@ -332,6 +344,20 @@
     const sc = schedule(project);
     sc.fuses.forEach((f) => { if (f.status === 'over') out.push({ level: 'warn', part: f.part, sheetId: f.sheetId, text: `${where({ name: f.sheet })}${f.ref} (${f.rating} A) carries about ${f.load} A of load.` }); });
     sc.relays.forEach((f) => { if (f.status === 'over') out.push({ level: 'warn', part: f.part, sheetId: f.sheetId, text: `${where({ name: f.sheet })}${f.ref} contacts (${f.rating} A) switch about ${f.load} A.` }); });
+    // fuses inside a custom component (such as a relay and fuse box) against the wires they feed,
+    // through the component's own links and relay contacts
+    const fz = build(project, { switches: 'open', relays: 'closed', protect: false });
+    fz.inv.forEach((it) => {
+      if (!it.parent || it.b.kind !== 'protect' || !(it.b.rating > 0)) return;
+      const r = fz.uf.find(key(it.sheet, it.p.id, '2'));
+      it.v.wires.forEach((w) => {
+        const at = [w.from, w.to].some((e) => e.part === it.parent.p.id && fz.uf.find(key(it.sheet, e.part, e.pin)) === r);
+        const g = at && Loom.gaugeInfo(w.gauge);
+        if (g && it.b.rating > g.guideA) out.push({ level: 'warn', wire: w.id, part: it.parent.p.id, sheetId: it.sheet.id, text: `${where(it.sheet)}${it.p.label || it.p.id} (${it.b.rating}A) feeds ${w.name} at ${w.gauge}mm². Guide maximum for that size is ${g.guideA}A.` });
+      });
+    });
+    // a part inside a custom component is pointed at through the component itself
+    out.forEach((x) => { if (x.part) x.part = realPart(x.part); });
     return out;
   }
   // validate() now includes the project-level checks when given a project or the first sheet's view
@@ -344,6 +370,6 @@
     return d && d.sheet ? base.concat(extra.filter((c) => !c.sheetId || c.sheetId === d.sheet.id)) : base.concat(extra);
   };
 
-  Object.assign(Loom, { nets, netOf, simulate, coilOn, partStates, partKey, schedule, projectChecks, EARTH, buildNet: build });
+  Object.assign(Loom, { nets, netOf, simulate, coilOn, partStates, partKey, schedule, projectChecks, EARTH, buildNet: build, realPart });
   return Loom;
 });

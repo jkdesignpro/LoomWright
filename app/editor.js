@@ -109,8 +109,7 @@
     if (L.LIBRARY[type]) return;
     const fromUser = userLib.parts.find((p) => p.id === type);
     if (!fromUser) return;
-    const i = project.customParts.findIndex((p) => p.id === type);
-    if (i >= 0) project.customParts[i] = clone(fromUser); else project.customParts.push(clone(fromUser));
+    L.updateCustomPart(project, fromUser); // moves wires on renamed pins; wires on removed pins stay and show in the checks
   }
   function defOf(type) { return L.partDef(doc, type) || userLib.parts.find((p) => p.id === type) || null; }
 
@@ -2679,9 +2678,24 @@
       if (i >= 0) userLib.parts[i] = def; else userLib.parts.push(def);
       await PF.saveUserLibrary(userLib);
       // keep projects that already use it up to date
-      const j = project.customParts.findIndex((p) => p.id === def.id);
-      if (j >= 0) { pushHistory(); project.customParts[j] = clone(def); L.views(project).forEach((v) => L.pruneWires(v)); }
+      // wires on renamed pins move with them; only wires on pins that were taken away are removed
+      // (the builder warns about those first), and Ctrl+Z puts everything back
+      if (project.customParts.some((p) => p.id === def.id)) {
+        pushHistory();
+        const lost = L.updateCustomPart(project, def), gone = new Set(lost.map((x) => x.wire));
+        project.sheets.forEach((sh) => { for (let k = sh.wires.length - 1; k >= 0; k--) if (gone.has(sh.wires[k])) sh.wires.splice(k, 1); });
+        if (gone.size) setTimeout(() => toast(`${plural(gone.size, t('wire'))} ${t('removed from pins that are no longer on')} ${def.name}`, { label: t('Undo'), run: () => undo() }), 2700);
+      }
       buildLibrary(); commit();
+    },
+    /* Wires on each pin of a component type in the open project, for the builder's warning. */
+    pinUse(type) {
+      const use = {};
+      project.sheets.forEach((sh) => {
+        const ids = new Set(sh.parts.filter((p) => p.type === type).map((p) => p.id));
+        sh.wires.forEach((w) => [w.from, w.to].forEach((e) => { if (ids.has(e.part)) use[e.pin] = (use[e.pin] || 0) + 1; }));
+      });
+      return use;
     },
     async deleteComponent(id) {
       userLib.parts = userLib.parts.filter((p) => p.id !== id);

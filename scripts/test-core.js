@@ -373,4 +373,44 @@ assert.strictEqual(L.wireCode({ settings: { standard: 'sae' } }, { colour: 'brow
   assert.ok(L.templateList('electronics').length >= 2, 'electronics starter circuits');
 }
 
+// a custom component with real parts inside (relay and fuse box): trace, live test and fuse loads go through it
+{
+  const q = L.newDoc('inside'), v = L.view(q, 0);
+  q.customParts.push({ id: 'c_box', custom: true, cat: 'My components', name: 'Relay box', prefix: 'FB', w: 80, h: 80,
+    props: [{ k: 'f1', l: 'F1', d: '' }, { k: 'f2', l: 'F2', d: '' }],
+    pins: [{ id: 'B+', x: 0, y: 40 }, { id: 'F1', x: 80, y: 20 }, { id: 'K OUT', x: 80, y: 40 }, { id: 'K SW', x: 80, y: 60 }, { id: 'K GND', x: 80, y: 80 }],
+    shapes: [{ t: 'rect', x: 10, y: 0, width: 60, h: 80 }],
+    inside: { parts: [{ id: 'F1', type: 'fuse', props: { rating: '{f1}' } }, { id: 'F2', type: 'fuse', props: { rating: '{f2}' } }, { id: 'K', type: 'relay4' }],
+      links: [['B+', 'F1.1'], ['B+', 'F2.1'], ['F1.2', 'F1'], ['F2.2', 'K.30'], ['K.87', 'K OUT'], ['K.86', 'K SW'], ['K.85', 'K GND']] } });
+  const bat = L.addPart(v, 'battery', { x: 0, y: 0 }), box = L.addPart(v, 'c_box', { x: 100, y: 0, props: { f1: '5A', f2: '15A' } });
+  const sw = L.addPart(v, 'switch_spst', { x: 300, y: 0 }), la = L.addPart(v, 'lamp', { x: 400, y: 0, props: { watts: '55W' } }), lb = L.addPart(v, 'lamp', { x: 400, y: 100, props: { watts: '21W' } }), g = L.addPart(v, 'ground_chassis', { x: 500, y: 0 });
+  let wn = 0; const W = (a, ap, b, bp, gauge = '1.0') => v.wires.push({ id: 'iw' + (++wn), name: 'IW' + wn, from: { part: a.id, pin: ap }, to: { part: b.id, pin: bp }, colour: 'R', gauge, length: '1' });
+  W(bat, '+', box, 'B+', '6.0'); W(bat, '-', g, 'G', '6.0'); W(bat, '+', sw, '1'); W(sw, '2', box, 'K SW'); W(box, 'K GND', g, 'G');
+  W(box, 'K OUT', la, '1', '0.5'); W(la, '2', g, 'G'); W(box, 'F1', lb, '1'); W(lb, '2', g, 'G');
+  assert.deepStrictEqual(L.insideParts(v, box).parts.map((x) => x.label), [box.label + '/F1', box.label + '/F2', box.label + '/K'], 'inside parts take the box reference');
+  assert.deepStrictEqual([...L.simulate(q, {}).loads].sort(), [lb.id], 'spare fuse output is live, relay output is not');
+  const on = L.simulate(q, { [L.partKey(sw)]: 1 });
+  assert.ok(on.loads.has(la.id) && on.relays.has('relay4|' + box.label + '/K'), 'switch pulls the relay in the box and lights the lamp');
+  const sc = L.schedule(q), f2 = sc.fuses.find((f) => f.ref === box.label + '/F2');
+  assert.ok(f2 && f2.rating === 15 && f2.part === box.id && f2.loads.some((x) => x.ref === la.label), 'fuse inside the box carries the lamp load');
+  assert.ok(L.validate(q).some((c) => c.text.includes(box.label + '/F2 (15A) feeds IW6')), 'fuse inside the box is checked against the wire it feeds');
+}
+
+// editing a custom component keeps its circuit: wires follow renamed pins, only wires on removed pins are reported
+{
+  const q = L.newDoc('edit'), v = L.view(q, 0);
+  const d1 = { id: 'c_sw', custom: true, cat: 'My components', name: 'Panel', prefix: 'S', w: 60, h: 40, rev: 1, pins: [{ id: '1', x: 0, y: 20 }, { id: '2', x: 60, y: 20 }, { id: '3', x: 60, y: 40 }], shapes: [{ t: 'rect', x: 10, y: 0, width: 40, h: 40 }] };
+  L.updateCustomPart(q, d1);
+  const sp = L.addPart(v, 'c_sw', { x: 0, y: 0 }), la = L.addPart(v, 'lamp', { x: 200, y: 0 }), lb = L.addPart(v, 'lamp', { x: 200, y: 100 });
+  v.wires.push({ id: 'e1', name: 'E1', from: { part: sp.id, pin: '2' }, to: { part: la.id, pin: '1' } }, { id: 'e2', name: 'E2', from: { part: lb.id, pin: '1' }, to: { part: sp.id, pin: '3' } });
+  const d2 = { ...d1, rev: 2, pins: [{ id: 'IN', x: 0, y: 20 }, { id: 'OUT', x: 60, y: 20 }], renames: [{ rev: 2, map: { 1: 'IN', 2: 'OUT' } }] };
+  const lost = L.updateCustomPart(q, d2);
+  assert.strictEqual(v.wires[0].from.pin, 'OUT', 'wire follows the renamed pin');
+  assert.deepStrictEqual(lost.map((x) => x.wire.id), ['e2'], 'only the wire on the removed pin is reported');
+  // a later rename is applied once, even when the project is updated again
+  const d3 = { ...d2, rev: 3, pins: [{ id: 'IN', x: 0, y: 20 }, { id: '1', x: 60, y: 20 }], renames: [...d2.renames, { rev: 3, map: { OUT: '1' } }] };
+  L.updateCustomPart(q, d3); L.updateCustomPart(q, d3);
+  assert.strictEqual(v.wires[0].from.pin, '1', 'renames apply once, in order');
+}
+
 console.log(`ok: ${n} components, example project with ${s.sheets.length} sheets and ${L.wireList(s).length} wires`);
